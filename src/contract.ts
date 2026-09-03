@@ -142,10 +142,15 @@ export interface ResolvedPolicy {
  *
  * Backlog の書き込み系は form-urlencoded を取る。**添付（ファイルパート）はここに含めない** —
  * 添付は次段階で、ローカルファイルの検証を通した経路からしか載せられないようにする。
+ *
+ * **配列を含めない。** 借り物の `ApiClient` はフォームのスカラー配列を `TypeError` で弾く
+ * （通るのはファイルの配列だけ）。型で「書ける」と言って実行時に落ちる状態を作らないため、
+ * ここはスカラーだけにしてある。`notifiedUserId[]` のような配列が要るのは次段階なので、
+ * **そのとき上流を直すか回避するかを決める**（今決めても使わない）。
  */
 export type FormValue = string | number | boolean;
 
-export type FormFields = Readonly<Record<string, FormValue | readonly FormValue[]>>;
+export type FormFields = Readonly<Record<string, FormValue>>;
 
 /**
  * input 層が組み立てて api 層へ渡す、解決済みのリクエスト。
@@ -172,6 +177,16 @@ export class ScopeDeniedError extends Error {
     this.toolName = toolName;
     this.projectKey = projectKey;
   }
+}
+
+/**
+ * Backlog API の呼び出しが失敗した。
+ *
+ * **メッセージは第三者（Backlog サーバ）が書いた文字列を含む**ので、組み立てる側が
+ * `<untrusted>` で囲んでからこの型に載せる。元の例外は `cause` に残す。
+ */
+export class ApiFailureError extends Error {
+  override readonly name = 'ApiFailureError';
 }
 
 /** ポリシー記法の不備。起動時に投げて、サーバを立ち上げない。 */

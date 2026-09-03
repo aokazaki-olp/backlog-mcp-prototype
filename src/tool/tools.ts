@@ -4,11 +4,12 @@
  * @description MCP ツールの定義とハンドラ。input（検証・ポリシー判定・解決）→ api → output の3段
  */
 
-import { ScopeDeniedError, TOOL_NAMES, TOOL_SPECS } from '../contract.ts';
+import { ApiFailureError, ScopeDeniedError, TOOL_NAMES, TOOL_SPECS } from '../contract.ts';
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
 import { toProjectId, toProjectIds } from '../domain/masters.ts';
 import { limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
+import { toError } from '../shared/toError.ts';
 import type { ResolvedPolicy, ResolvedRequest, ToolName } from '../contract.ts';
 import type { BacklogGateway } from '../domain/gateway.ts';
 import type { Masters } from '../domain/masters.ts';
@@ -352,6 +353,32 @@ export const planToolCall = (
   }
 };
 
+/**
+ * gateway を呼び、失敗したら**下から来たメッセージを囲んで**投げ直す。
+ *
+ * `planToolCall` が投げるのはこちらが書いた文言（`ScopeDeniedError` 等）だが、
+ * `send` が投げるのは Backlog サーバが書いた文字列を含む（`Backlog API エラー: …`）。
+ * 課題本文と同じ untrusted なので、そのまま LLM へ返さない。
+ *
+ * **層で分けているので、エラー名の一覧を持たなくてよい** — この try の内側から
+ * 出てきたものは定義上すべて「下から来たもの」。
+ */
+const sendRequest = async (context: ToolContext, request: ResolvedRequest): Promise<unknown> => {
+  try {
+    return await context.gateway.send(request);
+  } catch (e) {
+    const original = toError(e);
+    const wrapped = wrapUntrusted(original.message, {
+      source: 'backlog:error',
+      maxLength: context.limits.maxTextLength,
+    });
+    // cause で元を残す（規約 §6.2）。監査ログと stderr には元の形で辿れる
+    throw new ApiFailureError(`Backlog API の呼び出しに失敗しました:\n${wrapped}`, {
+      cause: original,
+    });
+  }
+};
+
 /** I/O はここ1回だけ。input と output は `planToolCall` が持つ。 */
 const runTool = async (
   context: ToolContext,
@@ -359,7 +386,7 @@ const runTool = async (
   args: Record<string, unknown>,
 ): Promise<unknown> => {
   const { request, shape } = planToolCall(context, toolName, args);
-  return shape(await context.gateway.send(request));
+  return shape(await sendRequest(context, request));
 };
 
 // ============================================================================
