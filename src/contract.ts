@@ -183,6 +183,16 @@ export class ConfigError extends Error {
   override readonly name = 'ConfigError';
 }
 
+/**
+ * 起動時のマスタ解決の失敗。起動時に投げて、サーバを立ち上げない。
+ *
+ * `resolution` を名前に使わないのは、Backlog の「完了理由（resolutions）」と
+ * 語がぶつかるため（層をまたいで同じ語を違う意味で使わない）。
+ */
+export class MasterDataError extends Error {
+  override readonly name = 'MasterDataError';
+}
+
 /** Backlog のスペースが載るドメイン。一次情報ミラーで確認した閉じた3値。 */
 export const BACKLOG_DOMAINS = ['backlog.jp', 'backlog.com', 'backlogtool.com'] as const;
 
