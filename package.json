@@ -1,0 +1,31 @@
+{
+  "name": "backlog-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test",
+    "check": "npm run lint && npm run format && npm run typecheck && npm run test",
+    "verify:rules": "bash scripts/verify-rules.sh",
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "got": "^14.6.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.13.3",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.69.0"
+  }
+}

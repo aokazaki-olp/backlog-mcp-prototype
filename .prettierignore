@@ -1,0 +1,21 @@
+# 規約 §8.3「借り物・生成物は lint / typecheck の対象から外す」
+# 抑制コメントは借り物には使えない（同期や再生成で上書きされる）ため、ここで範囲を切る。
+
+node_modules/
+dist/
+
+# 生成物 — Backlog API ドキュメントのミラー（tools/backlog-docs で再生成する）
+docs/reference/
+
+# 借り物 — 正本は aokazaki-olp/coding-rules
+CODING_RULES.md
+
+# 借り物 — スキルの正本は .agents/skills（さらに元は別リポジトリ）
+.agents/
+.claude/
+
+# 借り物 — ミラー生成スクリプト
+tools/
+
+# 借り物 — 正本は aokazaki-olp/libraries（ローカル編集禁止）
+src/libs/
