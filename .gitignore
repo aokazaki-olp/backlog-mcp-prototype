@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.log
+
+# ローカル設定・秘密
+.env
+.env.*
+backlog-policy.local.json
+
+# 監査ログの既定の出力先
+audit/

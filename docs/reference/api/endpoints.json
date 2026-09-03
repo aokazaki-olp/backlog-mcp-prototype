@@ -1,0 +1,5806 @@
+{
+  "source": "https://developer.nulab.com/ja/docs/backlog/",
+  "language": "ja",
+  "fetchedAt": "2026-08-30",
+  "apiVersion": "v2",
+  "count": 152,
+  "endpoints": [
+    {
+      "slug": "get-space",
+      "title": "スペース情報の取得",
+      "method": "GET",
+      "path": "/api/v2/space",
+      "category": "space",
+      "role": "すべての権限",
+      "summary": "スペースの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-space/",
+      "file": "v2/get-space.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-recent-updates",
+      "title": "最近の更新の取得",
+      "method": "GET",
+      "path": "/api/v2/space/activities",
+      "category": "space",
+      "role": "すべての権限",
+      "summary": "スペース上で行われた最近の更新の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-recent-updates/",
+      "file": "v2/get-recent-updates.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "activityTypeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "type(1-49)"
+          },
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "post-attachment-file",
+      "title": "添付ファイルの送信",
+      "method": "POST",
+      "path": "/api/v2/space/attachment",
+      "category": "space",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題やコメント、Wikiにファイルを添付するために、Backlogスペースにファイルをアップロードします。アップロードが成功すると、添付ファイルのIDが返されます。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/post-attachment-file/",
+      "file": "v2/post-attachment-file.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "file",
+            "type": "",
+            "required": true,
+            "multiple": false,
+            "description": "添付するファイル"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-space-disk-usage",
+      "title": "スペースの容量使用状況の取得",
+      "method": "GET",
+      "path": "/api/v2/space/diskUsage",
+      "category": "space",
+      "role": "管理者",
+      "summary": "スペースの容量使用状況の情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-space-disk-usage/",
+      "file": "v2/get-space-disk-usage.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-space-logo",
+      "title": "スペースアイコン画像の取得",
+      "method": "GET",
+      "path": "/api/v2/space/image",
+      "category": "space",
+      "role": "すべての権限",
+      "summary": "スペースのアイコン画像を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-space-logo/",
+      "file": "v2/get-space-logo.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-licence",
+      "title": "ライセンス情報の取得",
+      "method": "GET",
+      "path": "/api/v2/space/licence",
+      "category": "space",
+      "role": "すべての権限",
+      "summary": "ライセンスの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-licence/",
+      "file": "v2/get-licence.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-space-notification",
+      "title": "スペースのお知らせの取得",
+      "method": "GET",
+      "path": "/api/v2/space/notification",
+      "category": "space",
+      "role": "すべての権限",
+      "summary": "スペースのお知らせの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-space-notification/",
+      "file": "v2/get-space-notification.md",
+      "parameters": {}
+    },
+    {
+      "slug": "update-space-notification",
+      "title": "スペースのお知らせの更新",
+      "method": "PUT",
+      "path": "/api/v2/space/notification",
+      "category": "space",
+      "role": "管理者",
+      "summary": "スペースのお知らせの情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-space-notification/",
+      "file": "v2/update-space-notification.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-activity",
+      "title": "アクティビティの取得",
+      "method": "GET",
+      "path": "/api/v2/activities/:activityId",
+      "category": "activities",
+      "role": "すべての権限",
+      "summary": "アクティビティの詳細を返します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-activity/",
+      "file": "v2/get-activity.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-rate-limit",
+      "title": "レート制限情報の取得",
+      "method": "GET",
+      "path": "/api/v2/rateLimit",
+      "category": "rateLimit",
+      "role": "すべての権限",
+      "summary": "使用中のAPIキーに対応するユーザーに対して、現在設定されているレート制限に関する情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-rate-limit/",
+      "file": "v2/get-rate-limit.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-user-list",
+      "title": "ユーザー一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users",
+      "category": "users",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "スペースのユーザーの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-user-list/",
+      "file": "v2/get-user-list.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-user",
+      "title": "ユーザー情報の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ユーザー情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-user/",
+      "file": "v2/get-user.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-user-recent-updates",
+      "title": "ユーザーの最近の活動の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/activities",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ユーザーの最近の活動の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-user-recent-updates/",
+      "file": "v2/get-user-recent-updates.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "activityTypeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "type(1-17)"
+          },
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-user-icon",
+      "title": "ユーザーアイコンの取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/icon",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ユーザーのアイコン画像を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-user-icon/",
+      "file": "v2/get-user-icon.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-received-star-list",
+      "title": "ユーザーの受け取ったスター一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/stars",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ユーザーの受け取ったスターの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-received-star-list/",
+      "file": "v2/get-received-star-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-user-received-stars",
+      "title": "ユーザーの受け取ったスターの数の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/stars/count",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ユーザーの受け取ったスターの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-user-received-stars/",
+      "file": "v2/count-user-received-stars.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "since",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "指定した日付以降のスターをカウント (yyyy-MM-dd)"
+          },
+          {
+            "name": "until",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "指定した日付以前のスターをカウント (yyyy-MM-dd)"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-watching-list",
+      "title": "ウォッチ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/watchings",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ウォッチの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-watching-list/",
+      "file": "v2/get-watching-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチ一覧のソートに使用する属性名 ”created\" \"updated\" \"issueUpdated” 指定が無い場合は”issueUpdated”"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "resourceAlreadyRead",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチしている課題の詳細を既読かどうか。trueの場合は既読のウォッチ、falseの場合は未読のウォッチ、指定しない場合は両方のウォッチを返します。指定が無い場合は両方"
+          },
+          {
+            "name": "issueId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-watching",
+      "title": "ウォッチ数の取得",
+      "method": "GET",
+      "path": "/api/v2/users/:userId/watchings/count",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "ウォッチの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-watching/",
+      "file": "v2/count-watching.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザーのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "resourceAlreadyRead",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "既読かどうか。trueの場合は既読のウォッチ、falseの場合は未読のウォッチ、指定しない場合は両方のウォッチを返します。指定が無い場合は両方"
+          },
+          {
+            "name": "alreadyRead",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチメニューの一覧表示後に更新されたウォッチの件数を返します。trueの場合はウォッチメニューを表示した後に更新されていない(既読状態の)件数を返します。falseの場合はウォッチメニューを表示した後に更新された(未読状態の)ウォッチの件数を返します。指定が無い場合は両方を合わせた件数を返します。resourceAlreadyReadが指定してある場合、alreadyReadは使用されません。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-own-user",
+      "title": "認証ユーザー情報の取得",
+      "method": "GET",
+      "path": "/api/v2/users/myself",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "APIとの認証に使用しているユーザーの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-own-user/",
+      "file": "v2/get-own-user.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-list-of-recently-viewed-issues",
+      "title": "自分が最近見た課題一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users/myself/recentlyViewedIssues",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "APIとの認証に使用しているユーザーが最近見た課題の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-recently-viewed-issues/",
+      "file": "v2/get-list-of-recently-viewed-issues.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-recently-viewed-issue",
+      "title": "自分が最近見た課題の追加",
+      "method": "POST",
+      "path": "/api/v2/users/myself/recentlyViewedIssues",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "APIとの認証に使用しているユーザーが最近見た課題を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-recently-viewed-issue/",
+      "file": "v2/add-recently-viewed-issue.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-recently-viewed-projects",
+      "title": "自分が最近見たプロジェクト一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users/myself/recentlyViewedProjects",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "APIとの認証に使用しているユーザーが最近見たプロジェクトの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-recently-viewed-projects/",
+      "file": "v2/get-list-of-recently-viewed-projects.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-recently-viewed-wikis",
+      "title": "自分が最近見たWiki一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/users/myself/recentlyViewedWikis",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-recently-viewed-wikis/",
+      "file": "v2/get-list-of-recently-viewed-wikis.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-recently-viewed-wiki",
+      "title": "自分が最近見たWikiの追加",
+      "method": "POST",
+      "path": "/api/v2/users/myself/recentlyViewedWikis",
+      "category": "users",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-recently-viewed-wiki/",
+      "file": "v2/add-recently-viewed-wiki.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "WikiページのId"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-teams",
+      "title": "チーム一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/teams",
+      "category": "teams",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "チームの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-teams/",
+      "file": "v2/get-list-of-teams.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-team",
+      "title": "チーム情報の取得",
+      "method": "GET",
+      "path": "/api/v2/teams/:teamId",
+      "category": "teams",
+      "role": "管理者",
+      "summary": "チームの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-team/",
+      "file": "v2/get-team.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "teamId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "チームのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-team-icon",
+      "title": "チームアイコンの取得",
+      "method": "GET",
+      "path": "/api/v2/teams/:teamId/icon",
+      "category": "teams",
+      "role": "すべての権限",
+      "summary": "チームアイコン画像を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-team-icon/",
+      "file": "v2/get-team-icon.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "teamId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "チームのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-list",
+      "title": "プロジェクト一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-list/",
+      "file": "v2/get-project-list.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "archived",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "省略された場合は全てのプロジェクト、falseの場合はアーカイブされていないプロジェクト、trueの場合はアーカイブされたプロジェクトを返します。"
+          },
+          {
+            "name": "all",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ユーザが管理者権限の場合のみ有効なパラメータです。trueの場合はすべてのプロジェクト、falseの場合は参加しているプロジェクトのみを返します。初期値はfalse。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-project",
+      "title": "プロジェクトの追加",
+      "method": "POST",
+      "path": "/api/v2/projects",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "新しいプロジェクトを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-project/",
+      "file": "v2/add-project.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクト名"
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクトキー(半角英大文字と半角数字とアンダースコアが使用できます)"
+          },
+          {
+            "name": "chartEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "チャートを使用するかどうか"
+          },
+          {
+            "name": "useResolvedForChart",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "「処理済み」以降を「完了」とみなすどうか"
+          },
+          {
+            "name": "subtaskingEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題を使用するかどうか"
+          },
+          {
+            "name": "grandchildIssueEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題に3階層目を使用するかどうか `subtaskingEnabled` が `true` の場合のみ有効です。"
+          },
+          {
+            "name": "projectLeaderCanEditProjectLeader",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクト管理者も他のプロジェクト管理者を指定可能にする"
+          },
+          {
+            "name": "useWiki",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiを使用するかどうか"
+          },
+          {
+            "name": "useDocument",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ドキュメントを使用するかどうか"
+          },
+          {
+            "name": "useFileSharing",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルを使用するかどうか"
+          },
+          {
+            "name": "useWikiTreeView",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiツリー表示を有効にするかどうか"
+          },
+          {
+            "name": "useSubversion",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Subversionを使用するかどうか"
+          },
+          {
+            "name": "useGit",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Gitを使用するかどうか"
+          },
+          {
+            "name": "useOriginalImageSizeAtWiki",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiの画像をオリジナルのサイズで表示するかどうか"
+          },
+          {
+            "name": "textFormattingRule",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "テキスト整形のルール backlog または markdown"
+          },
+          {
+            "name": "useDevAttributes",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "優先度、マイルストーン、発生バージョンを使用するかどうか"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-project",
+      "title": "プロジェクトの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-project/",
+      "file": "v2/delete-project.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project",
+      "title": "プロジェクト情報の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project/",
+      "file": "v2/get-project.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-project",
+      "title": "プロジェクト情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトの情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-project/",
+      "file": "v2/update-project.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクト名"
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトキー"
+          },
+          {
+            "name": "chartEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "チャートを使用するかどうか"
+          },
+          {
+            "name": "useResolvedForChart",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "「処理済み」以降を「完了」とみなすどうか"
+          },
+          {
+            "name": "subtaskingEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題を使用するかどうか"
+          },
+          {
+            "name": "grandchildIssueEnabled",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題に3階層目を使用するかどうか `subtaskingEnabled` が `true` の場合のみ有効です。"
+          },
+          {
+            "name": "projectLeaderCanEditProjectLeader",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクト管理者も他のプロジェクト管理者を指定可能にする"
+          },
+          {
+            "name": "useWiki",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiを使用するかどうか"
+          },
+          {
+            "name": "useDocument",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ドキュメントを使用するかどうか"
+          },
+          {
+            "name": "useFileSharing",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルを使用するかどうか"
+          },
+          {
+            "name": "useWikiTreeView",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiツリー表示を有効にするかどうか"
+          },
+          {
+            "name": "useSubversion",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Subversionを使用するかどうか"
+          },
+          {
+            "name": "useGit",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Gitを使用するかどうか"
+          },
+          {
+            "name": "useOriginalImageSizeAtWiki",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "Wikiの画像をオリジナルのサイズで表示するかどうか"
+          },
+          {
+            "name": "textFormattingRule",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "テキスト整形のルール backlog または markdown"
+          },
+          {
+            "name": "archived",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトの一覧に表示するかどうか"
+          },
+          {
+            "name": "useDevAttributes",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "優先度、マイルストーン、発生バージョンを使用するかどうか"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-recent-updates",
+      "title": "プロジェクトの最近の活動の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/activities",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクト上の最近の活動の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-recent-updates/",
+      "file": "v2/get-project-recent-updates.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "query": [
+          {
+            "name": "activityTypeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "type(1-49)"
+          },
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-project-administrator",
+      "title": "プロジェクト管理者の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/administrators",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトユーザーからプロジェクト管理者権限を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-project-administrator/",
+      "file": "v2/delete-project-administrator.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "削除するユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-project-administrators",
+      "title": "プロジェクト管理者一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/administrators",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクト管理者に設定されているユーザーの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-project-administrators/",
+      "file": "v2/get-list-of-project-administrators.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-project-administrator",
+      "title": "プロジェクト管理者の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/administrators",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトユーザーにプロジェクト管理者権限を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-project-administrator/",
+      "file": "v2/add-project-administrator.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "追加するユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-category-list",
+      "title": "カテゴリー一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/categories",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトに登録されているカテゴリーの一覧を返します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-category-list/",
+      "file": "v2/get-category-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-category",
+      "title": "カテゴリーの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/categories",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プロジェクトにカテゴリーを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-category/",
+      "file": "v2/add-category.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "カテゴリーの名前"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-category",
+      "title": "カテゴリーの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/categories/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "カテゴリーを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-category/",
+      "file": "v2/delete-category.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カテゴリーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-category",
+      "title": "カテゴリー情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/categories/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "カテゴリーの情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-category/",
+      "file": "v2/update-category.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カテゴリーのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "カテゴリーの名前"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-custom-field-list",
+      "title": "カスタム属性一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "参加しているプロジェクトのカスタム属性一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-custom-field-list/",
+      "file": "v2/get-custom-field-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー 自分が参加しているプロジェクトの一覧はプロジェクト一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-custom-field",
+      "title": "カスタム属性の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトに新しいカスタム属性を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-custom-field/",
+      "file": "v2/add-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "typeId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "カスタム属性の形式 1: 文字列 2: 文章 3: 数値 4: 日付 5: 単一リスト 6: 複数リスト 7: チェックボックス 8: ラジオ"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "カスタム属性の名前"
+          },
+          {
+            "name": "applicableIssueTypes[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "カスタム属性を有効にする種別ID 空の場合、すべての課題種別で有効"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性の説明"
+          },
+          {
+            "name": "required",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "必須な属性とする場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-custom-field",
+      "title": "カスタム属性の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields/:id",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "カスタム属性を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-custom-field/",
+      "file": "v2/delete-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性のID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-custom-field",
+      "title": "カスタム属性の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields/:id",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "カスタム属性を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-custom-field/",
+      "file": "v2/update-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性の名前"
+          },
+          {
+            "name": "applicableIssueTypes[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "カスタム属性を有効にする種別ID 空の場合、すべての課題種別で有効"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性の説明"
+          },
+          {
+            "name": "required",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "必須な属性とする場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-list-item-for-list-type-custom-field",
+      "title": "選択リストカスタム属性のリスト項目の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields/:id/items",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "自分が参加しているプロジェクトのカスタム属性（選択リスト）に、新しい選択肢を追加します。 「課題の追加/編集時に選択肢を追加できる」の設定が無効な場合は管理者権限のユーザーのみ呼び出せます。 指定されたカスタム属性が選択リスト形式でない場合はエラーになります。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-list-item-for-list-type-custom-field/",
+      "file": "v2/add-list-item-for-list-type-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー 自分が参加しているプロジェクトの一覧はプロジェクト一覧の取得から取得できます。"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性のID カスタム属性のIDは「カスタム属性一覧の取得」から取得できます。"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "追加するリスト項目の名前"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-list-item-for-list-type-custom-field",
+      "title": "選択リストカスタム属性のリスト項目の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields/:id/items/:itemId",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "選択リスト形式のカスタム属性のリスト項目を削除します。 指定されたカスタム属性が選択リスト形式でない場合はエラーになります。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-list-item-for-list-type-custom-field/",
+      "file": "v2/delete-list-item-for-list-type-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性のID"
+          },
+          {
+            "name": "itemId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "リスト項目のID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-list-item-for-list-type-custom-field",
+      "title": "選択リストカスタム属性のリスト項目の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/customFields/:id/items/:itemId",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "選択リスト形式のカスタム属性のリスト項目を更新します。 指定されたカスタム属性が選択リスト形式でない場合はエラーになります。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-list-item-for-list-type-custom-field/",
+      "file": "v2/update-list-item-for-list-type-custom-field.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "カスタム属性のID"
+          },
+          {
+            "name": "itemId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "リスト項目のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リスト項目の名前"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-disk-usage",
+      "title": "プロジェクトの容量使用状況の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/diskUsage",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトの容量使用状況の情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-disk-usage/",
+      "file": "v2/get-project-disk-usage.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-file",
+      "title": "共有ファイルのダウンロード",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/files/:sharedFileId",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "共有ファイルを取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-file/",
+      "file": "v2/get-file.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-shared-files",
+      "title": "共有ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/files/metadata/:path",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "共有ファイルの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-shared-files/",
+      "file": "v2/get-list-of-shared-files.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "ディレクトリのパス"
+          }
+        ],
+        "query": [
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-1000) 指定が無い場合は1000"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-icon",
+      "title": "プロジェクトアイコンの取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/image",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトのアイコン画像を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-icon/",
+      "file": "v2/get-project-icon.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-issue-type-list",
+      "title": "種別一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/issueTypes",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "参加しているプロジェクトの課題種別一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-issue-type-list/",
+      "file": "v2/get-issue-type-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー 自分が参加しているプロジェクトの一覧はプロジェクト一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-issue-type",
+      "title": "種別の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/issueTypes",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プロジェクトに種別を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-issue-type/",
+      "file": "v2/add-issue-type.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "種別の名前"
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "種別の背景色：以下から指定 ”#e30000\" \"#990000\" \"#934981\" \"#814fbc\" \"#2779ca\" \"#007e9a\" \"#7ea800\" \"#ff9200\" \"#ff3265\" \"#666665”"
+          },
+          {
+            "name": "templateSummary",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題テンプレートの件名"
+          },
+          {
+            "name": "templateDescription",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題テンプレートの詳細"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-issue-type",
+      "title": "種別の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/issueTypes/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プロジェクトから種別を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-issue-type/",
+      "file": "v2/delete-issue-type.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "種別のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "substituteIssueTypeId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "紐づく課題を付け替える先の種別のID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-issue-type",
+      "title": "種別情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/issueTypes/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "種別の情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-issue-type/",
+      "file": "v2/update-issue-type.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "種別のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "種別の名前"
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "種別の背景色"
+          },
+          {
+            "name": "templateSummary",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題テンプレートの件名"
+          },
+          {
+            "name": "templateDescription",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題テンプレートの詳細"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-status-list-of-project",
+      "title": "プロジェクトの状態一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/statuses",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクト固有の課題に設定できる状態一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-status-list-of-project/",
+      "file": "v2/get-status-list-of-project.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "Project ID or Project Key"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-status",
+      "title": "状態の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/statuses",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトに状態を追加します。 1プロジェクトにつき8個まで状態を追加できます。 標準の4つの状態と合わせると、合計12個の状態を設定できます。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-status/",
+      "file": "v2/add-status.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "状態の名前"
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "状態の背景色：以下から指定 ”#ea2c00\" \"#e87758\" \"#e07b9a\" \"#868cb7\" \"#3b9dbd\" \"#4caf93\" \"#b0be3c\" \"#eda62a\" \"#f42858\" \"#393939”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-status",
+      "title": "状態の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/statuses/:id",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "プロジェクトから状態を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-status/",
+      "file": "v2/delete-status.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "状態のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "substituteStatusId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "紐づく課題を付け替える先の状態のID。 削除対象の状態が設定されている課題がある場合、このパラメーターで指定した状態へ一括変更します。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-status",
+      "title": "状態情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/statuses/:id",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "追加した状態の情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-status/",
+      "file": "v2/update-status.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "状態のID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "状態の名前"
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "状態の背景色；以下から指定 ”#ea2c00\" \"#e87758\" \"#e07b9a\" \"#868cb7\" \"#3b9dbd\" \"#4caf93\" \"#b0be3c\" \"#eda62a\" \"#f42858\" \"#393939”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-order-of-status",
+      "title": "状態の並び替え",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/statuses/updateDisplayOrder",
+      "category": "projects",
+      "role": "管理者",
+      "summary": "状態の表示順を変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-order-of-status/",
+      "file": "v2/update-order-of-status.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "statusId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "表示順に並べた、状態のIDのリスト。そのプロジェクトで使える全ての状態を渡してください。表示順には以下の制限があります ・未対応は先頭にあること ・完了は末尾にあること ・処理中は処理済みよりも前にあること"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-project-team",
+      "title": "プロジェクトチームの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/teams",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトからチームを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-project-team/",
+      "file": "v2/delete-project-team.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "teamId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "削除するチームのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-team-list",
+      "title": "プロジェクトチーム一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/teams",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトのチームの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-team-list/",
+      "file": "v2/get-project-team-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-project-team",
+      "title": "プロジェクトチームの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/teams",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトにチームを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-project-team/",
+      "file": "v2/add-project-team.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "teamId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "追加するチームのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-project-user",
+      "title": "プロジェクトユーザーの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/users",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトからユーザーを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-project-user/",
+      "file": "v2/delete-project-user.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "削除するユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-project-user-list",
+      "title": "プロジェクトユーザー一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/users",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトのユーザーの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-project-user-list/",
+      "file": "v2/get-project-user-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "query": [
+          {
+            "name": "excludeGroupMembers",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "グループを介してプロジェクトに参加しているメンバーを除く"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-project-user",
+      "title": "プロジェクトユーザーの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/users",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトにユーザーを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-project-user/",
+      "file": "v2/add-project-user.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "userId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "追加するユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-version-milestone-list",
+      "title": "バージョン(マイルストーン)一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/versions",
+      "category": "projects",
+      "role": "すべての権限",
+      "summary": "プロジェクトに登録されているバージョン(マイルストーン)の一覧を返します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-version-milestone-list/",
+      "file": "v2/get-version-milestone-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-version-milestone",
+      "title": "バージョン(マイルストーン)の追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/versions",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プロジェクトにバージョン(マイルストーン)を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-version-milestone/",
+      "file": "v2/add-version-milestone.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "バージョンの名前"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンの説明"
+          },
+          {
+            "name": "startDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンの開始日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "releaseDueDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンのリリース予定日 (yyyy-MM-dd)"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-version",
+      "title": "バージョン(マイルストーン)の削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/versions/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "バージョン(マイルストーン)を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-version/",
+      "file": "v2/delete-version.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-version-milestone",
+      "title": "バージョン(マイルストーン)情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/versions/:id",
+      "category": "projects",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "バージョン(マイルストーン)の情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-version-milestone/",
+      "file": "v2/update-version-milestone.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "バージョンの名前"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンの説明"
+          },
+          {
+            "name": "startDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンの開始日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "releaseDueDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "バージョンのリリース予定日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "archived",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトホームに表示しない場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-webhooks",
+      "title": "Webhook一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/webhooks",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトに登録されているWebhookの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-webhooks/",
+      "file": "v2/get-list-of-webhooks.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・プロジェクトのID ・プロジェクトキー プロジェクトのIDとプロジェクトキーはプロジェクト一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-webhook",
+      "title": "Webhookの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/webhooks",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトにWebhookを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-webhook/",
+      "file": "v2/add-webhook.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・プロジェクトのID ・プロジェクトキー プロジェクトのIDとプロジェクトキーはプロジェクト一覧の取得から取得できます。"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "Webhookの名前"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "Webhookの説明"
+          },
+          {
+            "name": "hookUrl",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "イベントの通知先のURL"
+          },
+          {
+            "name": "allEvent",
+            "type": "boolean",
+            "required": true,
+            "multiple": false,
+            "description": "全てのイベントを通知するかどうか"
+          },
+          {
+            "name": "activityTypeIds[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "通知するイベントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-webhook",
+      "title": "Webhookの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/webhooks/:webhookId",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトに登録されているWebhookを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-webhook/",
+      "file": "v2/delete-webhook.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・プロジェクトのID ・プロジェクトキー プロジェクトのIDとプロジェクトキーはプロジェクト一覧の取得から取得できます。"
+          },
+          {
+            "name": "webhookId",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "WebhookのID。 WebhookのIDはWebhook一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-webhook",
+      "title": "Webhookの取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/webhooks/:webhookId",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトに登録されているWebhookの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-webhook/",
+      "file": "v2/get-webhook.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・プロジェクトのID ・プロジェクトキー プロジェクトのIDとプロジェクトキーはプロジェクト一覧の取得から取得できます。"
+          },
+          {
+            "name": "webhookId",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "WebhookのID。 WebhookのIDはWebhook一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-webhook",
+      "title": "Webhookの更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/webhooks/:webhookId",
+      "category": "projects",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "プロジェクトに登録されているWebhookの設定を更新します。リクエストパラメーターで指定した項目のみが更新されます。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-webhook/",
+      "file": "v2/update-webhook.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・プロジェクトのID ・プロジェクトキー プロジェクトのIDとプロジェクトキーはプロジェクト一覧の取得から取得できます。"
+          },
+          {
+            "name": "webhookId",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "WebhookのID。 WebhookのIDはWebhook一覧の取得から取得できます。"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "Webhookの名前"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "Webhookの説明"
+          },
+          {
+            "name": "hookUrl",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "イベントの通知先のURL"
+          },
+          {
+            "name": "allEvent",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "全てのイベントを通知するかどうか"
+          },
+          {
+            "name": "activityTypeIds[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "通知するイベントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-issue-list",
+      "title": "課題一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "参加しているプロジェクトから課題を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-issue-list/",
+      "file": "v2/get-issue-list.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "プロジェクトのID。 プロジェクトのIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "issueTypeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の種別のID。 種別のIDは種別一覧の取得から取得できます。"
+          },
+          {
+            "name": "categoryId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のカテゴリーのID。 カテゴリーのIDはカテゴリー一覧の取得から取得できます。"
+          },
+          {
+            "name": "versionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のバージョンのID。 バージョンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "milestoneId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のマイルストーンのID。 マイルストーンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "statusId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の状態のID。 状態のIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "priorityId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の優先度のID。 優先度のIDは優先度一覧の取得から取得できます。"
+          },
+          {
+            "name": "assigneeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の担当者のユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "createdUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の登録者のユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "resolutionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の完了理由のID。 完了理由のIDは完了理由一覧の取得から取得できます。"
+          },
+          {
+            "name": "parentChild",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題の条件。指定が無い場合は0が使われます。 ・0: すべて ・1: 子課題以外 ・2: 2階層または3階層 ・3: 階層なし ・4: 子課題あり ・5: 3階層目 ・6: 2階層目 ・7: 最上位 ・8: 3階層以外 ・9: 最上位（3階層）以外 ・10: 最下層"
+          },
+          {
+            "name": "attachment",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "課題が添付ファイルを含むかどうか。 ・true：添付ファイルを含む課題 ・false：添付ファイルを含まない課題"
+          },
+          {
+            "name": "sharedFile",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "課題が共有ファイルを含むかどうか。 ・true：共有ファイルを含む課題 ・false：共有ファイルを含まない課題"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題一覧の並び順に使用する属性。 ・issueType ・category ・version ・milestone ・summary ・status ・priority ・attachment ・sharedFile ・created ・createdUser ・updated ・updatedUser ・assignee ・startDate ・dueDate ・estimatedHours ・actualHours ・childIssue ・customField_${id} カスタム属性のIDはカスタム属性一覧の取得から取得できます。"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題一覧の並び順。指定が無い場合はdescが使われます。 ・asc: 昇順 ・desc: 降順"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の取得開始位置。0以上の整数を指定してください。"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の件数の上限。1〜100の範囲で指定してください。指定が無い場合は20が使われます。"
+          },
+          {
+            "name": "createdSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の登録日の期間の開始（yyyy-MM-dd）"
+          },
+          {
+            "name": "createdUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の登録日の期間の終了（yyyy-MM-dd）"
+          },
+          {
+            "name": "updatedSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の更新日の期間の開始（yyyy-MM-dd）"
+          },
+          {
+            "name": "updatedUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の更新日の期間の終了（yyyy-MM-dd）"
+          },
+          {
+            "name": "startDateSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の開始日の期間の開始（yyyy-MM-dd）"
+          },
+          {
+            "name": "startDateUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の開始日の期間の終了（yyyy-MM-dd）"
+          },
+          {
+            "name": "dueDateSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の期限日の期間の開始（yyyy-MM-dd）"
+          },
+          {
+            "name": "dueDateUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の期限日の期間の終了（yyyy-MM-dd）"
+          },
+          {
+            "name": "hasDueDate",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "falseを指定すると、期限日が設定されていない課題を返します。trueの指定はサポートされておらず、エラーが返されます。"
+          },
+          {
+            "name": "id[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のID。 課題のIDは課題情報の取得から取得できます。"
+          },
+          {
+            "name": "parentIssueId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の親課題のID。 課題のIDは課題情報の取得から取得できます。"
+          },
+          {
+            "name": "keyword",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "検索キーワード"
+          },
+          {
+            "name": "expand[]",
+            "type": "string",
+            "required": false,
+            "multiple": true,
+            "description": "拡張フィールドの指定。 ・`childIssueSummary`: 直下の子課題の総件数（`total`）および完了件数（`closed`）を `childIssueSummary` オブジェクトとしてレスポンスに含めます。省略時はレスポンスに含まれません。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-issue",
+      "title": "課題の追加",
+      "method": "POST",
+      "path": "/api/v2/issues",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "参加しているプロジェクトに新しい課題を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-issue/",
+      "file": "v2/add-issue.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "projectId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "課題を登録するプロジェクトのID。 プロジェクトのIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "課題の件名"
+          },
+          {
+            "name": "parentIssueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の親課題のID。 課題のIDは課題情報の取得から取得できます。"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の詳細。メンション記法が使えます。"
+          },
+          {
+            "name": "startDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の開始日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "dueDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の期限日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "estimatedHours",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の予定時間"
+          },
+          {
+            "name": "actualHours",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の実績時間"
+          },
+          {
+            "name": "issueTypeId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "課題の種別のID。 課題種別のIDは種別一覧の取得から取得できます。"
+          },
+          {
+            "name": "categoryId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のカテゴリーのID。 カテゴリーのIDはカテゴリー一覧の取得から取得できます。"
+          },
+          {
+            "name": "versionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のバージョンのID。 バージョンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "milestoneId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のマイルストーンのID。 マイルストーンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "priorityId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "課題の優先度のID。 優先度のIDは優先度一覧の取得から取得できます。"
+          },
+          {
+            "name": "assigneeId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の担当者のユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の追加の通知を受け取るユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイル送信が返すID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-issue",
+      "title": "課題の削除",
+      "method": "DELETE",
+      "path": "/api/v2/issues/:issueIdOrKey",
+      "category": "issues",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "参加しているプロジェクトの課題を削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-issue/",
+      "file": "v2/delete-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-issue",
+      "title": "課題情報の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "参加しているプロジェクトから課題の情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-issue/",
+      "file": "v2/get-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-issue",
+      "title": "課題情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/issues/:issueIdOrKey",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "参加しているプロジェクトの課題を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-issue/",
+      "file": "v2/update-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          }
+        ],
+        "request": [
+          {
+            "name": "summary",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の件名"
+          },
+          {
+            "name": "parentIssueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の親課題のID。 課題のIDは課題情報の取得から取得できます。"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の詳細。メンション記法が使えます。"
+          },
+          {
+            "name": "statusId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の状態のID。 状態のIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "resolutionId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の完了理由のID。 完了理由のIDは完了理由一覧の取得から取得できます。"
+          },
+          {
+            "name": "startDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の開始日（yyyy-MM-dd）"
+          },
+          {
+            "name": "dueDate",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題の期限日（yyyy-MM-dd）"
+          },
+          {
+            "name": "estimatedHours",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の予定時間"
+          },
+          {
+            "name": "actualHours",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の実績時間"
+          },
+          {
+            "name": "issueTypeId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の種別のID。 種別のIDは種別一覧の取得から取得できます。"
+          },
+          {
+            "name": "categoryId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のカテゴリーのID。 カテゴリーのIDはカテゴリー一覧の取得から取得できます。"
+          },
+          {
+            "name": "versionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のバージョンのID。 バージョンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "milestoneId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のマイルストーンのID。 バージョンのIDはバージョン(マイルストーン)一覧の取得から取得できます。"
+          },
+          {
+            "name": "priorityId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の優先度のID。 優先度のIDは優先度一覧の取得から取得できます。"
+          },
+          {
+            "name": "assigneeId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題の担当者のユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の追加の通知を受け取るユーザーのID。 ユーザーのIDはプロジェクトユーザー一覧の取得から取得できます。"
+          },
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイル送信が返すID"
+          },
+          {
+            "name": "comment",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "コメント。メンション記法が使えます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-issue-attachments",
+      "title": "課題添付ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/attachments",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題の添付ファイルの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-issue-attachments/",
+      "file": "v2/get-list-of-issue-attachments.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-issue-attachment",
+      "title": "課題添付ファイルの削除",
+      "method": "DELETE",
+      "path": "/api/v2/issues/:issueIdOrKey/attachments/:attachmentId",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "課題の添付ファイルを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-issue-attachment/",
+      "file": "v2/delete-issue-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-issue-attachment",
+      "title": "課題添付ファイルのダウンロード",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/attachments/:attachmentId",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題の添付ファイルをダウンロードします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-issue-attachment/",
+      "file": "v2/get-issue-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-comment-list",
+      "title": "課題コメントの取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/comments",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題に登録されているコメントの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-comment-list/",
+      "file": "v2/get-comment-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ],
+        "query": [
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-comment",
+      "title": "課題コメントの追加",
+      "method": "POST",
+      "path": "/api/v2/issues/:issueIdOrKey/comments",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題に新しいコメントを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-comment/",
+      "file": "v2/add-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ],
+        "request": [
+          {
+            "name": "content",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "コメントの本文。メンション記法が使えます。"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "コメント登録の通知を受け取るユーザーID"
+          },
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイルの送信APIが返すID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-comment",
+      "title": "課題コメントの削除",
+      "method": "DELETE",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/:commentId",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題コメントを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-comment/",
+      "file": "v2/delete-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-comment",
+      "title": "課題コメント情報の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/:commentId",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題コメントの詳細を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-comment/",
+      "file": "v2/get-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-comment",
+      "title": "課題コメント情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/:commentId",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題コメントの情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-comment/",
+      "file": "v2/update-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "content",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "コメントの本文。メンション記法が使えます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-comment-notifications",
+      "title": "課題コメントのお知らせ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/:commentId/notifications",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題コメントのお知らせ一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-comment-notifications/",
+      "file": "v2/get-list-of-comment-notifications.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-comment-notification",
+      "title": "課題コメントにお知らせを追加",
+      "method": "POST",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/:commentId/notifications",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "コメントにお知らせを追加します",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-comment-notification/",
+      "file": "v2/add-comment-notification.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題の登録の通知を受け取るユーザーのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-comment",
+      "title": "課題コメント数の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/comments/count",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題に登録されているコメントの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-comment/",
+      "file": "v2/count-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-issue-participant-list",
+      "title": "課題の参加者一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/participants",
+      "category": "issues",
+      "role": "",
+      "summary": "課題の参加者一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-issue-participant-list/",
+      "file": "v2/get-issue-participant-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-related-issues",
+      "title": "関連課題一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/relatedIssues",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題に設定されている関連課題の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-related-issues/",
+      "file": "v2/get-list-of-related-issues.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-related-issue",
+      "title": "関連課題の追加",
+      "method": "POST",
+      "path": "/api/v2/issues/:issueIdOrKey/relatedIssues",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題に関連課題を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-related-issue/",
+      "file": "v2/add-related-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          }
+        ],
+        "request": [
+          {
+            "name": "targetIssueId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "関連付ける課題のID。 課題のIDは課題情報の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-related-issue",
+      "title": "関連課題の削除",
+      "method": "DELETE",
+      "path": "/api/v2/issues/:issueIdOrKey/relatedIssues/:relatedIssueId",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 課題の登録のみ 制限なし",
+      "summary": "課題から関連課題の関連付けを解除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-related-issue/",
+      "file": "v2/remove-related-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "以下のいずれかを指定します。 ・課題のID ・課題キー 課題のIDと課題キーは課題一覧の取得から取得できます。"
+          },
+          {
+            "name": "relatedIssueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "関連付けを解除する課題のID。 関連課題のIDは関連課題一覧の取得から取得できます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-linked-shared-files",
+      "title": "課題共有ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/:issueIdOrKey/sharedFiles",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "課題にリンクされた共有ファイルの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-linked-shared-files/",
+      "file": "v2/get-list-of-linked-shared-files.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "link-shared-files-to-issue",
+      "title": "課題に共有ファイルをリンク",
+      "method": "POST",
+      "path": "/api/v2/issues/:issueIdOrKey/sharedFiles",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "課題に共有ファイルをリンクします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/link-shared-files-to-issue/",
+      "file": "v2/link-shared-files-to-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          }
+        ],
+        "request": [
+          {
+            "name": "fileId[]",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "共有ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-link-to-shared-file-from-issue",
+      "title": "課題の共有ファイルのリンクを解除",
+      "method": "DELETE",
+      "path": "/api/v2/issues/:issueIdOrKey/sharedFiles/:id",
+      "category": "issues",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "課題にリンクされた共有ファイルのリンクを解除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-link-to-shared-file-from-issue/",
+      "file": "v2/remove-link-to-shared-file-from-issue.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-issue",
+      "title": "課題数の取得",
+      "method": "GET",
+      "path": "/api/v2/issues/count",
+      "category": "issues",
+      "role": "すべての権限",
+      "summary": "課題の数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-issue/",
+      "file": "v2/count-issue.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "プロジェクトのID"
+          },
+          {
+            "name": "issueTypeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "種別のID"
+          },
+          {
+            "name": "categoryId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "カテゴリーのID"
+          },
+          {
+            "name": "versionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "発生バージョンのID"
+          },
+          {
+            "name": "milestoneId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "マイルストーンのID"
+          },
+          {
+            "name": "statusId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "状態のID"
+          },
+          {
+            "name": "priorityId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "優先度のID"
+          },
+          {
+            "name": "assigneeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "担当者のID"
+          },
+          {
+            "name": "createdUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "登録者のID"
+          },
+          {
+            "name": "resolutionId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "完了理由のID"
+          },
+          {
+            "name": "parentChild",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "親子課題の条件 0: すべて 1: 子課題以外 2: 子課題 3: 親課題でも子課題でもない課題 4: 親課題"
+          },
+          {
+            "name": "attachment",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルを含む場合はtrue"
+          },
+          {
+            "name": "sharedFile",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルを含む場合はtrue"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "課題一覧のソートに使用する属性名 ”issueType\" \"category\" \"version\" \"milestone\" \"summary\" \"status\" \"priority\" \"attachment\" \"sharedFile\" \"created\" \"createdUser\" \"updated\" \"updatedUser\" \"assignee\" \"startDate\" \"dueDate\" \"estimatedHours\" \"actualHours\" \"childIssue\" \"customField_${id}“"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "createdSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "登録日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "createdUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "登録日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "updatedSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "更新日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "updatedUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "更新日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "startDateSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "開始日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "startDateUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "開始日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "dueDateSince",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "期限日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "dueDateUntil",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "期限日 (yyyy-MM-dd)"
+          },
+          {
+            "name": "hasDueDate",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "falseを指定すると、期限日が設定されていない課題を返します。trueの指定はサポートされておらず、エラーが返されます。"
+          },
+          {
+            "name": "id[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "課題のID"
+          },
+          {
+            "name": "parentIssueId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "親課題のID"
+          },
+          {
+            "name": "keyword",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "検索キーワード"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page-list",
+      "title": "Wikiページ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page-list/",
+      "file": "v2/get-wiki-page-list.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "keyword",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "検索キーワード"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-wiki-page",
+      "title": "Wikiページの追加",
+      "method": "POST",
+      "path": "/api/v2/wikis",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-wiki-page/",
+      "file": "v2/add-wiki-page.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "projectId",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクトのID"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "ページ名"
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "ページの内容"
+          },
+          {
+            "name": "mailNotify",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ページの追加をメールで通知する場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-wiki-page",
+      "title": "Wikiページの削除",
+      "method": "DELETE",
+      "path": "/api/v2/wikis/:wikiId",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-wiki-page/",
+      "file": "v2/delete-wiki-page.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "mailNotify",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ページの削除をメールで通知する場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page",
+      "title": "Wikiページ情報の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page/",
+      "file": "v2/get-wiki-page.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-wiki-page",
+      "title": "Wikiページ情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/wikis/:wikiId",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-wiki-page/",
+      "file": "v2/update-wiki-page.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "ページ名"
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "ページの内容"
+          },
+          {
+            "name": "mailNotify",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": "ページの更新をメールで通知する場合はtrue"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-wiki-attachments",
+      "title": "Wiki添付ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId/attachments",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-wiki-attachments/",
+      "file": "v2/get-list-of-wiki-attachments.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "attach-file-to-wiki",
+      "title": "Wiki添付ファイルの追加",
+      "method": "POST",
+      "path": "/api/v2/wikis/:wikiId/attachments",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/attach-file-to-wiki/",
+      "file": "v2/attach-file-to-wiki.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイルの送信APIが返すID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-wiki-attachment",
+      "title": "Wiki添付ファイルの削除",
+      "method": "DELETE",
+      "path": "/api/v2/wikis/:wikiId/attachments/:attachmentId",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-wiki-attachment/",
+      "file": "v2/remove-wiki-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page-attachment",
+      "title": "Wiki添付ファイルのダウンロード",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId/attachments/:attachmentId",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page-attachment/",
+      "file": "v2/get-wiki-page-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page-history",
+      "title": "Wikiページ更新履歴一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId/history",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page-history/",
+      "file": "v2/get-wiki-page-history.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ],
+        "query": [
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-shared-files-on-wiki",
+      "title": "Wiki共有ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId/sharedFiles",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-shared-files-on-wiki/",
+      "file": "v2/get-list-of-shared-files-on-wiki.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "link-shared-files-to-wiki",
+      "title": "Wikiに共有ファイルをリンク",
+      "method": "POST",
+      "path": "/api/v2/wikis/:wikiId/sharedFiles",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/link-shared-files-to-wiki/",
+      "file": "v2/link-shared-files-to-wiki.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "fileId[]",
+            "type": "int",
+            "required": true,
+            "multiple": false,
+            "description": "共有ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-link-to-shared-file-from-wiki",
+      "title": "Wikiの共有ファイルのリンクを解除",
+      "method": "DELETE",
+      "path": "/api/v2/wikis/:wikiId/sharedFiles/:id",
+      "category": "wikis",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-link-to-shared-file-from-wiki/",
+      "file": "v2/remove-link-to-shared-file-from-wiki.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          },
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "共有ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page-star",
+      "title": "Wikiページのスター一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/:wikiId/stars",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page-star/",
+      "file": "v2/get-wiki-page-star.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-wiki-page",
+      "title": "Wikiページ数の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/count",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-wiki-page/",
+      "file": "v2/count-wiki-page.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-wiki-page-tag-list",
+      "title": "Wikiページタグ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/wikis/tags",
+      "category": "wikis",
+      "role": "すべての権限",
+      "summary": "【お知らせ】2026年7月14日から、Wikiの提供方針を以下のとおり変更します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-wiki-page-tag-list/",
+      "file": "v2/get-wiki-page-tag-list.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-document-list",
+      "title": "ドキュメント一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/documents",
+      "category": "documents",
+      "role": "すべての権限",
+      "summary": "ドキュメントページの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-document-list/",
+      "file": "v2/get-document-list.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectId[]",
+            "type": "Number",
+            "required": false,
+            "multiple": true,
+            "description": "プロジェクトのID。 プロジェクトのIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "keyword",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "検索キーワード"
+          },
+          {
+            "name": "sort",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "・created ・updated"
+          },
+          {
+            "name": "order",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "一覧の並び順。指定が無い場合はdescが使われます。 ・asc: 昇順 ・desc: 降順"
+          },
+          {
+            "name": "offset",
+            "type": "Number",
+            "required": true,
+            "multiple": false,
+            "description": "取得開始位置。0以上の整数を指定してください。"
+          },
+          {
+            "name": "count",
+            "type": "Number",
+            "required": false,
+            "multiple": false,
+            "description": "件数の上限。1〜100の範囲で指定してください。指定が無い場合は20が使われます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-document",
+      "title": "ドキュメントの追加",
+      "method": "POST",
+      "path": "/api/v2/documents",
+      "category": "documents",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "ドキュメントを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-document/",
+      "file": "v2/add-document.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "projectId",
+            "type": "Number",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクトのID。 プロジェクトのIDはプロジェクトの状態一覧の取得から取得できます。"
+          },
+          {
+            "name": "title",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "ドキュメントのタイトル。"
+          },
+          {
+            "name": "content",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "ドキュメントの内容。Markdown形式で記述できます。"
+          },
+          {
+            "name": "emoji",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "ドキュメントタイトル横に表示される絵文字。"
+          },
+          {
+            "name": "parentId",
+            "type": "String",
+            "required": false,
+            "multiple": false,
+            "description": "親ドキュメントのID。このIDを指定した場合、ドキュメントはツリー上でparentIdのドキュメントの子として作成されます。"
+          },
+          {
+            "name": "addLast",
+            "type": "Boolean",
+            "required": false,
+            "multiple": false,
+            "description": "trueにした場合、ドキュメントはツリー上の兄弟ドキュメントの中で末尾に作成されます。デフォルトはfalseで先頭に追加されます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-document",
+      "title": "ドキュメントの削除",
+      "method": "DELETE",
+      "path": "/api/v2/documents/:documentId",
+      "category": "documents",
+      "role": "管理者 プロジェクト管理者",
+      "summary": "ドキュメントを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-document/",
+      "file": "v2/delete-document.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "documentId",
+            "type": "String",
+            "required": true,
+            "multiple": false,
+            "description": "ドキュメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-document",
+      "title": "ドキュメント情報の取得",
+      "method": "GET",
+      "path": "/api/v2/documents/:documentId",
+      "category": "documents",
+      "role": "すべての権限",
+      "summary": "ドキュメントページの情報を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-document/",
+      "file": "v2/get-document.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "documentId",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "ドキュメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-document-attachments",
+      "title": "ドキュメント添付ファイルの取得",
+      "method": "GET",
+      "path": "/api/v2/documents/:documentId/attachments/:attachmentId",
+      "category": "documents",
+      "role": "すべての権限",
+      "summary": "ドキュメントの添付ファイルをダウンロードします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-document-attachments/",
+      "file": "v2/get-document-attachments.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-document-comment",
+      "title": "ドキュメントコメントの取得",
+      "method": "GET",
+      "path": "/api/v2/documents/:documentId/comments",
+      "category": "documents",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "ドキュメントのコメントの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-document-comment/",
+      "file": "v2/get-document-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "documentId",
+            "type": "String",
+            "required": true,
+            "multiple": false,
+            "description": "ドキュメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-document-tag",
+      "title": "ドキュメントタグの削除",
+      "method": "DELETE",
+      "path": "/api/v2/documents/:documentId/tags",
+      "category": "documents",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "ドキュメントからタグを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-document-tag/",
+      "file": "v2/remove-document-tag.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "documentId",
+            "type": "String",
+            "required": true,
+            "multiple": false,
+            "description": "ドキュメントのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "tagNames[]",
+            "type": "String",
+            "required": false,
+            "multiple": true,
+            "description": "削除するタグ名"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-document-tag",
+      "title": "ドキュメントタグの追加",
+      "method": "POST",
+      "path": "/api/v2/documents/:documentId/tags",
+      "category": "documents",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "ドキュメントにタグを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-document-tag/",
+      "file": "v2/add-document-tag.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "documentId",
+            "type": "String",
+            "required": true,
+            "multiple": false,
+            "description": "ドキュメントのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "tagNames[]",
+            "type": "String",
+            "required": false,
+            "multiple": true,
+            "description": "追加するタグ名"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-document",
+      "title": "ドキュメント数の取得",
+      "method": "GET",
+      "path": "/api/v2/documents/count",
+      "category": "documents",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プロジェクト内のドキュメントの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-document/",
+      "file": "v2/count-document.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectIdOrKey",
+            "type": "String",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクトのID またはプロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-document-tree",
+      "title": "ドキュメントツリーの取得",
+      "method": "GET",
+      "path": "/api/v2/documents/tree",
+      "category": "documents",
+      "role": "すべての権限",
+      "summary": "ドキュメントツリーを取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-document-tree/",
+      "file": "v2/get-document-tree.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-git-repositories",
+      "title": "Gitリポジトリ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "Gitリポジトリの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-git-repositories/",
+      "file": "v2/get-list-of-git-repositories.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-git-repository",
+      "title": "Gitリポジトリの取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "Gitリポジトリを取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-git-repository/",
+      "file": "v2/get-git-repository.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-pull-request-list",
+      "title": "プルリクエスト一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-list/",
+      "file": "v2/get-pull-request-list.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          }
+        ],
+        "query": [
+          {
+            "name": "statusId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "状態のID"
+          },
+          {
+            "name": "assigneeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "担当者のID"
+          },
+          {
+            "name": "issueId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "関連課題のID"
+          },
+          {
+            "name": "createdUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "登録者のID"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-pull-request",
+      "title": "プルリクエストの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-pull-request/",
+      "file": "v2/add-pull-request.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          }
+        ],
+        "request": [
+          {
+            "name": "summary",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "プルリクエストの件名"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "プルリクエストの詳細。メンション記法が使えます。"
+          },
+          {
+            "name": "base",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "マージ先のブランチ名"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "マージされるブランチ名"
+          },
+          {
+            "name": "issueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "関連課題のID"
+          },
+          {
+            "name": "assigneeId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの担当者のID"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "プルリクエストの登録の通知を受け取るユーザーのID"
+          },
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイルの送信APIが返すID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-pull-request",
+      "title": "プルリクエストの取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストを取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request/",
+      "file": "v2/get-pull-request.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-pull-request",
+      "title": "プルリクエストの更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストを更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-pull-request/",
+      "file": "v2/update-pull-request.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ],
+        "request": [
+          {
+            "name": "summary",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの件名"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの詳細。メンション記法が使えます。"
+          },
+          {
+            "name": "issueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "関連課題のID"
+          },
+          {
+            "name": "assigneeId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの担当者のID"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "プルリクエストの登録の通知を受け取るユーザーのID"
+          },
+          {
+            "name": "comment",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "コメント。メンション記法が使えます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-list-of-pull-request-attachment",
+      "title": "プルリクエスト添付ファイル一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/attachments",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストの添付ファイルの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-list-of-pull-request-attachment/",
+      "file": "v2/get-list-of-pull-request-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-pull-request-attachments",
+      "title": "プルリクエスト添付ファイルの削除",
+      "method": "DELETE",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/attachments/:attachmentId",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストの添付ファイルを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-pull-request-attachments/",
+      "file": "v2/delete-pull-request-attachments.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "download-pull-request-attachment",
+      "title": "プルリクエスト添付ファイルのダウンロード",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/attachments/:attachmentId",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストの添付ファイルをダウンロードします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/download-pull-request-attachment/",
+      "file": "v2/download-pull-request-attachment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          },
+          {
+            "name": "attachmentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "添付ファイルのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-pull-request-comment",
+      "title": "プルリクエストコメントの取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/comments",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストのコメントの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-pull-request-comment/",
+      "file": "v2/get-pull-request-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ],
+        "query": [
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-pull-request-comment",
+      "title": "プルリクエストコメントの追加",
+      "method": "POST",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/comments",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストにコメントを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-pull-request-comment/",
+      "file": "v2/add-pull-request-comment.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ],
+        "request": [
+          {
+            "name": "content",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "コメントの本文。メンション記法が使えます。"
+          },
+          {
+            "name": "attachmentId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "添付ファイルの送信APIが返すID"
+          },
+          {
+            "name": "notifiedUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "コメント登録の通知を受け取るユーザーID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-pull-request-comment-information",
+      "title": "プルリクエストコメント情報の更新",
+      "method": "PATCH",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/comments/:commentId",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストコメントの情報を更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-pull-request-comment-information/",
+      "file": "v2/update-pull-request-comment-information.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "content",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "コメントの本文。メンション記法が使えます。"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-number-of-pull-request-comments",
+      "title": "プルリクエストコメント数の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/:number/comments/count",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストに登録されているコメントの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-number-of-pull-request-comments/",
+      "file": "v2/get-number-of-pull-request-comments.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          },
+          {
+            "name": "number",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストの番号"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-number-of-pull-requests",
+      "title": "プルリクエスト数の取得",
+      "method": "GET",
+      "path": "/api/v2/projects/:projectIdOrKey/git/repositories/:repoIdOrName/pullRequests/count",
+      "category": "git",
+      "role": "**権限** すべての権限 **制限** 制限なし",
+      "summary": "プルリクエストの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-number-of-pull-requests/",
+      "file": "v2/get-number-of-pull-requests.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "projectIdOrKey",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "プロジェクトのID または プロジェクトキー"
+          },
+          {
+            "name": "repoIdOrName",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "リポジトリのID または リポジトリ名"
+          }
+        ],
+        "query": [
+          {
+            "name": "statusId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "状態のID"
+          },
+          {
+            "name": "assigneeId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "担当者のID"
+          },
+          {
+            "name": "issueId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "関連課題のID"
+          },
+          {
+            "name": "createdUserId[]",
+            "type": "int",
+            "required": false,
+            "multiple": true,
+            "description": "登録者のID"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-notification",
+      "title": "お知らせ一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/notifications",
+      "category": "notifications",
+      "role": "すべての権限",
+      "summary": "自分の受け取ったお知らせの一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-notification/",
+      "file": "v2/get-notification.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "minId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最小ID"
+          },
+          {
+            "name": "maxId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "最大ID"
+          },
+          {
+            "name": "count",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "取得上限(1-100) 指定が無い場合は20"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "”asc”または”desc” 指定が無い場合は”desc”"
+          },
+          {
+            "name": "senderId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "送信者ID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "read-notification",
+      "title": "お知らせの既読化",
+      "method": "POST",
+      "path": "/api/v2/notifications/:id/markAsRead",
+      "category": "notifications",
+      "role": "すべての権限",
+      "summary": "お知らせを既読にします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/read-notification/",
+      "file": "v2/read-notification.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "id",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "お知らせのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "count-notification",
+      "title": "お知らせ数の取得",
+      "method": "GET",
+      "path": "/api/v2/notifications/count",
+      "category": "notifications",
+      "role": "すべての権限",
+      "summary": "自分の受け取ったお知らせの数を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/count-notification/",
+      "file": "v2/count-notification.md",
+      "parameters": {
+        "query": [
+          {
+            "name": "alreadyRead",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          },
+          {
+            "name": "resourceAlreadyRead",
+            "type": "boolean",
+            "required": false,
+            "multiple": false,
+            "description": ""
+          }
+        ]
+      }
+    },
+    {
+      "slug": "reset-unread-notification-count",
+      "title": "お知らせ数のリセット",
+      "method": "POST",
+      "path": "/api/v2/notifications/markAsRead",
+      "category": "notifications",
+      "role": "すべての権限",
+      "summary": "自分の受け取ったお知らせの未読数をリセットします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/reset-unread-notification-count/",
+      "file": "v2/reset-unread-notification-count.md",
+      "parameters": {}
+    },
+    {
+      "slug": "add-watching",
+      "title": "ウォッチの追加",
+      "method": "POST",
+      "path": "/api/v2/watchings",
+      "category": "watchings",
+      "role": "すべての権限",
+      "summary": "ウォッチを追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-watching/",
+      "file": "v2/add-watching.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "issueIdOrKey",
+            "type": "string",
+            "required": true,
+            "multiple": false,
+            "description": "課題のID または 課題キー"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "メモ"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "delete-watching",
+      "title": "ウォッチの削除",
+      "method": "DELETE",
+      "path": "/api/v2/watchings/:watchingId",
+      "category": "watchings",
+      "role": "すべての権限",
+      "summary": "ウォッチを削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/delete-watching/",
+      "file": "v2/delete-watching.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "watchingId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-watching",
+      "title": "ウォッチ情報の取得",
+      "method": "GET",
+      "path": "/api/v2/watchings/:watchingId",
+      "category": "watchings",
+      "role": "すべての権限",
+      "summary": "ウォッチの情報を追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-watching/",
+      "file": "v2/get-watching.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "watchingId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "update-watching",
+      "title": "ウォッチの更新",
+      "method": "PATCH",
+      "path": "/api/v2/watchings/:watchingId",
+      "category": "watchings",
+      "role": "すべての権限",
+      "summary": "ウォッチを更新します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/update-watching/",
+      "file": "v2/update-watching.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "watchingId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチのID"
+          }
+        ],
+        "request": [
+          {
+            "name": "note",
+            "type": "string",
+            "required": false,
+            "multiple": false,
+            "description": "メモ"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "mark-watching-as-read",
+      "title": "ウォッチの既読化",
+      "method": "POST",
+      "path": "/api/v2/watchings/:watchingId/markAsRead",
+      "category": "watchings",
+      "role": "すべての権限",
+      "summary": "ウォッチを既読にします。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/mark-watching-as-read/",
+      "file": "v2/mark-watching-as-read.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "watchingId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "ウォッチのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "add-star",
+      "title": "スターの追加",
+      "method": "POST",
+      "path": "/api/v2/stars",
+      "category": "stars",
+      "role": "すべての権限",
+      "summary": "課題、コメント、Wikiにスターを1つ追加します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/add-star/",
+      "file": "v2/add-star.md",
+      "parameters": {
+        "request": [
+          {
+            "name": "issueId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "課題のID"
+          },
+          {
+            "name": "commentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "コメントのID"
+          },
+          {
+            "name": "wikiId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "WikiページのID"
+          },
+          {
+            "name": "pullRequestId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストのID"
+          },
+          {
+            "name": "pullRequestCommentId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "プルリクエストコメントのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "remove-star",
+      "title": "スターの削除",
+      "method": "DELETE",
+      "path": "/api/v2/stars/:starId",
+      "category": "stars",
+      "role": "すべての権限",
+      "summary": "課題、コメント、Wikiのスターを1つ削除します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/remove-star/",
+      "file": "v2/remove-star.md",
+      "parameters": {
+        "url": [
+          {
+            "name": "starId",
+            "type": "int",
+            "required": false,
+            "multiple": false,
+            "description": "スターのID"
+          }
+        ]
+      }
+    },
+    {
+      "slug": "get-priority-list",
+      "title": "優先度一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/priorities",
+      "category": "priorities",
+      "role": "すべての権限",
+      "summary": "課題に設定できる優先度の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-priority-list/",
+      "file": "v2/get-priority-list.md",
+      "parameters": {}
+    },
+    {
+      "slug": "get-resolution-list",
+      "title": "完了理由一覧の取得",
+      "method": "GET",
+      "path": "/api/v2/resolutions",
+      "category": "resolutions",
+      "role": "すべての権限",
+      "summary": "課題に設定できる完了理由の一覧を取得します。",
+      "doc": "https://developer.nulab.com/ja/docs/backlog/api/2/get-resolution-list/",
+      "file": "v2/get-resolution-list.md",
+      "parameters": {}
+    }
+  ]
+}
