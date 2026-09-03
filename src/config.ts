@@ -4,6 +4,7 @@
  * @description 環境変数を検証し、Backlog の baseUrl を組み立てる（受け取らない）
  */
 
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { BACKLOG_DOMAINS, ConfigError } from './contract.ts';
 import type { BacklogDomain, ServerConfig } from './contract.ts';
 
@@ -21,6 +22,27 @@ const DEFAULT_DOMAIN: BacklogDomain = 'backlog.jp';
 
 const isBacklogDomain = (value: string): value is BacklogDomain =>
   (BACKLOG_DOMAINS as readonly string[]).includes(value);
+
+/** 既定の出力先。ポリシーの隣に置く。 */
+const DEFAULT_LOG_DIR_NAME = 'logs';
+
+/**
+ * 監査ログの出力先を決める。
+ *
+ * 相対指定は**ポリシーファイルのディレクトリから**解決する。`cwd` は宣言した場所で
+ * 変わるので基準にしない。既定はポリシーの隣（`<policy dir>/logs`）で、
+ * 「何が許可されていたか」と「何が行われたか」が同じ場所に並ぶ。
+ *
+ * **temp を既定にしない。** `/tmp` は systemd の既定で10日後に消え（`tmpfiles.d/tmp.conf`）、
+ * かつ `1777`（全ユーザー書き込み可）である。OS が定期的に消す場所に置いた監査ログは、
+ * 監査ログとして機能しない。
+ */
+const resolveLogDir = (raw: string | undefined, policyPath: string): string => {
+  if (raw === undefined || raw === '') {
+    return resolve(dirname(policyPath), DEFAULT_LOG_DIR_NAME);
+  }
+  return isAbsolute(raw) ? raw : resolve(dirname(policyPath), raw);
+};
 
 const required = (env: NodeJS.ProcessEnv, name: string): string => {
   const value = env[name];
@@ -59,13 +81,17 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ServerConfig => {
 
   const rawReadOnly = env['BACKLOG_READ_ONLY'];
 
+  // 絶対パスにしておく。ログの出力先の基準になるので、後から cwd が動いてもずれない
+  const policyPath = resolve(required(env, 'BACKLOG_POLICY'));
+
   return Object.freeze({
     spaceId,
     domain,
     // 組み立てた値。受け取った値ではない。
     baseUrl: `https://${spaceId}.${domain}`,
     apiKey: required(env, 'BACKLOG_API_KEY'),
-    policyPath: required(env, 'BACKLOG_POLICY'),
+    policyPath,
+    logDir: resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath),
     readOnly: rawReadOnly === '1' || rawReadOnly === 'true',
   });
 };
@@ -79,4 +105,4 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ServerConfig => {
  * @returns 1行の説明
  */
 export const describeConfig = (config: ServerConfig): string =>
-  `space=${config.baseUrl} policy=${config.policyPath}${config.readOnly ? ' read-only' : ''}`;
+  `space=${config.baseUrl} policy=${config.policyPath} log=${config.logDir}${config.readOnly ? ' read-only' : ''}`;

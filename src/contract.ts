@@ -229,6 +229,15 @@ export interface ServerConfig {
   readonly domain: BacklogDomain;
   readonly baseUrl: string;
   readonly apiKey: string;
+  /** 絶対パスに解決済み。ログの出力先の基準にもなる。 */
   readonly policyPath: string;
+  /**
+   * 監査ログの出力先（絶対パス）。
+   *
+   * 相対指定は**ポリシーファイルのディレクトリから**解決する。`cwd` を基準にしないのは、
+   * MCP サーバの `cwd` が宣言した場所で変わるため（クライアントのドキュメントで確認）。
+   * ポリシーは必須なので、基準が無い状態が作れない。
+   */
+  readonly logDir: string;
   readonly readOnly: boolean;
 }

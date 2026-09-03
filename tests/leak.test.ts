@@ -25,6 +25,7 @@ const CONFIG: ServerConfig = {
   baseUrl: 'https://example.backlog.jp',
   apiKey: API_KEY,
   policyPath: '/dev/null',
+  logDir: '/dev/null',
   readOnly: false,
 };
 

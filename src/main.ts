@@ -9,12 +9,17 @@ import { loadConfig, describeConfig } from './config.ts';
 import { PolicyError } from './contract.ts';
 import { createBacklogGateway } from './domain/backlogGateway.ts';
 import { resolveMasters } from './domain/masters.ts';
-import { stderrAuditSink, withAudit, writeAudit } from './mcp/audit.ts';
+import {
+  createFileAuditSink,
+  multiAuditSink,
+  stderrAuditSink,
+  withAudit,
+  writeAudit,
+} from './mcp/audit.ts';
 import { serve } from './mcp/stdio.ts';
 import { explainPolicy, loadPolicy, writableProjectKeys } from './policy/policy.ts';
 import { DEFAULT_LIMITS, buildHandlers } from './tool/tools.ts';
 import { toError } from './shared/toError.ts';
-import type { AuditSink } from './mcp/audit.ts';
 import type { McpHandlers, ServerInfo } from './mcp/protocol.ts';
 import type { StdioChannel } from './mcp/stdio.ts';
 
@@ -60,33 +65,49 @@ const readPolicyFile = async (policyPath: string): Promise<unknown> => {
  * 途中で1つでも失敗したらサーバを立ち上げない（fail-closed）。
  * 「設定を間違えたら静かに全開放」ではなく「起動しない」に転ばせる。
  */
-const bootstrap = async (sink: AuditSink): Promise<McpHandlers> => {
+const bootstrap = async (): Promise<McpHandlers> => {
   const config = loadConfig(process.env);
-  const policy = loadPolicy(await readPolicyFile(config.policyPath), {
-    readOnly: config.readOnly,
-  });
 
-  const gateway = createBacklogGateway(config);
-  const masters = await resolveMasters(gateway, [...policy.scopes.keys()]);
+  // ファイルに書けなければここで落ちる。監査に寄りかかった設計が監査なしで動くのは、
+  // 防御について嘘をつくことになる（fail-closed）。
+  const sink = multiAuditSink([createFileAuditSink(config.logDir), stderrAuditSink]);
 
-  const writable = writableProjectKeys(policy);
+  try {
+    const policy = loadPolicy(await readPolicyFile(config.policyPath), {
+      readOnly: config.readOnly,
+    });
 
-  process.stderr.write(`${describeConfig(config)}\n`);
-  process.stderr.write(`${explainPolicy(policy)}\n`);
-  process.stderr.write(
-    `書き込み許可: ${writable.length === 0 ? '(なし)' : writable.join(', ')} (${String(writable.length)} プロジェクト)\n`,
-  );
+    const gateway = createBacklogGateway(config);
+    const masters = await resolveMasters(gateway, [...policy.scopes.keys()]);
 
-  writeAudit(sink, {
-    event: 'startup',
-    space: config.baseUrl,
-    readOnly: config.readOnly,
-    policyHash: policy.hash,
-    projects: [...policy.scopes.keys()].sort(),
-    writableProjects: writable,
-  });
+    const writable = writableProjectKeys(policy);
 
-  return withAudit(buildHandlers({ policy, masters, gateway, limits: DEFAULT_LIMITS }), sink);
+    process.stderr.write(`${describeConfig(config)}\n`);
+    process.stderr.write(`${explainPolicy(policy)}\n`);
+    process.stderr.write(
+      `書き込み許可: ${writable.length === 0 ? '(なし)' : writable.join(', ')} (${String(writable.length)} プロジェクト)\n`,
+    );
+
+    writeAudit(sink, {
+      event: 'startup',
+      space: config.baseUrl,
+      readOnly: config.readOnly,
+      policyHash: policy.hash,
+      projects: [...policy.scopes.keys()].sort(),
+      writableProjects: writable,
+    });
+
+    return withAudit(buildHandlers({ policy, masters, gateway, limits: DEFAULT_LIMITS }), sink);
+  } catch (e) {
+    // 起動できなかったことも記録に残す。**種類だけ**を書き、理由の本文は stderr に留める
+    // （サーバが書いた文字列が混ざりうるので、ログを第三者のテキストの置き場にしない）。
+    writeAudit(sink, {
+      event: 'startup-failed',
+      space: config.baseUrl,
+      error: toError(e).name,
+    });
+    throw e;
+  }
 };
 
 // ============================================================================
@@ -120,7 +141,7 @@ const describeFailure = (value: unknown): string => {
 };
 
 try {
-  await serve(stdioChannel, await bootstrap(stderrAuditSink), SERVER_INFO);
+  await serve(stdioChannel, await bootstrap(), SERVER_INFO);
 } catch (e) {
   process.stderr.write(`起動に失敗しました\n  ${describeFailure(toError(e))}\n`);
   process.exitCode = 1;

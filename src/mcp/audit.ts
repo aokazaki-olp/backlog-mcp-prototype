@@ -5,6 +5,10 @@
  *              実際に効く2つ（被害の上限を下げる・検出可能にする）のうちの後者
  */
 
+import { closeSync, mkdirSync, openSync, writeSync } from 'node:fs';
+import { join } from 'node:path';
+import { ConfigError } from '../contract.ts';
+import { toError } from '../shared/toError.ts';
 import type { McpHandlers, ToolDefinition, ToolResult } from './protocol.ts';
 
 /**
@@ -17,11 +21,81 @@ export interface AuditSink {
   write(line: string): void;
 }
 
-/** 既定の書き出し先。stderr へ1行1レコードで出す。 */
+/**
+ * stderr へ1行1レコードで出す。
+ *
+ * **これだけを出口にしない。** MCP 仕様は「クライアントは stderr を capture / forward /
+ * **ignore** してよい」と定めており、残るかどうかがクライアント次第になる。
+ * 被害の検出を監査ログに預けている設計なので、耐久性を他人に委ねない。
+ */
 export const stderrAuditSink: AuditSink = {
   write(line: string): void {
     process.stderr.write(`${line}\n`);
   },
+};
+
+/** 複数の出口へ同じ行を流す。1つが失敗したら起動を続けない（黙って片方だけ書かない）。 */
+export const multiAuditSink = (sinks: readonly AuditSink[]): AuditSink => ({
+  write(line: string): void {
+    for (const sink of sinks) {
+      sink.write(line);
+    }
+  },
+});
+
+/** ファイル名に使う日付。レコードの `ts`（UTC）と同じ日を指すよう UTC で切る。 */
+const utcDate = (now: Date): string => now.toISOString().slice(0, 10);
+
+/**
+ * ディレクトリへ `audit-YYYY-MM-DD.jsonl` を追記する出口を作る。
+ *
+ * **ローテーションを実装しない。** 日付が変わればファイルが変わるので、世代管理は
+ * ファイル名で足りる。**古いログの削除もしない** — 監査ログを黙って消す機能は作らない。
+ *
+ * **同期書き込みにする。** 非同期バッファはプロセスが落ちたときに直近の行を失う。
+ * 1ツール呼び出しにつき1行しか書かないので、同期のコストは払える。
+ *
+ * ファイル記述子はプロセスと同じ寿命で持つ（`using` でスコープ解放しない）。
+ * 書き込みが同期なので閉じ忘れで失うものが無く、stderr と同じ扱いでよい。
+ *
+ * @param dir - 出力先ディレクトリ（絶対パス）
+ * @returns 追記する出口
+ * @throws {ConfigError} ディレクトリを作れない・書けない場合（起動させない）
+ */
+export const createFileAuditSink = (dir: string): AuditSink => {
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+  } catch (e) {
+    throw new ConfigError(`監査ログの出力先を作れません: ${dir}`, { cause: toError(e) });
+  }
+
+  let openedDate = '';
+  let fd = -1;
+
+  const fdFor = (date: string): number => {
+    if (date === openedDate) {
+      return fd;
+    }
+    if (fd !== -1) {
+      closeSync(fd);
+    }
+    // 追記のみ。0600 は新規作成時にだけ効く
+    fd = openSync(join(dir, `audit-${date}.jsonl`), 'a', 0o600);
+    openedDate = date;
+    return fd;
+  };
+
+  try {
+    fdFor(utcDate(new Date()));
+  } catch (e) {
+    throw new ConfigError(`監査ログを書き出せません: ${dir}`, { cause: toError(e) });
+  }
+
+  return {
+    write(line: string): void {
+      writeSync(fdFor(utcDate(new Date())), `${line}\n`);
+    },
+  };
 };
 
 /**
