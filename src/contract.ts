@@ -1,0 +1,175 @@
+/**
+ * contract.ts
+ *
+ * @description 層をまたいで共有する型と、ツールの静的な仕様表。実装を持たない葉モジュール。
+ */
+
+// ============================================================================
+// 権限の語彙
+// ============================================================================
+
+/**
+ * 権限の3段。順序に意味がある（添字が大きいほど強い）。
+ *
+ * 列挙（`['read','write']`）にしないのは、`['write']` との差が曖昧になるため。
+ * 削除はこの語彙に存在しないので、ポリシーにどう書いても表現できない。
+ */
+export const CAN_LEVELS = ['read', 'comment', 'write'] as const;
+
+export type Can = (typeof CAN_LEVELS)[number];
+
+/**
+ * 機能領域。`document` を `wiki` と分けているのは Backlog で別機能だから。
+ *
+ * `user` / `space` / `priority` / `resolution` は含まない。プロジェクトに属さず
+ * スコープで表現できないため、起動時に解決して内部マスタとして持つ（ツールにしない）。
+ */
+export const TOOLSETS = ['issue', 'wiki', 'document', 'git', 'notification', 'activity'] as const;
+
+export type Toolset = (typeof TOOLSETS)[number];
+
+/** 仮実装で公開するツール。 */
+export const TOOL_NAMES = [
+  'search_issues',
+  'get_issue',
+  'get_issue_comments',
+  'list_wiki_pages',
+  'add_issue_comment',
+] as const;
+
+export type ToolName = (typeof TOOL_NAMES)[number];
+
+// ============================================================================
+// ツールの静的な仕様
+// ============================================================================
+
+/**
+ * プロジェクトの特定方法。エンドポイントは3種に割れる。
+ *
+ * - `key`: 課題キー等の引数からローカルに判定できる。API 到達前に弾ける
+ * - `filter`: 絞り込みパラメータをポリシー由来の値で上書きできる
+ *
+ * 数値 ID しか受けない経路（`GET /wikis/:wikiId` 等）はツールにしないため、この型に無い。
+ */
+export type ScopeKind = 'key' | 'filter';
+
+export interface ToolSpec {
+  readonly toolset: Toolset;
+  /** このツールを使うのに必要な `can` の下限。 */
+  readonly requires: Can;
+  readonly scopeKind: ScopeKind;
+  readonly title: string;
+  readonly description: string;
+  /** MCP の ToolAnnotations に載せる。仕様上ヒントであり、防御には使わない。 */
+  readonly readOnly: boolean;
+}
+
+/**
+ * ツール名 → 仕様の全単射。
+ *
+ * mapped type にしているのは完全性チェックのため。`TOOL_NAMES` にツールを足して
+ * ここに書き忘れるとコンパイルエラーになる（`electron-prototype` の
+ * `EXPECTED_API_KEYS` と同じ手）。
+ */
+export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
+  search_issues: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: '課題を検索する',
+    description:
+      '許可されたプロジェクトの課題を検索する。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
+    readOnly: true,
+  },
+  get_issue: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'key',
+    title: '課題を取得する',
+    description: '課題キー（例: PROJ-123）を指定して課題を取得する。',
+    readOnly: true,
+  },
+  get_issue_comments: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'key',
+    title: '課題のコメントを取得する',
+    description: '課題キー（例: PROJ-123）を指定してコメント一覧を取得する。',
+    readOnly: true,
+  },
+  list_wiki_pages: {
+    toolset: 'wiki',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'Wiki ページ一覧を取得する',
+    description: '許可されたプロジェクトの Wiki ページ一覧を取得する。',
+    readOnly: true,
+  },
+  add_issue_comment: {
+    toolset: 'issue',
+    requires: 'comment',
+    scopeKind: 'key',
+    title: '課題にコメントする',
+    description: '課題キー（例: PROJ-123）を指定してコメントを追加する。',
+    readOnly: false,
+  },
+};
+
+// ============================================================================
+// ポリシーの正規形
+// ============================================================================
+
+/**
+ * ポリシーを展開した正規形。`projectKey` → 許可されたツール名の集合。
+ *
+ * `can` / `toolsets` はどれもこの集合への畳み込みであり、記法の違いはここで消える。
+ * `tools/list` の生成とハンドラの確認は、どちらもこの同じ集合を参照する。
+ */
+export type ScopeSet = ReadonlyMap<string, ReadonlySet<ToolName>>;
+
+export interface ResolvedPolicy {
+  readonly scopes: ScopeSet;
+  /** 監査用。記法ではなく正規形に対して取るので、書き方を変えても権限が同じならハッシュが同じ。 */
+  readonly hash: string;
+}
+
+// ============================================================================
+// 層間の受け渡し
+// ============================================================================
+
+/**
+ * input 層が組み立てて api 層へ渡す、解決済みのリクエスト。
+ *
+ * ここに載る `projectId` は**すでにポリシー由来**である。api 層に「上書き」という
+ * 概念を持ち込まないため、絞り込みは input 層で完結させる。
+ */
+export interface ResolvedRequest {
+  readonly endpoint: string;
+  readonly method: 'GET' | 'POST' | 'PATCH';
+  readonly query?: Readonly<Record<string, unknown>>;
+  readonly form?: Readonly<Record<string, unknown>>;
+}
+
+/** api 層が output 層へ渡す値。HTTP の語彙（status 等）はここに現れない。 */
+export interface DomainResult {
+  readonly kind: 'ok';
+  readonly value: unknown;
+}
+
+/** ポリシー違反。API に到達する前に返す。 */
+export class ScopeDeniedError extends Error {
+  override readonly name = 'ScopeDeniedError';
+  readonly toolName: string;
+  readonly projectKey: string | null;
+
+  constructor(message: string, toolName: string, projectKey: string | null) {
+    super(message);
+    this.toolName = toolName;
+    this.projectKey = projectKey;
+  }
+}
+
+/** 設定の不備。起動時に投げて、サーバを立ち上げない。 */
+export class PolicyError extends Error {
+  override readonly name = 'PolicyError';
+}
