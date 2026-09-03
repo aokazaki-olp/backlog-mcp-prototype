@@ -1,6 +1,6 @@
 {
   "projects": [
-    "DOCS",
+    "SALES",
     { "key": "PROJ", "can": "write" },
     { "key": "INFRA", "can": "comment", "toolsets": ["issue"] }
   ]

@@ -21,7 +21,7 @@ import type { RawResponse, Transport } from '../src/libs/httpTypes.js';
 const MASTER_RESPONSES: Record<string, unknown> = {
   '/api/v2/projects': [
     { id: 101, projectKey: 'PROJ' },
-    { id: 102, projectKey: 'DOCS' },
+    { id: 102, projectKey: 'SALES' },
   ],
   '/api/v2/priorities': [{ id: 2, name: '高' }],
   '/api/v2/resolutions': [{ id: 0, name: '対応済み' }],

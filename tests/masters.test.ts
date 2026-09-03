@@ -25,7 +25,7 @@ const makeFetcher = (
 const okResponses = {
   '/projects': [
     { id: 151, projectKey: 'PROJ', name: 'プロジェクト' },
-    { id: 152, projectKey: 'DOCS', name: 'ドキュメント' },
+    { id: 152, projectKey: 'SALES', name: '営業' },
     { id: 999, projectKey: 'OTHER', name: '別プロジェクト' },
   ],
   '/priorities': [
@@ -44,13 +44,13 @@ describe('resolveMasters', () => {
   it('要求したキーだけを解決する', async () => {
     const fetcher = makeFetcher(okResponses);
 
-    const masters = await resolveMasters(fetcher, ['PROJ', 'DOCS']);
+    const masters = await resolveMasters(fetcher, ['PROJ', 'SALES']);
 
     assert.deepEqual(
       [...masters.projectIds],
       [
         ['PROJ', 151],
-        ['DOCS', 152],
+        ['SALES', 152],
       ],
     );
     // 参加していても要求していない OTHER は入らない
@@ -151,10 +151,10 @@ describe('resolveMasters — 応答の形を検証する', () => {
 
 describe('toProjectId / toProjectIds', () => {
   it('解決済みのキーを変換する', async () => {
-    const masters = await resolveMasters(makeFetcher(okResponses), ['PROJ', 'DOCS']);
+    const masters = await resolveMasters(makeFetcher(okResponses), ['PROJ', 'SALES']);
 
     assert.equal(toProjectId(masters, 'PROJ'), 151);
-    assert.deepEqual(toProjectIds(masters, ['DOCS', 'PROJ']), [152, 151]);
+    assert.deepEqual(toProjectIds(masters, ['SALES', 'PROJ']), [152, 151]);
   });
 
   it('未解決のキーは送出する（スペースに存在しても許可されていなければ通さない）', async () => {

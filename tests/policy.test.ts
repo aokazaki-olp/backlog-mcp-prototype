@@ -11,11 +11,11 @@ import {
 
 describe('loadPolicy — 記法の展開', () => {
   it('文字列で書いたら read になる', () => {
-    const policy = loadPolicy({ projects: ['DOCS'] });
+    const policy = loadPolicy({ projects: ['SALES'] });
 
-    assert.equal(isAllowed(policy, 'DOCS', 'get_issue'), true);
-    assert.equal(isAllowed(policy, 'DOCS', 'search_issues'), true);
-    assert.equal(isAllowed(policy, 'DOCS', 'add_issue_comment'), false);
+    assert.equal(isAllowed(policy, 'SALES', 'get_issue'), true);
+    assert.equal(isAllowed(policy, 'SALES', 'search_issues'), true);
+    assert.equal(isAllowed(policy, 'SALES', 'add_issue_comment'), false);
   });
 
   it('can: comment で書き込み系が1段だけ開く', () => {
@@ -38,11 +38,11 @@ describe('loadPolicy — 記法の展開', () => {
 
   it('プロジェクトごとに can を変えられる', () => {
     const policy = loadPolicy({
-      projects: ['DOCS', { key: 'PROJ', can: 'comment' }],
+      projects: ['SALES', { key: 'PROJ', can: 'comment' }],
     });
 
     assert.equal(isAllowed(policy, 'PROJ', 'add_issue_comment'), true);
-    assert.equal(isAllowed(policy, 'DOCS', 'add_issue_comment'), false);
+    assert.equal(isAllowed(policy, 'SALES', 'add_issue_comment'), false);
   });
 
   it('許可していないプロジェクトは常に false', () => {
@@ -103,7 +103,7 @@ describe('loadPolicy — readOnly の上書き', () => {
     const source = {
       projects: [
         { key: 'PROJ', can: 'write' },
-        { key: 'DOCS', can: 'comment' },
+        { key: 'SALES', can: 'comment' },
       ],
     };
 
@@ -112,7 +112,7 @@ describe('loadPolicy — readOnly の上書き', () => {
 
     assert.equal(isAllowed(normal, 'PROJ', 'add_issue_comment'), true);
     assert.equal(isAllowed(readOnly, 'PROJ', 'add_issue_comment'), false);
-    assert.equal(isAllowed(readOnly, 'DOCS', 'add_issue_comment'), false);
+    assert.equal(isAllowed(readOnly, 'SALES', 'add_issue_comment'), false);
   });
 
   it('読み取りは残る（絞る方向にしか効かない）', () => {
@@ -125,11 +125,11 @@ describe('loadPolicy — readOnly の上書き', () => {
 
 describe('正規形', () => {
   it('書き方が違っても権限が同じならハッシュが同じ', () => {
-    const written = loadPolicy({ projects: ['DOCS'] });
+    const written = loadPolicy({ projects: ['SALES'] });
     const explicit = loadPolicy({
       projects: [
         {
-          key: 'DOCS',
+          key: 'SALES',
           can: 'read',
           toolsets: ['issue', 'wiki', 'document', 'git', 'notification', 'activity'],
         },
@@ -154,26 +154,26 @@ describe('正規形', () => {
   });
 
   it('実行時にも変更できない', () => {
-    const policy = loadPolicy({ projects: ['DOCS'] });
+    const policy = loadPolicy({ projects: ['SALES'] });
 
     assert.throws(() => {
       (policy.scopes as Map<string, Set<string>>).set('EVIL', new Set(['add_issue_comment']));
     }, TypeError);
 
-    const tools = policy.scopes.get('DOCS');
+    const tools = policy.scopes.get('SALES');
     assert.ok(tools);
     assert.throws(() => {
       (tools as Set<string>).add('add_issue_comment');
     }, TypeError);
 
     assert.equal(isAllowed(policy, 'EVIL', 'add_issue_comment'), false);
-    assert.equal(isAllowed(policy, 'DOCS', 'add_issue_comment'), false);
+    assert.equal(isAllowed(policy, 'SALES', 'add_issue_comment'), false);
   });
 });
 
 describe('tools/list とハンドラが同じ集合を見る', () => {
   it('listedTools はいずれかのプロジェクトで許可されたものだけ', () => {
-    const policy = loadPolicy({ projects: ['DOCS', { key: 'PROJ', can: 'comment' }] });
+    const policy = loadPolicy({ projects: ['SALES', { key: 'PROJ', can: 'comment' }] });
 
     const listed = listedTools(policy);
     assert.equal(listed.has('add_issue_comment'), true);
@@ -181,7 +181,7 @@ describe('tools/list とハンドラが同じ集合を見る', () => {
   });
 
   it('read だけなら書き込みツールは一覧に出ない', () => {
-    const policy = loadPolicy({ projects: ['DOCS'] });
+    const policy = loadPolicy({ projects: ['SALES'] });
 
     assert.equal(listedTools(policy).has('add_issue_comment'), false);
   });
@@ -198,10 +198,10 @@ describe('tools/list とハンドラが同じ集合を見る', () => {
 
 describe('explainPolicy', () => {
   it('ハッシュとプロジェクトごとの許可を出す', () => {
-    const policy = loadPolicy({ projects: ['DOCS'] });
+    const policy = loadPolicy({ projects: ['SALES'] });
     const text = explainPolicy(policy);
 
     assert.match(text, /policy hash=[0-9a-f]{16}/);
-    assert.match(text, /DOCS: /);
+    assert.match(text, /SALES: /);
   });
 });

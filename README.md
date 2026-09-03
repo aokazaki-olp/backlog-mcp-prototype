@@ -32,13 +32,14 @@ URL ではなくスペースID を受けるのは、`https` 以外のスキー�
 ```json
 {
   "projects": [
-    "DOCS",
+    "SALES",
     { "key": "PROJ", "can": "write" },
     { "key": "INFRA", "can": "comment", "toolsets": ["issue"] }
   ]
 }
 ```
 
+- `SALES` / `PROJ` / `INFRA` は**架空のプロジェクトキー**（Backlog 側に実在するもの。`PROJ-123` の接頭辞）。ポリシーの語彙ではない
 - **文字列で書いたら `read`。** 細かくしたいときだけオブジェクトにする
 - `can` は `read` < `comment` < `write` の単一値。**削除はこの語彙に存在しない**
 - `toolsets` は `issue` / `wiki` / `document` / `git` / `notification` / `activity`。省略すると全部

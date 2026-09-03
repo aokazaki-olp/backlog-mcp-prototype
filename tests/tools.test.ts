@@ -10,12 +10,12 @@ import type { Masters } from '../src/domain/masters.ts';
 import type { PlanContext, ToolContext } from '../src/tool/tools.ts';
 
 /**
- * PROJ = 書き込み可 / DOCS = 読み取りのみ / INFRA = コメント可だが issue のみ。
+ * PROJ = 書き込み可 / SALES = 読み取りのみ / INFRA = コメント可だが issue のみ。
  * OTHER はスペースに存在するがポリシーに書かれていない。
  */
 const POLICY_SOURCE = {
   projects: [
-    'DOCS',
+    'SALES',
     { key: 'PROJ', can: 'write' },
     { key: 'INFRA', can: 'comment', toolsets: ['issue'] },
   ],
@@ -24,7 +24,7 @@ const POLICY_SOURCE = {
 const MASTER_RESPONSES: Record<string, unknown> = {
   '/projects': [
     { id: 101, projectKey: 'PROJ' },
-    { id: 102, projectKey: 'DOCS' },
+    { id: 102, projectKey: 'SALES' },
     { id: 103, projectKey: 'INFRA' },
     { id: 999, projectKey: 'OTHER' },
   ],
@@ -49,7 +49,7 @@ const makeGateway = (
 let masters: Masters;
 
 before(async () => {
-  masters = await resolveMasters(makeGateway(MASTER_RESPONSES), ['PROJ', 'DOCS', 'INFRA']);
+  masters = await resolveMasters(makeGateway(MASTER_RESPONSES), ['PROJ', 'SALES', 'INFRA']);
 });
 
 const contextOf = (source: unknown = POLICY_SOURCE, readOnly = false): PlanContext => ({
@@ -66,8 +66,8 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
   it('search_issues の projectId[] はポリシー由来になる', () => {
     const { request } = planToolCall(contextOf(), 'search_issues', {});
 
-    // プロジェクトキーの昇順（DOCS, INFRA, PROJ）。順序は決定的にする
-    assert.deepEqual(request.query?.['projectId[]'], [102, 103, 101]);
+    // プロジェクトキーの昇順（INFRA, PROJ, SALES）。順序は決定的にする
+    assert.deepEqual(request.query?.['projectId[]'], [103, 101, 102]);
   });
 
   it('引数に projectId を混ぜても採用されない', () => {
@@ -78,7 +78,7 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
     });
 
     // 許可外の 999 は組み立てたリクエストのどこにも現れない
-    assert.deepEqual(request.query?.['projectId[]'], [102, 103, 101]);
+    assert.deepEqual(request.query?.['projectId[]'], [103, 101, 102]);
     assert.doesNotMatch(JSON.stringify(request), /999|OTHER/);
   });
 
@@ -116,7 +116,7 @@ describe('planToolCall — 許可外は API 到達前に拒否する', () => {
 
   it('can が足りないプロジェクトへの書き込みを拒否する', () => {
     assert.throws(
-      () => planToolCall(contextOf(), 'add_issue_comment', { issueKey: 'DOCS-1', content: 'x' }),
+      () => planToolCall(contextOf(), 'add_issue_comment', { issueKey: 'SALES-1', content: 'x' }),
       ScopeDeniedError,
     );
   });
@@ -258,7 +258,7 @@ const handlersOf = (source: unknown = POLICY_SOURCE, readOnly = false): ToolCont
 
 describe('buildHandlers — tools/list', () => {
   it('read しか無いポリシーでは書き込みツールを載せない', () => {
-    const handlers = buildHandlers(handlersOf({ projects: ['DOCS'] }));
+    const handlers = buildHandlers(handlersOf({ projects: ['SALES'] }));
     const names = handlers.listTools().map(t => t.name);
 
     assert.equal(names.includes('search_issues'), true);
@@ -282,10 +282,10 @@ describe('buildHandlers — tools/list', () => {
 
 describe('buildHandlers — tools/call は一覧と独立に確認する', () => {
   it('一覧に出していないツール名でも拒否する', async () => {
-    const handlers = buildHandlers(handlersOf({ projects: ['DOCS'] }));
+    const handlers = buildHandlers(handlersOf({ projects: ['SALES'] }));
 
     const result = await handlers.callTool('add_issue_comment', {
-      issueKey: 'DOCS-1',
+      issueKey: 'SALES-1',
       content: 'x',
     });
 
