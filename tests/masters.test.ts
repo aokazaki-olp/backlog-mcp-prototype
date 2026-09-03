@@ -2,26 +2,22 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { MasterDataError } from '../src/contract.ts';
 import { resolveMasters, toProjectId, toProjectIds } from '../src/domain/masters.ts';
-import type { MasterFetcher } from '../src/domain/masters.ts';
+import type { ResolvedRequest } from '../src/contract.ts';
+import type { BacklogGateway } from '../src/domain/gateway.ts';
 
-interface Call {
-  readonly endpoint: string;
-  readonly query: Record<string, unknown> | undefined;
-}
-
-/** 呼び出しを記録するだけの fetcher。Transport より上の層で差し替える。 */
+/** 呼び出しを記録するだけの gateway。Transport より上の層で差し替える。 */
 const makeFetcher = (
   responses: Record<string, unknown>,
-): MasterFetcher & { readonly calls: Call[] } => {
-  const calls: Call[] = [];
+): BacklogGateway & { readonly calls: ResolvedRequest[] } => {
+  const calls: ResolvedRequest[] = [];
   return {
     calls,
-    get(endpoint, query) {
-      calls.push({ endpoint, query });
-      if (!(endpoint in responses)) {
-        return Promise.reject(new Error(`未定義のエンドポイント: ${endpoint}`));
+    send(request) {
+      calls.push(request);
+      if (!(request.endpoint in responses)) {
+        return Promise.reject(new Error(`未定義のエンドポイント: ${request.endpoint}`));
       }
-      return Promise.resolve(responses[endpoint]);
+      return Promise.resolve(responses[request.endpoint]);
     },
   };
 };
@@ -90,6 +86,7 @@ describe('resolveMasters — GET /projects に all=true を送らない', () => 
     const projectsCall = fetcher.calls.find(c => c.endpoint === '/projects');
     assert.ok(projectsCall);
     assert.equal(projectsCall.query, undefined);
+    assert.equal(projectsCall.method, 'GET');
   });
 
   it('どの呼び出しにも all が現れない', async () => {

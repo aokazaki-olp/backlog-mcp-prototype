@@ -138,22 +138,27 @@ export interface ResolvedPolicy {
 // ============================================================================
 
 /**
+ * フォームに載せられる値。
+ *
+ * Backlog の書き込み系は form-urlencoded を取る。**添付（ファイルパート）はここに含めない** —
+ * 添付は次段階で、ローカルファイルの検証を通した経路からしか載せられないようにする。
+ */
+export type FormValue = string | number | boolean;
+
+export type FormFields = Readonly<Record<string, FormValue | readonly FormValue[]>>;
+
+/**
  * input 層が組み立てて api 層へ渡す、解決済みのリクエスト。
  *
  * ここに載る `projectId` は**すでにポリシー由来**である。api 層に「上書き」という
- * 概念を持ち込まないため、絞り込みは input 層で完結させる。
+ * 概念を持ち込まないため、絞り込みは input 層で完結させる。この型を境にすることで、
+ * スコープが効いているかの検証が I/O 抜きの純関数テストになる。
  */
 export interface ResolvedRequest {
   readonly endpoint: string;
   readonly method: 'GET' | 'POST' | 'PATCH';
   readonly query?: Readonly<Record<string, unknown>>;
-  readonly form?: Readonly<Record<string, unknown>>;
-}
-
-/** api 層が output 層へ渡す値。HTTP の語彙（status 等）はここに現れない。 */
-export interface DomainResult {
-  readonly kind: 'ok';
-  readonly value: unknown;
+  readonly form?: FormFields;
 }
 
 /** ポリシー違反。API に到達する前に返す。 */

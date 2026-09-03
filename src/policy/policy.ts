@@ -261,6 +261,28 @@ export const projectKeysFor = (policy: ResolvedPolicy, toolName: ToolName): read
 };
 
 /**
+ * 書き込み系のツールが1つでも許可されているプロジェクトキーを返す。
+ *
+ * 起動時に stderr へ出すためのもの。**ポリシーが形骸化していても、それが見える**
+ * ようにする（列挙が面倒でも全プロジェクトを書けば、この行に全部並ぶ）。
+ *
+ * @param policy - 展開済みポリシー
+ * @returns プロジェクトキーの配列（決定的な順序）
+ */
+export const writableProjectKeys = (policy: ResolvedPolicy): readonly string[] => {
+  const result: string[] = [];
+  for (const [projectKey, tools] of policy.scopes) {
+    for (const toolName of tools) {
+      if (!TOOL_SPECS[toolName].readOnly) {
+        result.push(projectKey);
+        break;
+      }
+    }
+  }
+  return result.sort();
+};
+
+/**
  * 展開結果を人が読める形にする。stderr と監査ログへ出す。
  *
  * 正規形は**読めるが書けない**。ポリシーに書けるのは `projects` / `can` / `toolsets` だけ。

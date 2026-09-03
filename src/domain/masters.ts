@@ -6,6 +6,7 @@
 
 import { MasterDataError } from '../contract.ts';
 import { freezeMap } from '../shared/freezeCollection.ts';
+import type { BacklogGateway } from './gateway.ts';
 
 /** `{ id, name }` の形をとる Backlog のマスタ要素。 */
 interface NamedId {
@@ -31,11 +32,6 @@ export interface Masters {
   readonly resolutionIds: ReadonlyMap<string, number>;
   /** API キーの持ち主。「自分の担当課題」を引くのに要る。 */
   readonly myUserId: number;
-}
-
-/** マスタ解決に必要な最小の呼び出し面。`BacklogApiClient` はこれを満たす。 */
-export interface MasterFetcher {
-  get(endpoint: string, query?: Record<string, unknown>): Promise<unknown>;
 }
 
 // ============================================================================
@@ -92,11 +88,11 @@ const toMyUserId = (value: unknown): number => {
  * 管理者の API キーを使ってもスペース全体には広がらない。
  */
 const resolveProjectIds = async (
-  fetcher: MasterFetcher,
+  gateway: BacklogGateway,
   projectKeys: readonly string[],
 ): Promise<ReadonlyMap<string, number>> => {
   // クエリを一切渡さない。`all` を「false で送る」のではなく「送らない」。
-  const response = await fetcher.get('/projects');
+  const response = await gateway.send({ endpoint: '/projects', method: 'GET' });
 
   if (!Array.isArray(response)) {
     throw new MasterDataError('GET /projects の応答が配列ではありません');
@@ -137,13 +133,13 @@ const resolveProjectIds = async (
  *
  * 4本の呼び出しは互いに独立なので並列に投げる（規約 §5.3）。
  *
- * @param fetcher - Backlog API を叩くもの
+ * @param gateway - Backlog API を叩くもの
  * @param projectKeys - 解決したいプロジェクトキー（ポリシーが許可したもの）
  * @returns 凍結済みのマスタ
  * @throws {MasterDataError} 応答の形が想定と違う場合、要求されたキーを解決できない場合
  */
 export const resolveMasters = async (
-  fetcher: MasterFetcher,
+  gateway: BacklogGateway,
   projectKeys: readonly string[],
 ): Promise<Masters> => {
   if (projectKeys.length === 0) {
@@ -151,10 +147,10 @@ export const resolveMasters = async (
   }
 
   const [projectIds, priorities, resolutions, myself] = await Promise.all([
-    resolveProjectIds(fetcher, projectKeys),
-    fetcher.get('/priorities'),
-    fetcher.get('/resolutions'),
-    fetcher.get('/users/myself'),
+    resolveProjectIds(gateway, projectKeys),
+    gateway.send({ endpoint: '/priorities', method: 'GET' }),
+    gateway.send({ endpoint: '/resolutions', method: 'GET' }),
+    gateway.send({ endpoint: '/users/myself', method: 'GET' }),
   ]);
 
   return Object.freeze({
