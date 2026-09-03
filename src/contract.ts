@@ -169,7 +169,36 @@ export class ScopeDeniedError extends Error {
   }
 }
 
-/** 設定の不備。起動時に投げて、サーバを立ち上げない。 */
+/** ポリシー記法の不備。起動時に投げて、サーバを立ち上げない。 */
 export class PolicyError extends Error {
   override readonly name = 'PolicyError';
+}
+
+/**
+ * 環境変数の不備。起動時に投げて、サーバを立ち上げない。
+ *
+ * **メッセージに値そのものを載せない。** API キーが混ざる経路を作らないため。
+ */
+export class ConfigError extends Error {
+  override readonly name = 'ConfigError';
+}
+
+/** Backlog のスペースが載るドメイン。一次情報ミラーで確認した閉じた3値。 */
+export const BACKLOG_DOMAINS = ['backlog.jp', 'backlog.com', 'backlogtool.com'] as const;
+
+export type BacklogDomain = (typeof BACKLOG_DOMAINS)[number];
+
+/**
+ * 起動時に確定する設定。
+ *
+ * `baseUrl` は**受け取った値ではなく組み立てた値**である。env から URL を受けないので、
+ * `https` 以外のスキーム・任意ホスト・パス注入は設定として表現できない。
+ */
+export interface ServerConfig {
+  readonly spaceId: string;
+  readonly domain: BacklogDomain;
+  readonly baseUrl: string;
+  readonly apiKey: string;
+  readonly policyPath: string;
+  readonly readOnly: boolean;
 }
