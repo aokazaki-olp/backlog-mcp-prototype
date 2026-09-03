@@ -64,9 +64,29 @@ URL ではなくスペースID を受けるのは、`https` 以外のスキー�
 }
 ```
 
-`node` は **24.12 以降**が要る（`package.json` の `engines` を参照。型注釈除去が stable な版）。
+`node` は **24.12 以降**が要る（`package.json` の `engines` を参照。型注釈除去が stable な版）。**ビルドは要らない** — Node が `.ts` を直接実行する。`src/libs/` は生成物ごとコミットしてあるので `npm ci` だけで動く。
 
 起動時に stderr へ接続先・展開したポリシー・書き込みを許可したプロジェクトを出す。
+
+### 初回の接続確認
+
+`stdin` が閉じれば終了するので、JSON-RPC を流し込めばそのまま疎通確認になる。
+
+```bash
+npm ci
+printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
+              '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  | BACKLOG_SPACE_ID=example \
+    BACKLOG_API_KEY=xxxxxxxx \
+    BACKLOG_POLICY=./backlog-policy.json \
+    node src/main.ts
+```
+
+**起動に失敗すれば exit 1 で、stdout には1バイトも出ない**（fail-closed）。理由は stderr に出て、`cause` まで辿って表示する。
+
+> **`npm start` を作っていないのは意図的。** npm は `> backlog-mcp@0.1.0 start` のような行を **stdout** に出す。stdio トランスポートでは stdout が JSON-RPC の通信路そのものなので、それだけでクライアントとの接続が壊れる。起動は常に `node src/main.ts` を直接指す。
+
+最初に転ぶとしたら `GET /projects` の応答の形。ポリシーのプロジェクトを1つでも解決できなければ `MasterDataError` で起動しない。
 
 ## 監査ログ
 

@@ -12,8 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test",
     "check": "npm run lint && npm run format && npm run typecheck && npm run test",
-    "verify:rules": "bash scripts/verify-rules.sh",
-    "start": "node src/main.ts"
+    "verify:rules": "bash scripts/verify-rules.sh"
   },
   "dependencies": {
     "got": "^14.6.6"
