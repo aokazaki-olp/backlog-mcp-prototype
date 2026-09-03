@@ -1,0 +1,7 @@
+{
+  "projects": [
+    "DOCS",
+    { "key": "PROJ", "can": "write" },
+    { "key": "INFRA", "can": "comment", "toolsets": ["issue"] }
+  ]
+}
