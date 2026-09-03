@@ -52,12 +52,23 @@ npm run verify:rules
 
 規約 §8.3 の範囲の切り方に従い、次は `lint` / `format` の対象から外してある（`.prettierignore` / `eslint.config.js`）。**抑制コメントで対処しない。同期や再生成で上書きされるため。**
 
-| 対象                                | 正本                                                                     |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `CODING_RULES.md`                   | `aokazaki-olp/coding-rules`                                              |
-| `.agents/skills/` `.claude/skills/` | 別リポジトリ                                                             |
-| `docs/reference/`                   | 生成物（`tools/backlog-docs/`）                                          |
-| `src/libs/`                         | `aokazaki-olp/libraries`（**ローカル編集禁止**。`SOURCE.md` に版を記録） |
+| 対象                                | 正本                                          |
+| ----------------------------------- | --------------------------------------------- |
+| `CODING_RULES.md`                   | `aokazaki-olp/coding-rules`                   |
+| `.agents/skills/` `.claude/skills/` | 別リポジトリ                                  |
+| `docs/reference/`                   | 生成物（`tools/backlog-docs/`）               |
+| `src/libs/`                         | `aokazaki-olp/libraries` の**生成物**（後述） |
+
+### `src/libs/` は借り物を「コンパイルした生成物」
+
+**ローカルで編集しない。** 作り直しは `tools/sync-libs.sh`、版は `src/libs/SOURCE.md` に記録。
+
+libraries は**旧規約のままが正しい**（新規約を入れると全モジュールの改修になる）。そのままコピーすると本リポジトリでは実行できないため、`tsconfig.libs.json` でコンパイルして `.js` + `.d.ts` を置いている。
+
+- パラメータプロパティが展開される（型注釈除去では実行できない）
+- 出力後は **`.js` が実ファイル**になるので、`src/libs/` への相対 import は `.js` を書く。lint の「相対 import の `.js` 禁止」はここだけ例外にしてある（規約の趣旨は「実ファイルの拡張子を書く」）
+
+規約 §1.3（適用範囲は実行モデルで決める）・§8（実行モデルごとに設定を分ける）に沿った扱い。`src/libs/` だけが「コンパイルを通す実行モデル」に属する。
 
 ## スキル
 

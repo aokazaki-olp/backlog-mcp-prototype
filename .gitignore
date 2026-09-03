@@ -2,6 +2,9 @@ node_modules/
 dist/
 *.log
 
+# tools/sync-libs.sh が使う一時ディレクトリ（借り物の .ts ソース）
+.libs-src/
+
 # ローカル設定・秘密
 .env
 .env.*

@@ -113,6 +113,11 @@ expect_lint_error '相対 import の `.js` を禁止する（静的）' \
 export const f = (): unknown => toError;"
 expect_lint_error '相対 import の `.js` を禁止する（動的）' \
   "export const f = async (): Promise<unknown> => import('../shared/toError.js');"
+# src/libs/ は借り物の生成物で実ファイルが `.js`。規約の趣旨は「実ファイルの拡張子を書く」
+# なので、そこへの `.js` は正しい。例外が libs だけに効いていることを確かめる。
+expect_lint_ok 'libs へは `.js` を書ける（実ファイルが `.js` だから）' \
+  "import { BacklogApiClient } from '../libs/BacklogApiClient.js';
+export const f = (): unknown => BacklogApiClient;"
 
 echo
 echo '── 構文・スタイル（規約 §5）'
@@ -149,7 +154,7 @@ expect_lint_error '`child_process` の import を禁止する' \
 export const f = (): unknown => execSync;"
 expect_layer_error 'tool 層から libs 層への import を禁止する' \
   'src/tool/_probe.ts' \
-  "import { BacklogApiClient } from '../libs/BacklogApiClient.ts';
+  "import { BacklogApiClient } from '../libs/BacklogApiClient.js';
 export const f = (): unknown => BacklogApiClient;"
 expect_layer_error 'policy 層から domain 層への import を禁止する' \
   'src/policy/_probe.ts' \

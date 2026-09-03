@@ -1,0 +1,29 @@
+{
+  // src/libs/ を生成するためだけの設定。**本体のコードには使わない。**
+  //
+  // 借り物（aokazaki-olp/libraries）は旧規約で書かれており、パラメータプロパティを使う。
+  // Node の型注釈除去では実行できないので、ここでコンパイルして .js + .d.ts を作る。
+  //
+  // 規約 §1.3 は「適用範囲はファイルの拡張子ではなく、そのコードを何が実行するかで決める」、
+  // §8 は「実行モデルごとに設定を分ける」と要求している。src/libs/ は
+  // 「コンパイルを通す実行モデル」として、この別設定を持つ。
+  //
+  // 本体の tsconfig.json と違って **erasableSyntaxOnly を付けない**（付けたら意味がない）。
+  // strict も付けない。借り物を新規約の厳しさで検査しても直せない（§8.3「借り物は対象外」）。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["ES2022"],
+    "types": ["node"],
+
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "removeComments": false,
+
+    "outDir": "src/libs",
+    "skipLibCheck": true
+  },
+  "include": []
+}
