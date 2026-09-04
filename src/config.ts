@@ -5,7 +5,9 @@
  */
 
 import { dirname, isAbsolute, resolve } from 'node:path';
+import { config as loadEnvFile } from '@dotenvx/dotenvx';
 import { BACKLOG_DOMAINS, ConfigError } from './contract.ts';
+import { toError } from './shared/toError.ts';
 import type { BacklogDomain, ServerConfig } from './contract.ts';
 
 /**
@@ -52,18 +54,102 @@ const required = (env: NodeJS.ProcessEnv, name: string): string => {
   return value;
 };
 
+/** dotenvx が復号できなかった値に残す接頭辞。 */
+const CIPHERTEXT_PREFIX = 'encrypted:';
+
+/** `.env` の中で API キーを入れておくキー名。 */
+const API_KEY_NAME = 'BACKLOG_API_KEY';
+
 /**
- * 環境変数から設定を組み立てる。純関数。
+ * 暗号化された `.env` から API キーを取り出す。**環境変数には平文を置かない。**
+ *
+ * 避けたい事故は2つ。
+ *
+ * 1. 環境変数は LLM のコンテキストに入り込みうる
+ * 2. `.mcp.json` を除外し忘れて追跡される
+ *
+ * どちらも「秘密を env にも `.mcp.json` にも置かない」ことで消える。env で受け取るのは
+ * **2つのファイルのパスだけ**で、暗号文（`.env`）はリポジトリに入れてよく、秘密鍵
+ * （`.env.keys`）はリポジトリの外に置く。**片方が漏れても復号できない。**
+ *
+ * ただし**両方のファイルを読める相手には効かない**。秘密鍵は平文でディスクにあり、
+ * Windows ではパーミッションも当てにできない（`fs` の `mode` は Windows で
+ * 「書き込み可否」しか表せない — Node 公式ドキュメントで確認）。守れるのは
+ * 「リポジトリが流出する」「env が覗かれる」の2経路だけで、それ以上は主張しない。
+ *
+ * 呼び方は実機で確かめてある（dotenvx 2.23.0）。
+ *
+ * - `processEnv` に自前のオブジェクトを渡すと **`process.env` を汚さない**
+ * - `strict: true` で**復号できなければ送出する**（鍵なし・鍵の取り違え・鍵ファイル不在の
+ *   3通りとも `DECRYPTION_FAILED` を確認）
+ *
+ * @param env - 環境変数
+ * @returns 復号した API キー
+ * @throws {ConfigError} パスが無い場合、復号できない場合、値が空の場合
+ */
+const decryptApiKey = (env: NodeJS.ProcessEnv): string => {
+  const envFile = required(env, 'BACKLOG_ENV_FILE');
+  const envKeysFile = required(env, 'BACKLOG_ENV_KEYS_FILE');
+  const decrypted: Record<string, string> = {};
+
+  try {
+    loadEnvFile({
+      path: [envFile],
+      envKeysFile,
+      // process.env ではなくこのオブジェクトへ書かせる
+      processEnv: decrypted,
+      // 復号できなければ黙って進まず送出させる
+      strict: true,
+      quiet: true,
+    });
+  } catch (e) {
+    // 値そのものは載せない。パスも載せない（どちらも秘密の在り処になる）
+    throw new ConfigError('API キーを復号できませんでした', { cause: toError(e) });
+  }
+
+  const apiKey = decrypted[API_KEY_NAME];
+  if (apiKey === undefined || apiKey === '') {
+    throw new ConfigError(`${envFile} に ${API_KEY_NAME} がありません`);
+  }
+  // strict が効いていれば到達しない。ライブラリの挙動に防御を預けないための保険
+  // （上流のテストは strict × 復号失敗の組み合わせを直接カバーしていない）
+  if (apiKey.startsWith(CIPHERTEXT_PREFIX)) {
+    throw new ConfigError(`${API_KEY_NAME} が復号されていません`);
+  }
+  return apiKey;
+};
+
+/**
+ * 差し替えられる依存。**テストから復号を差し込むためだけ**に使う（規約 §7）。
+ *
+ * env からは触れないので、設定として危険な値を表現できるようにはならない。
+ */
+export interface ConfigOverrides {
+  readonly resolveApiKey?: (env: NodeJS.ProcessEnv) => string;
+}
+
+/**
+ * 環境変数から設定を組み立てる。
  *
  * **URL を受け取らない。** スペースID とドメイン（閉じた3値）だけを受け、
  * `https://{spaceId}.{domain}` をこちらで組み立てる。スキーム・ホスト・パスを
  * 外から差し替える経路が存在しないので、ホスト検証そのものが不要になる。
  *
+ * **API キーも受け取らない。** 暗号化された `.env` から復号する（`decryptApiKey`）。
+ * 平文の環境変数で渡す口は用意していない — 用意すると「暗号化したつもりで平文のまま
+ * 動いている」状態が作れてしまう。
+ *
+ * 唯一 I/O を含むのが鍵の復号で、そこだけ `overrides` で差し替えられる。
+ *
  * @param env - 環境変数（`process.env` を渡す。テストでは任意のオブジェクト）
+ * @param overrides - テストから復号を差し込む口
  * @returns 確定した設定
- * @throws {ConfigError} 必須の環境変数が無い場合、値の形式が不正な場合
+ * @throws {ConfigError} 必須の環境変数が無い場合、値の形式が不正な場合、復号できない場合
  */
-export const loadConfig = (env: NodeJS.ProcessEnv): ServerConfig => {
+export const loadConfig = (
+  env: NodeJS.ProcessEnv,
+  overrides: ConfigOverrides = {},
+): ServerConfig => {
   const spaceId = required(env, 'BACKLOG_SPACE_ID');
   if (!SPACE_ID_PATTERN.test(spaceId)) {
     throw new ConfigError(
@@ -89,7 +175,7 @@ export const loadConfig = (env: NodeJS.ProcessEnv): ServerConfig => {
     domain,
     // 組み立てた値。受け取った値ではない。
     baseUrl: `https://${spaceId}.${domain}`,
-    apiKey: required(env, 'BACKLOG_API_KEY'),
+    apiKey: (overrides.resolveApiKey ?? decryptApiKey)(env),
     policyPath,
     logDir: resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath),
     readOnly: rawReadOnly === '1' || rawReadOnly === 'true',

@@ -87,10 +87,10 @@ const run = async (
     },
     {
       BACKLOG_SPACE_ID: 'example',
-      BACKLOG_API_KEY: 'secret-key-value',
+
       BACKLOG_POLICY: policyPath,
     },
-    { gateway: { transport, maxRetries: 0 } },
+    { gateway: { transport, maxRetries: 0 }, config: { resolveApiKey: () => 'secret-key-value' } },
   );
 
   return { written, urls: transport.urls, logDir: join(root, 'logs') };
@@ -273,10 +273,13 @@ describe('サーバ1本の通し — 起動できないとき', () => {
         },
         {
           BACKLOG_SPACE_ID: 'example',
-          BACKLOG_API_KEY: 'secret-key-value',
+
           BACKLOG_POLICY: policyPath,
         },
-        { gateway: { transport: makeTransport(), maxRetries: 0 } },
+        {
+          gateway: { transport: makeTransport(), maxRetries: 0 },
+          config: { resolveApiKey: () => 'secret-key-value' },
+        },
       ),
     );
 
@@ -304,10 +307,13 @@ describe('サーバ1本の通し — 起動できないとき', () => {
         },
         {
           BACKLOG_SPACE_ID: 'example',
-          BACKLOG_API_KEY: 'secret-key-value',
+
           BACKLOG_POLICY: policyPath,
         },
-        { gateway: { transport: makeTransport(), maxRetries: 0 } },
+        {
+          gateway: { transport: makeTransport(), maxRetries: 0 },
+          config: { resolveApiKey: () => 'secret-key-value' },
+        },
       ),
     );
 

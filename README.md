@@ -14,18 +14,47 @@ Backlog を Claude Code / Claude Desktop から扱う MCP サーバ。**イン�
 
 ## 設定
 
-**秘密は環境変数、構造はファイル。**
+**環境変数が受け取るのはパスだけ。秘密は1つも入らない。**
 
-| 環境変数            | 必須 | 内容                                                       |
-| ------------------- | :--: | ---------------------------------------------------------- |
-| `BACKLOG_SPACE_ID`  |  ✔   | スペースID **だけ**。URL は受け取らない                    |
-| `BACKLOG_API_KEY`   |  ✔   | Backlog の API キー                                        |
-| `BACKLOG_POLICY`    |  ✔   | ポリシーファイルのパス                                     |
-| `BACKLOG_DOMAIN`    |      | `backlog.jp`（既定）/ `backlog.com` / `backlogtool.com`    |
-| `BACKLOG_LOG_DIR`   |      | 監査ログの出力先。既定は**ポリシーファイルの隣**の `logs/` |
-| `BACKLOG_READ_ONLY` |      | `1` または `true` で全プロジェクトを `read` に切り下げる   |
+| 環境変数                | 必須 | 内容                                                       |
+| ----------------------- | :--: | ---------------------------------------------------------- |
+| `BACKLOG_SPACE_ID`      |  ✔   | スペースID **だけ**。URL は受け取らない                    |
+| `BACKLOG_ENV_FILE`      |  ✔   | **暗号化された** `.env` のパス                             |
+| `BACKLOG_ENV_KEYS_FILE` |  ✔   | 秘密鍵（`.env.keys`）のパス                                |
+| `BACKLOG_POLICY`        |  ✔   | ポリシーファイルのパス                                     |
+| `BACKLOG_DOMAIN`        |      | `backlog.jp`（既定）/ `backlog.com` / `backlogtool.com`    |
+| `BACKLOG_LOG_DIR`       |      | 監査ログの出力先。既定は**ポリシーファイルの隣**の `logs/` |
+| `BACKLOG_READ_ONLY`     |      | `1` または `true` で全プロジェクトを `read` に切り下げる   |
 
 URL ではなくスペースID を受けるのは、`https` 以外のスキーム・任意ホスト・パス注入を**設定として表現できなくする**ため。接続先は `https://{spaceId}.{domain}` としてサーバ側で組み立てる。
+
+### API キーは暗号化したファイルから読む
+
+**平文の環境変数で渡す口は用意していない。** 避けたい事故が2つあるため。
+
+1. 環境変数は LLM のコンテキストに入り込みうる
+2. `.mcp.json` を除外し忘れて追跡される
+
+秘密を env にも `.mcp.json` にも置かなければ、どちらも起きない。
+
+```bash
+# 1. 平文で書いて
+echo 'BACKLOG_API_KEY=xxxxxxxx' > .env
+
+# 2. 暗号化する（.env の値が置き換わり、.env.keys に秘密鍵が出る）
+npx dotenvx encrypt -f .env
+
+# 3. 秘密鍵をリポジトリの外へ move する
+mv .env.keys ~/.backlog-mcp/.env.keys
+```
+
+> **`encrypt` は `.env.keys` を `-f` の隣ではなくカレントディレクトリに書く。** 実行場所に注意。
+
+`.env` は暗号文になっているので、置き場所は自由（`.gitignore` は既に `.env*` を無視している）。**秘密鍵とは別の場所に置くこと** — 両方が同じ場所にあると暗号化の意味が無い。
+
+**守れるのは2経路だけ。** 「リポジトリが流出する」「env が覗かれる」。**両方のファイルを読める相手には効かない**（秘密鍵は平文でディスクにある）。「暗号化したから安全」ではない。
+
+> Windows ではファイルのパーミッションに頼れない。Node のドキュメントによれば `mkdir` の `mode` は **Not supported on Windows**、`chmod` は **書き込み可否しか変えられず、所有者 / グループ / その他の区別は無い**。だから保護は**置き場所と暗号化**で作る。
 
 ### ポリシー
 
@@ -57,7 +86,8 @@ URL ではなくスペースID を受けるのは、`https` 以外のスキー�
       "args": ["/path/to/backlog-mcp/src/main.ts"],
       "env": {
         "BACKLOG_SPACE_ID": "example",
-        "BACKLOG_API_KEY": "xxxxxxxx",
+        "BACKLOG_ENV_FILE": "${LOCALAPPDATA}/backlog-mcp/.env",
+        "BACKLOG_ENV_KEYS_FILE": "${LOCALAPPDATA}/backlog-mcp/keys/.env.keys",
         "BACKLOG_POLICY": "/path/to/backlog-policy.json"
       }
     }
@@ -78,7 +108,8 @@ npm ci
 printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
               '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
   | BACKLOG_SPACE_ID=example \
-    BACKLOG_API_KEY=xxxxxxxx \
+    BACKLOG_ENV_FILE=~/.backlog-mcp/.env \
+    BACKLOG_ENV_KEYS_FILE=~/.backlog-mcp/keys/.env.keys \
     BACKLOG_POLICY=./backlog-policy.json \
     node src/main.ts
 ```
@@ -98,7 +129,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 - **ファイルと stderr の両方に出す。** MCP 仕様は「クライアントは stderr を capture / forward / **ignore** してよい」と定めているので、stderr だけを出口にすると残るかどうかがクライアント次第になる
 - **書けなければ起動しない。** 監査に寄りかかった設計が監査なしで動くのは、防御について嘘をつくことになる
 - **ローテーションも自動削除もしない。** 日付でファイルが分かれるだけ。古いログを消すのは運用の判断
-- 同期書き込み（プロセスが落ちても直近の行を失わない）。ファイルは `0600`
+- 同期書き込み（プロセスが落ちても直近の行を失わない）
+- パーミッションは POSIX でのみ `0700` / `0600` を指定する。**Windows では効かない**（Node の `mkdir` の `mode` は Not supported on Windows、`chmod` は書き込み可否しか変えられない）。**保護として数えない** — 実際に効くのは置き場所のディレクトリ側
 
 `/tmp` を既定にしていないのは、systemd の既定で**10日後に消える**（`tmpfiles.d/tmp.conf` の `q /tmp 1777 root root 10d`）ため。OS が定期的に消す場所に置いた監査ログは、監査ログとして機能しない。
 

@@ -20,6 +20,7 @@ import { serve } from './mcp/stdio.ts';
 import { explainPolicy, loadPolicy, writableProjectKeys } from './policy/policy.ts';
 import { DEFAULT_LIMITS, buildHandlers } from './tool/tools.ts';
 import { toError } from './shared/toError.ts';
+import type { ConfigOverrides } from './config.ts';
 import type { GatewayOverrides } from './domain/backlogGateway.ts';
 import type { McpHandlers, ServerInfo } from './mcp/protocol.ts';
 import type { StdioChannel } from './mcp/stdio.ts';
@@ -51,6 +52,7 @@ export const SERVER_INFO: ServerInfo = {
  */
 export interface ServerOverrides {
   readonly gateway?: GatewayOverrides;
+  readonly config?: ConfigOverrides;
 }
 
 /** ポリシーファイルを読む。読めない・JSON でない・記法が不正のいずれでも起動しない。 */
@@ -89,7 +91,7 @@ export const createHandlers = async (
   env: NodeJS.ProcessEnv,
   overrides: ServerOverrides = {},
 ): Promise<McpHandlers> => {
-  const config = loadConfig(env);
+  const config = loadConfig(env, overrides.config);
 
   // ファイルに書けなければここで落ちる。監査に寄りかかった設計が監査なしで動くのは、
   // 防御について嘘をつくことになる（fail-closed）。

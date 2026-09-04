@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { loadConfig } from '../src/config.ts';
+import { loadConfig as loadConfigReal } from '../src/config.ts';
 import { ConfigError } from '../src/contract.ts';
 import { createFileAuditSink, multiAuditSink } from '../src/mcp/audit.ts';
 import type { AuditSink } from '../src/mcp/audit.ts';
@@ -25,9 +25,12 @@ const makeRoot = (): string => mkdtempSync(join(tmpdir(), 'backlog-mcp-test-'));
 
 const baseEnv = (policyPath: string): Record<string, string> => ({
   BACKLOG_SPACE_ID: 'example',
-  BACKLOG_API_KEY: 'secret-key-value',
   BACKLOG_POLICY: policyPath,
 });
+
+/** この節が見たいのは出力先の解決なので、復号だけ差し替える（規約 §7）。 */
+const loadConfig = (env: NodeJS.ProcessEnv): ReturnType<typeof loadConfigReal> =>
+  loadConfigReal(env, { resolveApiKey: () => 'secret-key-value' });
 
 describe('loadConfig — ログの出力先', () => {
   it('既定はポリシーファイルの隣の logs/', () => {
