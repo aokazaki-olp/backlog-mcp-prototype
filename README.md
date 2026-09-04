@@ -129,6 +129,23 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 
 課題の指定は**課題キー**（`PROJ-123`）のみ。数値の課題 ID は受け付けない（プロジェクトをローカルで判定できなくなるため）。検索対象のプロジェクトはポリシー由来の値で組み立てるので、引数では広げられない。
 
+### 返す項目は API ドキュメントから決めている
+
+`docs/reference/api/v2/` のミラー（応答例つき）を読んで決めた。**実データを見て決めたものではない。**
+
+| 扱い             | 項目                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **名前で返す**   | `issueType` / `status` / `priority` / `resolution` / `assignee` / `category` / `milestone` / `versions` / `createdUser` / `updatedUser` |
+| **そのまま返す** | `summary` / `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）    |
+| **囲んで返す**   | `description` / `childIssueSummary` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）                         |
+| **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount`                                                                       |
+| **落とす**       | `id` / `projectId` / `keyId`（連番）、`sharedFiles` / `stars`（`stars[].presenter` はユーザーオブジェクトごと入る）                     |
+| **出さない**     | `customFields`（後述）                                                                                                                  |
+
+**ユーザーオブジェクトは `name` しか出さない。** Backlog のユーザーは `id` / `userId` / `name` / `roleType` / `lang` / `nulabAccount` / `mailAddress` / `lastLoginTime` を持ち、`assignee` / `createdUser` / `updatedUser` / `stars[].presenter` / `notifications[].user` すべてが同じ形。**出力へ載せる経路を1つ（`pickName`）に限る**ことで担保していて、テストで固定してある。
+
+**`customFields` だけは出していない。** 定義の形（`GET /custom-fields`）はドキュメントにあるが、**課題の応答に入るときの値の形はミラーのどの応答例でも `[]`** で、一度も埋まっていない。スペースごとに管理者が定義するため。形を推測して書くと、外れたとき型は通ったまま黙って落ちるので、**分かるまで出さない**。
+
 ## プロンプトインジェクションについて
 
 課題・コメント・Wiki の本文は**第三者が書ける untrusted な入力**で、MCP サーバ側でインジェクションを防ぐことはできない。

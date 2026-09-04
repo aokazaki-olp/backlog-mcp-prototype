@@ -162,9 +162,34 @@ const boundedCount = (args: Record<string, unknown>, limits: ToolLimits): number
 const pickString = (value: unknown): string | undefined =>
   typeof value === 'string' ? value : undefined;
 
-/** `{ name: ... }` の形から name だけを取る（数値 ID は落とす）。 */
+/**
+ * `{ name: ... }` の形から name だけを取る。
+ *
+ * **ユーザーオブジェクトを出力に載せる唯一の経路。** Backlog のユーザーは
+ * `id` / `userId` / `name` / `roleType` / `lang` / `nulabAccount` / `mailAddress` /
+ * `lastLoginTime` を持ち、`assignee` / `createdUser` / `updatedUser` /
+ * `stars[].presenter` / `notifications[].user` すべてが同じ形をしている。
+ * **ここを通す限り `name` しか出ない** ので、経路を増やさないことが要件になる。
+ */
 const pickName = (value: unknown): string | undefined =>
   isRecord(value) ? pickString(value['name']) : undefined;
+
+/** `[{ name: ... }, ...]` から名前だけを並べる。空なら undefined（キーごと出さない）。 */
+const pickNames = (value: unknown): readonly string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const names = value.map(pickName).filter(name => name !== undefined);
+  return names.length === 0 ? undefined : names;
+};
+
+/** 数値をそのまま取る。**ID には使わない** — 工数のような実測値だけ。 */
+const pickNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' ? value : undefined;
+
+/** 配列の件数。中身（`id` やファイル名）は出さず、あるという事実だけ返す。 */
+const countOf = (value: unknown): number | undefined =>
+  Array.isArray(value) ? value.length : undefined;
 
 /**
  * 出力から**数値 ID を落とす**。
@@ -172,13 +197,30 @@ const pickName = (value: unknown): string | undefined =>
  * Backlog の `projectId` / `issueId` は連番なので、返すとスコープ外の資源の存在を
  * 推測できる。返した値が別の操作への入口にならないようにする（Electron が
  * `IpcRendererEvent` を渡すなと言うのと同型）。
+ *
+ * **項目はミラーの応答例から決めている**（`docs/reference/api/v2/get-issue.md`。
+ * 一覧は `childIssueSummary` が1つ増えるだけで同じ形）。実データではなく仕様で決まる。
+ *
+ * | 扱い | 項目 |
+ * | --- | --- |
+ * | 落とす | `id` / `projectId` / `keyId`（連番。`issueKey` があれば足りる） |
+ * | 落とす | `sharedFiles` / `stars`（使わない。`stars[].presenter` はユーザーごと入る） |
+ * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 |
+ * | **未確認** | `customFields` — スペースごとに管理者が定義し、**ミラーの応答例では常に `[]`**。 |
+ * |  | 値の形が分からないまま `shape` を書くと外れたとき黙って落ちるので、出さない |
  */
 const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: '課題の形が想定と違います' };
   }
   const issueKey = pickString(raw['issueKey']) ?? '(不明)';
+  const wrap = (text: string, field: string): string =>
+    wrapUntrusted(text, {
+      source: `backlog:issue:${issueKey}:${field}`,
+      maxLength: limits.maxTextLength,
+    });
   const description = pickString(raw['description']);
+  const childIssueSummary = pickString(raw['childIssueSummary']);
 
   return {
     issueKey,
@@ -186,19 +228,61 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     issueType: pickName(raw['issueType']),
     status: pickName(raw['status']),
     priority: pickName(raw['priority']),
+    resolution: pickName(raw['resolution']),
     assignee: pickName(raw['assignee']),
+    category: pickNames(raw['category']),
+    milestone: pickNames(raw['milestone']),
+    versions: pickNames(raw['versions']),
+    startDate: pickString(raw['startDate']),
+    dueDate: pickString(raw['dueDate']),
+    estimatedHours: pickNumber(raw['estimatedHours']),
+    actualHours: pickNumber(raw['actualHours']),
+    // 連番 ID は落とすが、「子課題である」事実は残す
+    hasParent: pickNumber(raw['parentIssueId']) !== undefined,
+    attachmentCount: countOf(raw['attachments']),
+    createdUser: pickName(raw['createdUser']),
     created: pickString(raw['created']),
+    updatedUser: pickName(raw['updatedUser']),
     updated: pickString(raw['updated']),
-    description:
-      description === undefined
-        ? undefined
-        : wrapUntrusted(description, {
-            source: `backlog:issue:${issueKey}:description`,
-            maxLength: limits.maxTextLength,
-          }),
+    description: description === undefined ? undefined : wrap(description, 'description'),
+    childIssueSummary:
+      childIssueSummary === undefined ? undefined : wrap(childIssueSummary, 'childIssueSummary'),
   };
 };
 
+/**
+ * 変更履歴を1つの塊にする。
+ *
+ * `field` は Backlog の語彙だが `newValue` / `originalValue` は第三者が書いた
+ * 文字列なので、呼び出し側で全体を囲む。
+ */
+const renderChangeLog = (raw: unknown): string | undefined => {
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  const lines: string[] = [];
+  for (const entry of raw) {
+    if (!isRecord(entry)) {
+      continue;
+    }
+    const field = pickString(entry['field']) ?? '(不明な項目)';
+    const originalValue = pickString(entry['originalValue']) ?? '(なし)';
+    const newValue = pickString(entry['newValue']) ?? '(なし)';
+    lines.push(`${field}: ${originalValue} → ${newValue}`);
+  }
+  return lines.length === 0 ? undefined : lines.join('\n');
+};
+
+/**
+ * **状態変更だけのコメントを「空のコメント」にしない。**
+ *
+ * Backlog は「未対応 → 処理中」のような操作もコメントとして返す。そのとき
+ * **`content` は `null`** で、変わった内容は `changeLog` に入る（ミラーの
+ * `get-comment-list.md` で確認）。`changeLog` を落とすと中身のない `<untrusted>`
+ * だけが並び、呼び出し側からは空のコメントに見える（規約 §5.4 の沈黙の失敗）。
+ *
+ * `id` / `projectId` / `issueId` / `stars` / `notifications` は落とす。
+ */
 const shapeComment = (
   raw: unknown,
   issueKey: string,
@@ -207,24 +291,39 @@ const shapeComment = (
   if (!isRecord(raw)) {
     return { error: 'コメントの形が想定と違います' };
   }
-  const content = pickString(raw['content']) ?? '';
+  const wrap = (text: string, field: string): string =>
+    wrapUntrusted(text, {
+      source: `backlog:issue:${issueKey}:${field}`,
+      maxLength: limits.maxTextLength,
+    });
+  const content = pickString(raw['content']);
+  const changeLog = renderChangeLog(raw['changeLog']);
+
   return {
     createdUser: pickName(raw['createdUser']),
     created: pickString(raw['created']),
-    content: wrapUntrusted(content, {
-      source: `backlog:issue:${issueKey}:comment`,
-      maxLength: limits.maxTextLength,
-    }),
+    updated: pickString(raw['updated']),
+    content: content === undefined || content === '' ? undefined : wrap(content, 'comment'),
+    changeLog: changeLog === undefined ? undefined : wrap(changeLog, 'comment:changeLog'),
+    // どちらも無いのは想定外の形。黙って空を返さない
+    note:
+      content === undefined && changeLog === undefined
+        ? '本文も変更履歴も無いコメントです'
+        : undefined,
   };
 };
 
+/** 一覧の1件。**`content` は一覧の応答に無い**（本文は `shapeWikiPageDetail`）。 */
 const shapeWikiPage = (raw: unknown): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: 'Wiki ページの形が想定と違います' };
   }
   return {
     name: pickString(raw['name']),
+    tags: pickNames(raw['tags']),
     createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+    updatedUser: pickName(raw['updatedUser']),
     updated: pickString(raw['updated']),
   };
 };
@@ -247,7 +346,11 @@ const shapeWikiPageDetail = (
   return {
     projectKey,
     name,
+    tags: pickNames(raw['tags']),
+    attachmentCount: countOf(raw['attachments']),
     createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+    updatedUser: pickName(raw['updatedUser']),
     updated: pickString(raw['updated']),
     content: wrapUntrusted(pickString(raw['content']) ?? '', {
       source: `backlog:wiki:${projectKey}:${name}:content`,
