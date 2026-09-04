@@ -458,8 +458,27 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     assert.equal(shaped['hasParent'], false);
   });
 
-  it('customFields は出さない（値の形がミラーで確認できていない）', () => {
-    assert.equal(Object.keys(shapedIssue()).includes('customFields'), false);
+  it('customFields は中身を出さず、件数だけ返す', () => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    // 要素のキー名は仕様書に無いので、中身に何が入っていても読まない
+    const shaped = shape({
+      ...MIRROR_ISSUE,
+      customFields: [
+        { id: 1, name: '対応環境', value: 'Windows 8' },
+        { id: 2, name: '重要度', value: 7 },
+      ],
+    }) as Record<string, unknown>;
+
+    assert.equal(shaped['customFieldCount'], 2);
+    assert.equal(Object.keys(shaped).includes('customFields'), false);
+    // 中身は読んでいないので、値も名前も出ない
+    assert.doesNotMatch(JSON.stringify(shaped), /対応環境|Windows 8|重要度/);
+  });
+
+  it('カスタム属性が無ければ件数ごと出さない（0 を全課題に載せない）', () => {
+    // 値が undefined のキーは Object.keys には残るが JSON では消える。
+    // LLM に届くのは JSON なので、そちらで見る
+    assert.doesNotMatch(JSON.stringify(shapedIssue()), /customFieldCount/);
   });
 
   it('id 系・sharedFiles・stars を落とす', () => {

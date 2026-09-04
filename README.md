@@ -138,13 +138,24 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 | **名前で返す**   | `issueType` / `status` / `priority` / `resolution` / `assignee` / `category` / `milestone` / `versions` / `createdUser` / `updatedUser` |
 | **そのまま返す** | `summary` / `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）    |
 | **囲んで返す**   | `description` / `childIssueSummary` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）                         |
-| **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount`                                                                       |
+| **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount` / `customFields` → `customFieldCount`（後述）                         |
 | **落とす**       | `id` / `projectId` / `keyId`（連番）、`sharedFiles` / `stars`（`stars[].presenter` はユーザーオブジェクトごと入る）                     |
-| **出さない**     | `customFields`（後述）                                                                                                                  |
+
+件数と名前の配列は、**空なら項目ごと出さない**（`0` や `[]` を全課題に載せるとノイズになる）。無いことは「項目が無い」で表す。
 
 **ユーザーオブジェクトは `name` しか出さない。** Backlog のユーザーは `id` / `userId` / `name` / `roleType` / `lang` / `nulabAccount` / `mailAddress` / `lastLoginTime` を持ち、`assignee` / `createdUser` / `updatedUser` / `stars[].presenter` / `notifications[].user` すべてが同じ形。**出力へ載せる経路を1つ（`pickName`）に限る**ことで担保していて、テストで固定してある。
 
-**`customFields` だけは出していない。** 定義の形（`GET /custom-fields`）はドキュメントにあるが、**課題の応答に入るときの値の形はミラーのどの応答例でも `[]`** で、一度も埋まっていない。スペースごとに管理者が定義するため。形を推測して書くと、外れたとき型は通ったまま黙って落ちるので、**分かるまで出さない**。
+### `customFields` は件数だけ返す
+
+仕様書にある情報の方が多い。
+
+- **`typeId` の8値**（1文字列 / 2文章 / 3数値 / 4日付 / 5単一リスト / 6複数リスト / 7チェックボックス / 8ラジオ）
+- **値の型** — テキスト=文字列 / 数値=数値 / 日付=`yyyy-MM-dd` / **リスト=値のID**
+- **定義の取得** — `GET /projects/:projectIdOrKey/customFields`（プロジェクト単位）
+
+**無いのは課題レスポンスの配列要素のキー名だけ**で、応答例8箇所すべてが `[]`。要素の形を推測して書くと、外れたとき型は通ったまま黙って空になる。だから**中身は読まず、件数だけ返して「ある」ことは伝える**。
+
+中身を出す段になったら、**定義を起動時に解決して `itemId → name` に変換するのが必須**になる。リスト型の値は ID なので、素通しすると「数値 ID を LLM に触らせない」という設計に反する。まず `tools/backlog-docs/fetch.sh` でミラーを取り直し（現在 2026-08-30 取得）、それでも埋まっていなければカスタム属性を設定した課題1件で決まる。
 
 ## プロンプトインジェクションについて
 

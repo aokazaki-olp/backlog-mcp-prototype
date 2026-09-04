@@ -187,9 +187,14 @@ const pickNames = (value: unknown): readonly string[] | undefined => {
 const pickNumber = (value: unknown): number | undefined =>
   typeof value === 'number' ? value : undefined;
 
-/** 配列の件数。中身（`id` やファイル名）は出さず、あるという事実だけ返す。 */
+/**
+ * 配列の件数。中身（`id` やファイル名）は出さず、あるという事実だけ返す。
+ *
+ * 空なら `undefined`（キーごと出さない）。`0` を全件に載せるとノイズになるので、
+ * `pickNames` と同じ約束にする — **無いことは「キーが無い」で表す**。
+ */
 const countOf = (value: unknown): number | undefined =>
-  Array.isArray(value) ? value.length : undefined;
+  Array.isArray(value) && value.length > 0 ? value.length : undefined;
 
 /**
  * 出力から**数値 ID を落とす**。
@@ -205,9 +210,17 @@ const countOf = (value: unknown): number | undefined =>
  * | --- | --- |
  * | 落とす | `id` / `projectId` / `keyId`（連番。`issueKey` があれば足りる） |
  * | 落とす | `sharedFiles` / `stars`（使わない。`stars[].presenter` はユーザーごと入る） |
- * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 |
- * | **未確認** | `customFields` — スペースごとに管理者が定義し、**ミラーの応答例では常に `[]`**。 |
- * |  | 値の形が分からないまま `shape` を書くと外れたとき黙って落ちるので、出さない |
+ * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 / `customFields` → 件数（下記） |
+ *
+ * **`customFields` は件数だけ返す。** 仕様書にある — `typeId` の8値（`add-custom-field.md`）も、
+ * 値の型（テキスト=文字列 / 数値=数値 / 日付=`yyyy-MM-dd` / **リスト=値のID**、`add-issue.md`）も、
+ * 定義の取得（`GET /projects/:projectIdOrKey/customFields`）も。**無いのは課題レスポンスの
+ * 配列要素のキー名だけ**で、応答例8箇所すべてが `[]`。
+ *
+ * 中身を出すなら、**定義を起動時に解決して `itemId → name` に変換するのが必須**になる
+ * （リスト型の値は ID なので、素通しすると原則4「ID を LLM に触らせない」に反する）。
+ * 要素のキー名を推測して書くと外れたとき型は通ったまま黙って空になるので、**件数だけ返して
+ * 「ある」ことは伝える**（規約 §5.4 — 黙って落とさない）。
  */
 const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
@@ -240,6 +253,8 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     // 連番 ID は落とすが、「子課題である」事実は残す
     hasParent: pickNumber(raw['parentIssueId']) !== undefined,
     attachmentCount: countOf(raw['attachments']),
+    // 中身は出さない（要素のキー名が仕様書に無い）。あることは伝える
+    customFieldCount: countOf(raw['customFields']),
     createdUser: pickName(raw['createdUser']),
     created: pickString(raw['created']),
     updatedUser: pickName(raw['updatedUser']),
