@@ -26,6 +26,13 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/api/v2/priorities': [{ id: 2, name: '高' }],
   '/api/v2/resolutions': [{ id: 0, name: '対応済み' }],
   '/api/v2/users/myself': { id: 42 },
+  '/api/v2/wikis': [{ id: 112, projectId: 101, name: 'Home' }],
+  '/api/v2/wikis/112': {
+    id: 112,
+    projectId: 101,
+    name: 'Home',
+    content: 'Wiki の本文。ここも第三者が書ける',
+  },
   '/api/v2/issues/PROJ-1': {
     id: 777,
     projectId: 101,
@@ -150,6 +157,40 @@ describe('サーバ1本の通し — 初期化からツール呼び出しまで'
     assert.match(text, /backlog:issue:PROJ-1:description/);
     assert.doesNotMatch(text, /777/);
     assert.doesNotMatch(text, /projectId/);
+  });
+
+  it('get_wiki_page は一覧 → 本文の2往復で本文まで届く', async () => {
+    const { written, urls } = await run([
+      request(1, 'tools/call', {
+        name: 'get_wiki_page',
+        arguments: { projectKey: 'PROJ', name: 'Home' },
+      }),
+    ]);
+
+    // 起動時のマスタ解決4本のあとに、一覧 → 本文の順で2本
+    assert.deepEqual(
+      urls.slice(4).map(url => new URL(url).pathname),
+      ['/api/v2/wikis', '/api/v2/wikis/112'],
+    );
+
+    const text =
+      (JSON.parse(written[0] ?? '{}') as { result: { content: { text: string }[] } }).result
+        .content[0]?.text ?? '';
+    assert.match(text, /backlog:wiki:PROJ:Home:content/);
+    assert.match(text, /Wiki の本文/);
+  });
+
+  it('2往復でも監査ログのツール呼び出しは1件', async () => {
+    const { logDir } = await run([
+      request(1, 'tools/call', {
+        name: 'get_wiki_page',
+        arguments: { projectKey: 'PROJ', name: 'Home' },
+      }),
+    ]);
+
+    const calls = auditLines(logDir).filter(record => record['event'] === 'tools/call');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.['ok'], true);
   });
 
   it('許可外のプロジェクトは API に到達しない', async () => {

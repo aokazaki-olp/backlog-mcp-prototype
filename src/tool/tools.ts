@@ -46,12 +46,32 @@ export interface ToolContext extends PlanContext {
 /**
  * input 段の成果物。**このリクエストは送るだけの状態になっている。**
  *
- * `shape` は応答を整える純関数（フィールドを絞り、第三者のテキストを囲む）。
+ * ほとんどのツールは1往復で済む（`send`）が、`GET /wikis/:wikiId` のように
+ * **数値 ID しか受けないエンドポイント**へ届くには、先に一覧を引いて名前から
+ * ID を解決する往復が要る（`chain`）。
+ *
+ * - `shape` は応答を整える純関数（フィールドを絞り、第三者のテキストを囲む）
+ * - `next` は**応答から次のリクエストを決める純関数**。I/O は `runTool` に留まるので、
+ *   「一覧の応答 → 次に何を叩くか」を Transport 抜きで検証できる
  */
-export interface PlannedCall {
-  readonly request: ResolvedRequest;
-  readonly shape: (raw: unknown) => unknown;
-}
+export type PlannedCall =
+  | {
+      readonly kind: 'send';
+      readonly request: ResolvedRequest;
+      readonly shape: (raw: unknown) => unknown;
+    }
+  | {
+      readonly kind: 'chain';
+      readonly request: ResolvedRequest;
+      readonly next: (raw: unknown) => PlannedCall;
+    };
+
+/**
+ * 1回のツール呼び出しで許す往復の上限。
+ *
+ * 今使うのは2（一覧 → 本文）。上限に達したら黙って止めず送出する（規約 §5.4）。
+ */
+const MAX_HOPS = 4;
 
 // ============================================================================
 // input — 引数の検証（外部入力なので unknown で受ける。規約 §4.6）
@@ -209,11 +229,60 @@ const shapeWikiPage = (raw: unknown): Record<string, unknown> => {
   };
 };
 
+/**
+ * Wiki の本文。**一覧（`shapeWikiPage`）とは別物** — 一覧に `content` は無い。
+ *
+ * `id` / `projectId` は落とす。返した値が別の操作への入口にならないようにする
+ * （そもそも `wikiId` を受け取るツールを作っていないので、返しても使い道が無い）。
+ */
+const shapeWikiPageDetail = (
+  raw: unknown,
+  projectKey: string,
+  limits: ToolLimits,
+): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: 'Wiki ページの形が想定と違います' };
+  }
+  const name = pickString(raw['name']) ?? '(不明)';
+  return {
+    projectKey,
+    name,
+    createdUser: pickName(raw['createdUser']),
+    updated: pickString(raw['updated']),
+    content: wrapUntrusted(pickString(raw['content']) ?? '', {
+      source: `backlog:wiki:${projectKey}:${name}:content`,
+      maxLength: limits.maxTextLength,
+    }),
+  };
+};
+
 const asArray = (value: unknown, where: string): readonly unknown[] => {
   if (!Array.isArray(value)) {
     throw new Error(`${where} の応答が配列ではありません`);
   }
   return value;
+};
+
+/**
+ * 一覧の応答からページ名に一致する id を取り出す。**純関数**。
+ *
+ * 呼び出し元が渡すのは「ポリシー由来の `projectIdOrKey` で絞った一覧」なので、
+ * ここで取れる id は**定義上すべて許可プロジェクトのもの**。LLM から id を受け取る
+ * 口が無いことと合わせて、スコープ外の Wiki へ到達する経路が存在しない。
+ *
+ * 見つからなければ送出する（規約 §5.4 — 黙って空を返さない）。
+ */
+const findWikiId = (raw: unknown, name: string): number => {
+  for (const item of asArray(raw, 'GET /wikis')) {
+    if (!isRecord(item) || item['name'] !== name) {
+      continue;
+    }
+    const id = item['id'];
+    if (typeof id === 'number') {
+      return id;
+    }
+  }
+  throw new Error(`Wiki ページ「${name}」が見つかりません`);
 };
 
 /** 打ち切った事実を必ず出力に載せる（規約 §5.4）。 */
@@ -265,6 +334,7 @@ export const planToolCall = (
         query['keyword'] = keyword;
       }
       return {
+        kind: 'send',
         request: { endpoint: '/issues', method: 'GET', query },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues'), count);
@@ -280,6 +350,7 @@ export const planToolCall = (
     case 'get_issue': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       return {
+        kind: 'send',
         request: { endpoint: `/issues/${issueKey}`, method: 'GET' },
         shape: raw => shapeIssue(raw, limits),
       };
@@ -289,6 +360,7 @@ export const planToolCall = (
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const count = boundedCount(args, limits);
       return {
+        kind: 'send',
         request: {
           endpoint: `/issues/${issueKey}/comments`,
           method: 'GET',
@@ -321,6 +393,7 @@ export const planToolCall = (
         query['keyword'] = keyword;
       }
       return {
+        kind: 'send',
         request: { endpoint: '/wikis', method: 'GET', query },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /wikis'), limits.maxCount);
@@ -329,10 +402,38 @@ export const planToolCall = (
       };
     }
 
+    case 'get_wiki_page': {
+      const projectKey = requiredString(args, 'projectKey');
+      if (!isAllowed(context.policy, projectKey, toolName)) {
+        throw new ScopeDeniedError(
+          `プロジェクト ${projectKey} では ${toolName} を実行できません`,
+          toolName,
+          projectKey,
+        );
+      }
+      const name = requiredString(args, 'name');
+      return {
+        kind: 'chain',
+        // 1本目は一覧。projectIdOrKey はポリシー由来なので、返るのは許可プロジェクトの Wiki だけ。
+        request: {
+          endpoint: '/wikis',
+          method: 'GET',
+          query: { projectIdOrKey: toProjectId(masters, projectKey) },
+        },
+        next: raw => ({
+          kind: 'send',
+          // 2本目の id は 1本目の応答からしか採らない。引数で渡す口は作っていない。
+          request: { endpoint: `/wikis/${String(findWikiId(raw, name))}`, method: 'GET' },
+          shape: detail => shapeWikiPageDetail(detail, projectKey, limits),
+        }),
+      };
+    }
+
     case 'add_issue_comment': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const content = requiredString(args, 'content');
       return {
+        kind: 'send',
         // notifiedUserId は載せない。LLM に通知先を決めさせない。
         request: {
           endpoint: `/issues/${issueKey}/comments`,
@@ -379,14 +480,27 @@ const sendRequest = async (context: ToolContext, request: ResolvedRequest): Prom
   }
 };
 
-/** I/O はここ1回だけ。input と output は `planToolCall` が持つ。 */
+/**
+ * **I/O はここだけ。** 何を送り、応答をどう読むかは `planToolCall` が持つ純関数が決める。
+ *
+ * `chain` が返るあいだ往復を続ける。上限に達したら送出する（規約 §5.4 — 打ち切りを
+ * 黙って成功にしない）。今の最長は2往復（Wiki の一覧 → 本文）。
+ */
 const runTool = async (
   context: ToolContext,
   toolName: ToolName,
   args: Record<string, unknown>,
 ): Promise<unknown> => {
-  const { request, shape } = planToolCall(context, toolName, args);
-  return shape(await sendRequest(context, request));
+  let planned = planToolCall(context, toolName, args);
+
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    const raw = await sendRequest(context, planned.request);
+    if (planned.kind === 'send') {
+      return planned.shape(raw);
+    }
+    planned = planned.next(raw);
+  }
+  throw new Error(`${toolName} が ${String(MAX_HOPS)} 往復で終わりませんでした`);
 };
 
 // ============================================================================
@@ -432,6 +546,18 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       keyword: { type: 'string', description: '検索キーワード' },
     },
     required: ['projectKey'],
+    additionalProperties: false,
+  },
+  get_wiki_page: {
+    type: 'object',
+    properties: {
+      projectKey: { type: 'string', description: 'プロジェクトキー（例: PROJ）' },
+      name: {
+        type: 'string',
+        description: 'ページ名。list_wiki_pages が返す name をそのまま渡す。数値 ID は不可',
+      },
+    },
+    required: ['projectKey', 'name'],
     additionalProperties: false,
   },
   add_issue_comment: {

@@ -34,6 +34,7 @@ export const TOOL_NAMES = [
   'get_issue',
   'get_issue_comments',
   'list_wiki_pages',
+  'get_wiki_page',
   'add_issue_comment',
 ] as const;
 
@@ -103,6 +104,15 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'Wiki ページ一覧を取得する',
     description: '許可されたプロジェクトの Wiki ページ一覧を取得する。',
+    readOnly: true,
+  },
+  get_wiki_page: {
+    toolset: 'wiki',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'Wiki ページの本文を取得する',
+    description:
+      'プロジェクトキーとページ名を指定して Wiki ページの本文を取得する。ページ名は list_wiki_pages が返す name をそのまま渡す。',
     readOnly: true,
   },
   add_issue_comment: {

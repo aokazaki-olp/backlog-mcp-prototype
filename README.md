@@ -110,9 +110,22 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `get_issue`          | read         |
 | `get_issue_comments` | read         |
 | `list_wiki_pages`    | read         |
+| `get_wiki_page`      | read         |
 | `add_issue_comment`  | comment      |
 
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
+
+### 数値 ID を受け取るツールは作らない
+
+Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` を返さない**。とはいえ `wikiId` を引数に取るツールを作ると、スコープ外の Wiki に到達できてしまう（連番なので総当たりも効く）。
+
+そこで `get_wiki_page` は `projectKey` と `name` だけを受け、**サーバ内で2往復する**。
+
+1. ポリシー由来の `projectIdOrKey` で一覧を引く ← ここでスコープが確定する
+2. 応答から名前が一致するページの `id` を取る ← `id` はサーバ内に留まる
+3. `GET /wikis/:id` で本文を取り、`<untrusted>` で囲んで返す
+
+2本目の `id` は「許可プロジェクトで絞った一覧の応答」からしか採らないので、**到達できる Wiki は定義上すべて許可プロジェクトのもの**。課題の作成で `issueTypeId` ではなく `issueType: "バグ"` を受けるのと同じ形で、**数値 ID を LLM に触らせない**。
 
 課題の指定は**課題キー**（`PROJ-123`）のみ。数値の課題 ID は受け付けない（プロジェクトをローカルで判定できなくなるため）。検索対象のプロジェクトはポリシー由来の値で組み立てるので、引数では広げられない。
 
