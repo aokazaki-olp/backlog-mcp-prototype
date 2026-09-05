@@ -12,13 +12,20 @@ import {
   TOOL_SPECS,
 } from '../contract.ts';
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
-import { toProjectId, toProjectIds } from '../domain/masters.ts';
+import { lookupName, projectMastersOf, toProjectId, toProjectIds } from '../domain/masters.ts';
+import { MasterDataError } from '../contract.ts';
 import { limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
 import { toError } from '../shared/toError.ts';
-import type { AttachmentFile, ResolvedPolicy, ResolvedRequest, ToolName } from '../contract.ts';
+import type {
+  AttachmentFile,
+  FormValue,
+  ResolvedPolicy,
+  ResolvedRequest,
+  ToolName,
+} from '../contract.ts';
 import type { BacklogGateway } from '../domain/gateway.ts';
-import type { Masters } from '../domain/masters.ts';
+import type { Masters, ProjectMasters } from '../domain/masters.ts';
 import type { McpHandlers, ToolDefinition, ToolResult } from '../mcp/protocol.ts';
 
 /** 課題キーの形。接頭辞がプロジェクトキー（半角英大文字・数字・アンダースコア）。 */
@@ -211,6 +218,80 @@ const resolveProjectKey = (
     );
   }
   return { projectKey, projectId: toProjectId(context.masters, projectKey) };
+};
+
+/** `yyyy-MM-dd` だけを受ける。Backlog が受け付ける形をこちらで固定する。 */
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+const optionalDate = (args: Record<string, unknown>, name: string): string | undefined => {
+  const value = optionalString(args, name);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!DATE_PATTERN.test(value)) {
+    throw new TypeError(`${name} には yyyy-MM-dd の形式で指定してください`);
+  }
+  return value;
+};
+
+/** 工数。**ID ではない実測値**なので数値のまま受ける。 */
+const optionalHours = (args: Record<string, unknown>, name: string): number | undefined => {
+  const value = args[name];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new TypeError(`${name} には 0 以上の数値を指定してください`);
+  }
+  return value;
+};
+
+/** 日付と工数をまとめて載せる。作成と更新で同じ扱いなので1つにする。 */
+const putSchedule = (form: Record<string, FormValue>, args: Record<string, unknown>): void => {
+  for (const name of ['startDate', 'dueDate'] as const) {
+    const value = optionalDate(args, name);
+    if (value !== undefined) {
+      form[name] = value;
+    }
+  }
+  for (const name of ['estimatedHours', 'actualHours'] as const) {
+    const value = optionalHours(args, name);
+    if (value !== undefined) {
+      form[name] = value;
+    }
+  }
+};
+
+/**
+ * 名前で受けた項目を ID に直してフォームへ載せる。**指定が無ければ載せない。**
+ *
+ * `update_issue` は「指定した項目だけ変える」ので、`undefined` を送らないことが要件になる。
+ */
+const putResolved = (
+  form: Record<string, FormValue>,
+  key: string,
+  name: string | undefined,
+  resolve: (name: string) => number,
+): void => {
+  if (name === undefined) {
+    return;
+  }
+  form[key] = resolve(name);
+};
+
+/**
+ * 担当者の名前 → ユーザー ID。**表示名が重複していたら送出する。**
+ *
+ * 同名が複数いるとどちらを指すか決まらない。黙って先勝ちにすると**別人に割り当てる**
+ * ので、ログイン名で指すよう案内して止める（規約 §5.4）。
+ */
+const resolveAssignee = (project: ProjectMasters, name: string): number => {
+  if (project.ambiguousUserNames.has(name)) {
+    throw new MasterDataError(
+      `担当者「${name}」は同名のユーザーが複数います。ログイン名（userId）で指定してください`,
+    );
+  }
+  return lookupName(project.userIds, name, '担当者');
 };
 
 const boundedCount = (args: Record<string, unknown>, limits: ToolLimits): number => {
@@ -1027,6 +1108,107 @@ export const planToolCall = (
       };
     }
 
+    case 'create_issue': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const project = projectMastersOf(masters, projectKey);
+      const summary = requiredString(args, 'summary');
+
+      // 必須の3つは名前で受けて ID に直す。数値 ID を受ける口は作っていない
+      const form: Record<string, FormValue> = {
+        projectId,
+        summary,
+        issueTypeId: lookupName(
+          project.issueTypeIds,
+          requiredString(args, 'issueType'),
+          '課題種別',
+        ),
+        priorityId: lookupName(masters.priorityIds, requiredString(args, 'priority'), '優先度'),
+      };
+
+      const description = optionalString(args, 'description');
+      if (description !== undefined) {
+        form['description'] = description;
+      }
+      putResolved(form, 'assigneeId', optionalString(args, 'assignee'), name =>
+        resolveAssignee(project, name),
+      );
+      // 配列は借り物が弾くので単数で受ける（引数が単数なので黙って減らされることはない）
+      putResolved(form, 'categoryId[]', optionalString(args, 'category'), name =>
+        lookupName(project.categoryIds, name, 'カテゴリー'),
+      );
+      putResolved(form, 'milestoneId[]', optionalString(args, 'milestone'), name =>
+        lookupName(project.versionIds, name, 'マイルストーン'),
+      );
+      putSchedule(form, args);
+
+      const post = (attachmentId?: number): PlannedCall => ({
+        kind: 'send',
+        // notifiedUserId は載せない。LLM に通知先を決めさせない
+        request: {
+          endpoint: '/issues',
+          method: 'POST',
+          form: attachmentId === undefined ? form : { ...form, 'attachmentId[]': attachmentId },
+        },
+        shape: raw => shapeIssue(raw, limits),
+      });
+      return withOptionalAttachment(context, args, post);
+    }
+
+    case 'update_issue': {
+      const { issueKey, projectKey } = resolveIssueKey(
+        context,
+        toolName,
+        requiredString(args, 'issueKey'),
+      );
+      const project = projectMastersOf(masters, projectKey);
+      const form: Record<string, FormValue> = {};
+
+      for (const name of ['summary', 'description', 'comment'] as const) {
+        const value = optionalString(args, name);
+        if (value !== undefined) {
+          form[name] = value;
+        }
+      }
+      putResolved(form, 'statusId', optionalString(args, 'status'), name =>
+        lookupName(project.statusIds, name, '状態'),
+      );
+      putResolved(form, 'resolutionId', optionalString(args, 'resolution'), name =>
+        lookupName(masters.resolutionIds, name, '完了理由'),
+      );
+      putResolved(form, 'priorityId', optionalString(args, 'priority'), name =>
+        lookupName(masters.priorityIds, name, '優先度'),
+      );
+      putResolved(form, 'issueTypeId', optionalString(args, 'issueType'), name =>
+        lookupName(project.issueTypeIds, name, '課題種別'),
+      );
+      putResolved(form, 'assigneeId', optionalString(args, 'assignee'), name =>
+        resolveAssignee(project, name),
+      );
+      putResolved(form, 'categoryId[]', optionalString(args, 'category'), name =>
+        lookupName(project.categoryIds, name, 'カテゴリー'),
+      );
+      putResolved(form, 'milestoneId[]', optionalString(args, 'milestone'), name =>
+        lookupName(project.versionIds, name, 'マイルストーン'),
+      );
+      putSchedule(form, args);
+
+      // 何も指定されていない更新は「成功したが何も変わっていない」になる（規約 §5.4）
+      if (Object.keys(form).length === 0 && optionalString(args, 'file') === undefined) {
+        throw new TypeError('変更する項目を1つ以上指定してください');
+      }
+
+      const post = (attachmentId?: number): PlannedCall => ({
+        kind: 'send',
+        request: {
+          endpoint: `/issues/${issueKey}`,
+          method: 'PATCH',
+          form: attachmentId === undefined ? form : { ...form, 'attachmentId[]': attachmentId },
+        },
+        shape: raw => shapeIssue(raw, limits),
+      });
+      return withOptionalAttachment(context, args, post);
+    }
+
     case 'add_issue_comment': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const content = requiredString(args, 'content');
@@ -1128,6 +1310,26 @@ const COUNT_PROPERTY = {
   type: 'integer',
   minimum: 1,
   description: '取得件数の希望値。サーバ側の上限で切り下げられます。',
+} as const;
+
+const NAMED_PROPERTIES = {
+  issueType: { type: 'string', description: '課題種別の名前（例: バグ）。数値 ID は不可' },
+  priority: { type: 'string', description: '優先度の名前（例: 高）' },
+  status: { type: 'string', description: '状態の名前（例: 処理中）' },
+  resolution: { type: 'string', description: '完了理由の名前（例: 対応済み）' },
+  assignee: {
+    type: 'string',
+    description: '担当者の表示名またはログイン名。同名が複数いる場合はログイン名で指定する',
+  },
+  category: { type: 'string', description: 'カテゴリーの名前。1件のみ' },
+  milestone: { type: 'string', description: 'マイルストーンの名前。1件のみ' },
+} as const;
+
+const SCHEDULE_PROPERTIES = {
+  startDate: { type: 'string', description: '開始日（yyyy-MM-dd）' },
+  dueDate: { type: 'string', description: '期限日（yyyy-MM-dd）' },
+  estimatedHours: { type: 'number', minimum: 0, description: '予定時間' },
+  actualHours: { type: 'number', minimum: 0, description: '実績時間' },
 } as const;
 
 const FILE_PROPERTY = {
@@ -1258,6 +1460,43 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       count: COUNT_PROPERTY,
     },
     required: ['projectKey', 'repository', 'number'],
+    additionalProperties: false,
+  },
+  create_issue: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      summary: { type: 'string', description: '課題の件名' },
+      issueType: NAMED_PROPERTIES.issueType,
+      priority: NAMED_PROPERTIES.priority,
+      description: { type: 'string', description: '課題の詳細（Markdown）' },
+      assignee: NAMED_PROPERTIES.assignee,
+      category: NAMED_PROPERTIES.category,
+      milestone: NAMED_PROPERTIES.milestone,
+      ...SCHEDULE_PROPERTIES,
+      file: FILE_PROPERTY,
+    },
+    required: ['projectKey', 'summary', 'issueType', 'priority'],
+    additionalProperties: false,
+  },
+  update_issue: {
+    type: 'object',
+    properties: {
+      issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
+      summary: { type: 'string', description: '課題の件名' },
+      description: { type: 'string', description: '課題の詳細（Markdown）' },
+      comment: { type: 'string', description: '変更と一緒に残すコメント' },
+      status: NAMED_PROPERTIES.status,
+      resolution: NAMED_PROPERTIES.resolution,
+      priority: NAMED_PROPERTIES.priority,
+      issueType: NAMED_PROPERTIES.issueType,
+      assignee: NAMED_PROPERTIES.assignee,
+      category: NAMED_PROPERTIES.category,
+      milestone: NAMED_PROPERTIES.milestone,
+      ...SCHEDULE_PROPERTIES,
+      file: FILE_PROPERTY,
+    },
+    required: ['issueKey'],
     additionalProperties: false,
   },
   add_pull_request_comment: {

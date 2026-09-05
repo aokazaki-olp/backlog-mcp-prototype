@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { AttachmentError, ScopeDeniedError, TOOL_NAMES } from '../src/contract.ts';
+import { AttachmentError, MasterDataError, ScopeDeniedError, TOOL_NAMES } from '../src/contract.ts';
 import { resolveMasters } from '../src/domain/masters.ts';
-import { loadPolicy } from '../src/policy/policy.ts';
+import { listedTools, loadPolicy } from '../src/policy/policy.ts';
 import { DEFAULT_LIMITS, buildHandlers, planToolCall } from '../src/tool/tools.ts';
 import type { ResolvedRequest, ToolName } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
@@ -31,6 +31,21 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/priorities': [{ id: 2, name: '高' }],
   '/resolutions': [{ id: 0, name: '対応済み' }],
   '/users/myself': { id: 42 },
+  // PROJ だけ can: write なので、プロジェクト単位のマスタもここだけ引かれる
+  '/projects/101/issueTypes': [
+    { id: 1, name: 'バグ' },
+    { id: 2, name: 'タスク' },
+  ],
+  '/projects/101/statuses': [
+    { id: 1, name: '未対応' },
+    { id: 3, name: '処理中' },
+  ],
+  '/projects/101/categories': [{ id: 12, name: '開発' }],
+  '/projects/101/versions': [{ id: 3, name: 'v1.0' }],
+  '/projects/101/users': [
+    { id: 7, userId: 'yamada', name: '山田太郎' },
+    { id: 8, userId: 'suzuki', name: '鈴木' },
+  ],
 };
 
 const makeGateway = (
@@ -49,7 +64,11 @@ const makeGateway = (
 let masters: Masters;
 
 before(async () => {
-  masters = await resolveMasters(makeGateway(MASTER_RESPONSES), ['PROJ', 'SALES', 'INFRA']);
+  masters = await resolveMasters(
+    makeGateway(MASTER_RESPONSES),
+    ['PROJ', 'SALES', 'INFRA'],
+    ['PROJ'],
+  );
 });
 
 const contextOf = (source: unknown = POLICY_SOURCE, readOnly = false): PlanContext => ({
@@ -1328,5 +1347,224 @@ describe('planToolCall — 添付', () => {
       TOOL_NAMES.some(name => name.includes('attachment') || name.includes('upload')),
       false,
     );
+  });
+});
+
+// ============================================================================
+// write 系 — 名前で受けて ID はサーバ内で解決する（原則4）
+// ============================================================================
+
+describe('planToolCall — create_issue', () => {
+  it('必須項目を名前で受け、すべて ID に直して送る', () => {
+    const request = planRequest(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '新しい課題',
+      issueType: 'バグ',
+      priority: '高',
+    });
+
+    assert.equal(request.endpoint, '/issues');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(request.form, {
+      projectId: 101,
+      summary: '新しい課題',
+      issueTypeId: 1,
+      priorityId: 2,
+    });
+  });
+
+  it('任意項目も名前で受ける', () => {
+    const request = planRequest(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '課題',
+      issueType: 'タスク',
+      priority: '高',
+      assignee: '山田太郎',
+      category: '開発',
+      milestone: 'v1.0',
+      description: '詳細',
+      startDate: '2026-09-01',
+      estimatedHours: 3,
+    });
+
+    assert.deepEqual(request.form, {
+      projectId: 101,
+      summary: '課題',
+      issueTypeId: 2,
+      priorityId: 2,
+      description: '詳細',
+      assigneeId: 7,
+      'categoryId[]': 12,
+      'milestoneId[]': 3,
+      startDate: '2026-09-01',
+      estimatedHours: 3,
+    });
+  });
+
+  it('担当者はログイン名でも指せる', () => {
+    const request = planRequest(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '課題',
+      issueType: 'バグ',
+      priority: '高',
+      assignee: 'suzuki',
+    });
+
+    assert.equal(request.form?.['assigneeId'], 8);
+  });
+
+  it('数値 ID を引数で渡す口が無い', () => {
+    const request = planRequest(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '課題',
+      issueType: 'バグ',
+      priority: '高',
+      // 混ぜても組み立てには使われない
+      issueTypeId: 999,
+      projectId: 999,
+      assigneeId: 999,
+      notifiedUserId: [1, 2],
+    });
+
+    assert.equal(request.form?.['issueTypeId'], 1);
+    assert.equal(request.form['projectId'], 101);
+    assert.equal(request.form['assigneeId'], undefined);
+    assert.equal(JSON.stringify(request.form).includes('999'), false);
+    assert.equal(JSON.stringify(request.form).includes('notifiedUserId'), false);
+  });
+
+  it('未知の名前は送出する（既定に落とさない）', () => {
+    const base = { projectKey: 'PROJ', summary: '課題', priority: '高' };
+
+    assert.throws(
+      () => planToolCall(contextOf(), 'create_issue', { ...base, issueType: '存在しない種別' }),
+      MasterDataError,
+    );
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'create_issue', {
+          ...base,
+          issueType: 'バグ',
+          priority: '最優先',
+        }),
+      MasterDataError,
+    );
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'create_issue', {
+          ...base,
+          issueType: 'バグ',
+          assignee: '知らない人',
+        }),
+      MasterDataError,
+    );
+  });
+
+  it('日付の形式を検証する', () => {
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'create_issue', {
+          projectKey: 'PROJ',
+          summary: '課題',
+          issueType: 'バグ',
+          priority: '高',
+          dueDate: '2026/09/01',
+        }),
+      TypeError,
+    );
+  });
+
+  it('write を許していないプロジェクトは API 到達前に拒否する', () => {
+    for (const projectKey of ['SALES', 'INFRA', 'OTHER']) {
+      assert.throws(
+        () =>
+          planToolCall(contextOf(), 'create_issue', {
+            projectKey,
+            summary: '課題',
+            issueType: 'バグ',
+            priority: '高',
+          }),
+        ScopeDeniedError,
+        `${projectKey} は拒否されるべき`,
+      );
+    }
+  });
+
+  it('BACKLOG_READ_ONLY で拒否される', () => {
+    assert.throws(
+      () =>
+        planToolCall(contextOf(POLICY_SOURCE, true), 'create_issue', {
+          projectKey: 'PROJ',
+          summary: '課題',
+          issueType: 'バグ',
+          priority: '高',
+        }),
+      ScopeDeniedError,
+    );
+  });
+});
+
+describe('planToolCall — update_issue', () => {
+  it('指定した項目だけを送る', () => {
+    const request = planRequest(contextOf(), 'update_issue', {
+      issueKey: 'PROJ-1',
+      status: '処理中',
+    });
+
+    assert.equal(request.endpoint, '/issues/PROJ-1');
+    assert.equal(request.method, 'PATCH');
+    assert.deepEqual(request.form, { statusId: 3 });
+  });
+
+  it('完了理由と優先度はスペース直下のマスタから引く', () => {
+    const request = planRequest(contextOf(), 'update_issue', {
+      issueKey: 'PROJ-1',
+      resolution: '対応済み',
+      priority: '高',
+      comment: '直しました',
+    });
+
+    assert.deepEqual(request.form, { resolutionId: 0, priorityId: 2, comment: '直しました' });
+  });
+
+  it('何も指定しない更新は送出する（成功したが何も変わらない、を作らない）', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'update_issue', { issueKey: 'PROJ-1' }),
+      TypeError,
+    );
+  });
+
+  it('課題キーの接頭辞でプロジェクトを判定する（許可外は API 到達前に拒否）', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'update_issue', { issueKey: 'OTHER-1', status: '処理中' }),
+      ScopeDeniedError,
+    );
+    // SALES は read だけ
+    assert.throws(
+      () => planToolCall(contextOf(), 'update_issue', { issueKey: 'SALES-1', status: '処理中' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('添付を付けると3手になる（コメントと同じ形）', () => {
+    const planned = planToolCall({ ...contextOf(), attachmentsRoot: '/allowed' }, 'update_issue', {
+      issueKey: 'PROJ-1',
+      comment: 'ログを添付します',
+      file: 'run.log',
+    });
+
+    assert.equal(planned.kind, 'attach');
+  });
+});
+
+describe('tools/list — write 系はポリシーに従う', () => {
+  it('write を許したプロジェクトがあるときだけ載る', () => {
+    const withWrite = listedTools(loadPolicy(POLICY_SOURCE));
+    const readOnly = listedTools(loadPolicy({ projects: ['SALES'] }));
+
+    assert.equal(withWrite.has('create_issue'), true);
+    assert.equal(withWrite.has('update_issue'), true);
+    assert.equal(readOnly.has('create_issue'), false);
+    assert.equal(readOnly.has('update_issue'), false);
   });
 });

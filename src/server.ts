@@ -17,7 +17,12 @@ import {
   writeAudit,
 } from './mcp/audit.ts';
 import { serve } from './mcp/stdio.ts';
-import { explainPolicy, loadPolicy, writableProjectKeys } from './policy/policy.ts';
+import {
+  explainPolicy,
+  loadPolicy,
+  writableProjectKeys,
+  writeScopedProjectKeys,
+} from './policy/policy.ts';
 import { readAttachment } from './attach/localFile.ts';
 import { DEFAULT_LIMITS, buildHandlers } from './tool/tools.ts';
 import { toError } from './shared/toError.ts';
@@ -104,7 +109,13 @@ export const createHandlers = async (
     });
 
     const gateway = createBacklogGateway(config, overrides.gateway);
-    const masters = await resolveMasters(gateway, [...policy.scopes.keys()]);
+    // プロジェクト単位のマスタは、書き込みを許したプロジェクトでしか要らない。
+    // read や comment しか無いプロジェクトのぶんまで引くと、使わない呼び出しが起動時に並ぶ
+    const masters = await resolveMasters(
+      gateway,
+      [...policy.scopes.keys()],
+      writeScopedProjectKeys(policy),
+    );
 
     const writable = writableProjectKeys(policy);
 

@@ -47,6 +47,8 @@ export const TOOL_NAMES = [
   'search_documents',
   'list_project_activities',
   'add_issue_comment',
+  'create_issue',
+  'update_issue',
   'add_pull_request_comment',
 ] as const;
 
@@ -187,6 +189,24 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'key',
     title: '課題にコメントする',
     description: '課題キー（例: PROJ-123）を指定してコメントを追加する。',
+    readOnly: false,
+  },
+  create_issue: {
+    toolset: 'issue',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: '課題を作成する',
+    description:
+      'プロジェクトキーを指定して課題を作成する。種別・優先度・担当者・カテゴリー・マイルストーンは**名前**で指定する（数値 ID は受け付けない）。',
+    readOnly: false,
+  },
+  update_issue: {
+    toolset: 'issue',
+    requires: 'write',
+    scopeKind: 'key',
+    title: '課題を更新する',
+    description:
+      '課題キー（例: PROJ-123）を指定して課題を更新する。状態・完了理由・優先度・担当者は**名前**で指定する。指定した項目だけが変わる。',
     readOnly: false,
   },
   add_pull_request_comment: {

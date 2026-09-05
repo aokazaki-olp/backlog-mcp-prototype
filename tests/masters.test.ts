@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { MasterDataError } from '../src/contract.ts';
-import { resolveMasters, toProjectId, toProjectIds } from '../src/domain/masters.ts';
+import {
+  lookupName,
+  projectMastersOf,
+  resolveMasters,
+  toProjectId,
+  toProjectIds,
+} from '../src/domain/masters.ts';
 import type { ResolvedRequest } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
 
@@ -162,5 +168,147 @@ describe('toProjectId / toProjectIds', () => {
 
     assert.throws(() => toProjectId(masters, 'OTHER'), MasterDataError);
     assert.throws(() => toProjectIds(masters, ['PROJ', 'OTHER']), MasterDataError);
+  });
+});
+
+// ============================================================================
+// プロジェクト単位のマスタ — 書き込みを許したプロジェクトだけ引く
+// ============================================================================
+
+const projectMasterResponses = {
+  ...okResponses,
+  '/projects/151/issueTypes': [
+    { id: 1, projectId: 151, name: 'バグ' },
+    { id: 2, projectId: 151, name: 'タスク' },
+  ],
+  '/projects/151/statuses': [
+    { id: 1, projectId: 151, name: '未対応' },
+    { id: 3, projectId: 151, name: '処理中' },
+  ],
+  '/projects/151/categories': [{ id: 12, projectId: 151, name: '開発' }],
+  '/projects/151/versions': [{ id: 3, projectId: 151, name: 'いますぐ' }],
+  '/projects/151/users': [
+    { id: 1, userId: 'admin', name: '管理者', mailAddress: 'admin@example.test' },
+    { id: 7, userId: 'yamada', name: '山田太郎', mailAddress: 'yamada@example.test' },
+  ],
+};
+
+describe('resolveMasters — プロジェクト単位のマスタ', () => {
+  it('書き込みを許したプロジェクトだけ引く', async () => {
+    const fetcher = makeFetcher(projectMasterResponses);
+
+    const masters = await resolveMasters(fetcher, ['PROJ', 'SALES'], ['PROJ']);
+
+    assert.deepEqual([...masters.perProject.keys()], ['PROJ']);
+    // SALES（152）のマスタは1本も引いていない
+    assert.equal(
+      fetcher.calls.some(call => call.endpoint.startsWith('/projects/152/')),
+      false,
+    );
+  });
+
+  it('指定しなければ1本も引かない（read だけの構成で起動が重くならない）', async () => {
+    const fetcher = makeFetcher(projectMasterResponses);
+
+    const masters = await resolveMasters(fetcher, ['PROJ']);
+
+    assert.equal(masters.perProject.size, 0);
+    assert.equal(
+      fetcher.calls.some(call => call.endpoint.includes('/issueTypes')),
+      false,
+    );
+  });
+
+  it('名前 → ID が引ける', async () => {
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+    const project = projectMastersOf(masters, 'PROJ');
+
+    assert.equal(project.issueTypeIds.get('バグ'), 1);
+    assert.equal(project.statusIds.get('処理中'), 3);
+    assert.equal(project.categoryIds.get('開発'), 12);
+    assert.equal(project.versionIds.get('いますぐ'), 3);
+  });
+
+  it('担当者は表示名でもログイン名でも引ける', async () => {
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+    const project = projectMastersOf(masters, 'PROJ');
+
+    assert.equal(project.userIds.get('山田太郎'), 7);
+    assert.equal(project.userIds.get('yamada'), 7);
+    assert.equal(project.ambiguousUserNames.size, 0);
+  });
+
+  it('同名のユーザーがいたら表示名では引けなくする（別人に割り当てない）', async () => {
+    const masters = await resolveMasters(
+      makeFetcher({
+        ...projectMasterResponses,
+        '/projects/151/users': [
+          { id: 7, userId: 'yamada', name: '山田太郎' },
+          { id: 8, userId: 'yamada2', name: '山田太郎' },
+        ],
+      }),
+      ['PROJ'],
+      ['PROJ'],
+    );
+    const project = projectMastersOf(masters, 'PROJ');
+
+    assert.equal(project.userIds.get('山田太郎'), undefined);
+    assert.equal(project.ambiguousUserNames.has('山田太郎'), true);
+    // ログイン名は一意なので引ける
+    assert.equal(project.userIds.get('yamada'), 7);
+    assert.equal(project.userIds.get('yamada2'), 8);
+  });
+
+  it('カテゴリーとバージョンは空でも起動する（定義していないプロジェクトがある）', async () => {
+    const masters = await resolveMasters(
+      makeFetcher({
+        ...projectMasterResponses,
+        '/projects/151/categories': [],
+        '/projects/151/versions': [],
+      }),
+      ['PROJ'],
+      ['PROJ'],
+    );
+    const project = projectMastersOf(masters, 'PROJ');
+
+    assert.equal(project.categoryIds.size, 0);
+    assert.equal(project.versionIds.size, 0);
+  });
+
+  it('種別が空なら起動しない（応答の形を疑う）', async () => {
+    await assert.rejects(
+      () =>
+        resolveMasters(
+          makeFetcher({ ...projectMasterResponses, '/projects/151/issueTypes': [] }),
+          ['PROJ'],
+          ['PROJ'],
+        ),
+      MasterDataError,
+    );
+  });
+
+  it('引いていないプロジェクトのマスタを求めたら送出する', async () => {
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+
+    assert.throws(() => projectMastersOf(masters, 'SALES'), MasterDataError);
+  });
+});
+
+describe('lookupName', () => {
+  it('引けなければ送出し、選べる名前を挙げる（既定に落とさない）', () => {
+    const map = new Map([
+      ['バグ', 1],
+      ['タスク', 2],
+    ]);
+
+    assert.equal(lookupName(map, 'バグ', '課題種別'), 1);
+    assert.throws(() => lookupName(map, '存在しない', '課題種別'), /バグ \/ タスク/);
+  });
+
+  it('定義が無いときは「定義がありません」と言う', () => {
+    assert.throws(
+      () => lookupName(new Map<string, number>(), 'なにか', 'カテゴリー'),
+      /定義がありません/,
+    );
   });
 });

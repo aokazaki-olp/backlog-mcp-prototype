@@ -146,6 +146,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `get_issue`                 | issue     | read         |
 | `get_issue_comments`        | issue     | read         |
 | `add_issue_comment`         | issue     | comment      |
+| `create_issue`              | issue     | write        |
+| `update_issue`              | issue     | write        |
 | `list_wiki_pages`           | wiki      | read         |
 | `get_wiki_page`             | wiki      | read         |
 | `list_git_repositories`     | git       | read         |
@@ -159,6 +161,25 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
 
 **行ごとのレビューコメントは作れない。** Backlog のプルリクエストコメント API のパラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけで、ファイル名も行番号も position も無い（ミラーで確認）。1レビュー = 1コメントとして、本文に `src/main.ts:42` の形で参照を書く。
+
+### 書き込みも名前で受ける
+
+`POST /issues` の必須は `projectId` / `summary` / `issueTypeId` / `priorityId` で**すべて数値 ID**、`PATCH /issues/:issueIdOrKey` も同様。素直に作ると「数値 ID を LLM に触らせない」設計に反するので、**起動時にマスタを解決して名前で受ける**。
+
+```
+✗ create_issue(projectId: 101, issueTypeId: 1, priorityId: 2)
+✓ create_issue(projectKey: "PROJ", issueType: "バグ", priority: "高")
+```
+
+**未知の名前は起動時マスタに無いので送出する。** 既定に落とさず、選べる名前をメッセージに挙げる（どれも Backlog の管理者が付けた名前で、第三者の自由記述ではない）。
+
+**担当者の表示名は一意ではない。** ユーザーは `{ id, userId, name }` を持ち、`name` は表示名。**同名が2人いたら表示名では引けなくして、ログイン名（`userId`）で指すよう返す**。黙って先勝ちにすると別人に割り当てることになる。
+
+**プロジェクト単位のマスタは、`can: "write"` を許したプロジェクトだけ引く。** 種別・状態・カテゴリー・バージョン・参加者の5本を、書き込み可能なプロジェクトごとに起動時に引く（read や comment しか無いプロジェクトでは1本も引かない）。
+
+**載せていないもの**: `parentIssueId`（数値 ID しか受けない。親を指定するなら1往復増える）／`notifiedUserId[]`（LLM に通知先を決めさせない）。`categoryId[]` と `milestoneId[]` は**単数で受ける**（借り物がスカラーの配列を弾くため。引数が単数なので黙って減らされることはない）。
+
+**`update_issue` は指定した項目だけ変える。** 何も指定しない更新は「成功したが何も変わっていない」になるので送出する。
 
 ### 添付は単独のツールにしない
 
