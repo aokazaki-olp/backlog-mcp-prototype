@@ -368,4 +368,26 @@ if flaws:
 
 open(f'{OUT}/README.md', 'w', encoding='utf-8').write('\n'.join(L))
 
+# ---- 出力内の相対リンクが解決できることを確かめる ----
+# 原文には裸の相対 href（`href="get-resolution-list"`）が混ざる。書き換えを取りこぼすと
+# ミラー内で辿れないリンクになるが、生成そのものは成功してしまうので明示的に検査する。
+broken = []
+for root, _, names in os.walk(OUT):
+    for name in names:
+        if not name.endswith('.md'):
+            continue
+        src = os.path.join(root, name)
+        for label, href in re.findall(r'\[([^\]]*)\]\(([^)]+)\)',
+                                    open(src, encoding='utf-8').read()):
+            path = href.split('#')[0]
+            if not path or path.startswith(('http://', 'https://', 'mailto:')):
+                continue
+            target = os.path.normpath(os.path.join(root, path))
+            if os.path.relpath(target, OUT).startswith('..'):
+                continue  # 出力の外を指すリンクは生成側の責任範囲外
+            if not os.path.exists(target):
+                broken.append(f'{os.path.relpath(src, OUT)}: [{label}]({href})')
+if broken:
+    raise SystemExit('解決できない相対リンク:\n  ' + '\n  '.join(broken))
+
 print(f'endpoints={len(endpoints)} categories={cats}')
