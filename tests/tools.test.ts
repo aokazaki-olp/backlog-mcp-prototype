@@ -269,24 +269,67 @@ describe('planToolCall — 書き込みに余計なものを載せない', () =>
 // ============================================================================
 
 describe('planToolCall — 上限', () => {
+  /** `{ issueKey: 'PROJ-1' }` を n 件。API が返した体で shape に渡す。 */
+  const issues = (n: number): unknown[] =>
+    Array.from({ length: n }, (_, k) => ({ issueKey: `PROJ-${String(k + 1)}` }));
+
   it('count の希望値は上限で切り下げられる', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', { count: 1000 });
+    const shaped = shape(issues(DEFAULT_LIMITS.maxCount + 1));
+
+    assert.equal((shaped as { items: unknown[] }).items.length, DEFAULT_LIMITS.maxCount);
+  });
+
+  /**
+   * **API 側の打ち切りを検出できるようにする。**
+   *
+   * 返したい数をそのまま要求すると、API は必ずその数までしか返さないので
+   * 「まだ続きがあるのか」を判定できない。1件多く要求して、多く返ってきたら
+   * 打ち切りが確定する（規約 §5.4 — 黙って削らない）。
+   */
+  it('API へは返す上限より1件多く要求する', () => {
     const { request } = planToolCall(contextOf(), 'search_issues', { count: 1000 });
 
-    assert.equal(request.query?.['count'], DEFAULT_LIMITS.maxCount);
+    assert.equal(request.query?.['count'], DEFAULT_LIMITS.maxCount + 1);
+  });
+
+  it('コメント取得も1件多く要求する', () => {
+    const { request } = planToolCall(contextOf(), 'get_issue_comments', {
+      issueKey: 'PROJ-1',
+      count: 3,
+    });
+
+    assert.equal(request.query?.['count'], 4);
   });
 
   it('打ち切ったことを出力に載せる', () => {
     const shape = shapeOf(contextOf(), 'search_issues', { count: 2 });
-    const shaped = shape([{ issueKey: 'PROJ-1' }, { issueKey: 'PROJ-2' }, { issueKey: 'PROJ-3' }]);
+    const shaped = shape(issues(3));
 
     assert.equal((shaped as { truncated?: boolean }).truncated, true);
+    assert.match(String((shaped as { note?: string }).note), /上限 2 件/);
+  });
+
+  it('打ち切ったときは要求した数だけ返す（余分な1件は捨てる）', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', { count: 2 });
+    const shaped = shape(issues(3));
+
+    assert.equal((shaped as { items: unknown[] }).items.length, 2);
   });
 
   it('上限内なら打ち切りの印を付けない', () => {
     const shape = shapeOf(contextOf(), 'search_issues', { count: 5 });
-    const shaped = shape([{ issueKey: 'PROJ-1' }]);
+    const shaped = shape(issues(1));
 
     assert.equal((shaped as { truncated?: boolean }).truncated, undefined);
+  });
+
+  it('ちょうど上限ぴったりなら打ち切りではない', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', { count: 2 });
+    const shaped = shape(issues(2));
+
+    assert.equal((shaped as { truncated?: boolean }).truncated, undefined);
+    assert.equal((shaped as { items: unknown[] }).items.length, 2);
   });
 });
 

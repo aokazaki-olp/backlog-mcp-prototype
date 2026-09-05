@@ -155,6 +155,19 @@ const boundedCount = (args: Record<string, unknown>, limits: ToolLimits): number
   return Math.min(raw, limits.maxCount);
 };
 
+/**
+ * API へ要求する件数。**返したい数より1件多く要求する。**
+ *
+ * 絞り込みの `count` をそのまま渡すと API は必ず `count` 件までしか返さないので、
+ * `limitCount` の判定が成立しえない。**実際に削っているのは API 側**で、そこを見ないと
+ * 打ち切りを黙って成功として返すことになる（規約 §5.4）。
+ *
+ * 1件多く返ってきたら「まだある」と確定する。余分な1件は `limitCount` が捨てる。
+ * `count` の上限は `maxCount` なので、+1 しても API 側の上限 100 は超えない
+ * (`GET /issues` / `GET /issues/:issueIdOrKey/comments` とも 1〜100)。
+ */
+const probeCount = (count: number): number => count + 1;
+
 // ============================================================================
 // output — フィールドを絞り、第三者のテキストを囲む
 // ============================================================================
@@ -443,7 +456,7 @@ export const planToolCall = (
       // projectId はポリシー由来。引数から受け取る口を作っていない。
       const query: Record<string, unknown> = {
         'projectId[]': scopedProjectIds(context, toolName),
-        count,
+        count: probeCount(count),
         sort: 'updated',
         order: 'desc',
       };
@@ -482,7 +495,7 @@ export const planToolCall = (
         request: {
           endpoint: `/issues/${issueKey}/comments`,
           method: 'GET',
-          query: { count, order: 'desc' },
+          query: { count: probeCount(count), order: 'desc' },
         },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/comments'), count);
