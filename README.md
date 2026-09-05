@@ -180,8 +180,8 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 | 扱い             | 項目                                                                                                                                    |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **名前で返す**   | `issueType` / `status` / `priority` / `resolution` / `assignee` / `category` / `milestone` / `versions` / `createdUser` / `updatedUser` |
-| **そのまま返す** | `summary` / `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）    |
-| **囲んで返す**   | `description` / `childIssueSummary` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）                         |
+| **そのまま返す** | `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）                |
+| **囲んで返す**   | `summary` / `description` / `childIssueSummary` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）             |
 | **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount` / `customFields` → `customFieldCount`（後述）                         |
 | **落とす**       | `id` / `projectId` / `keyId`（連番）、`sharedFiles` / `stars`（`stars[].presenter` はユーザーオブジェクトごと入る）                     |
 

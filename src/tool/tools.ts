@@ -327,12 +327,14 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
       source: `backlog:issue:${issueKey}:${field}`,
       maxLength: limits.maxTextLength,
     });
+  const summary = pickString(raw['summary']);
   const description = pickString(raw['description']);
   const childIssueSummary = pickString(raw['childIssueSummary']);
 
   return {
     issueKey,
-    summary: pickString(raw['summary']),
+    // 件名も第三者が書ける。一覧では本文より先に読まれるので、囲まないと素通しになる
+    summary: summary === undefined ? undefined : wrap(summary, 'summary'),
     issueType: pickName(raw['issueType']),
     status: pickName(raw['status']),
     priority: pickName(raw['priority']),
