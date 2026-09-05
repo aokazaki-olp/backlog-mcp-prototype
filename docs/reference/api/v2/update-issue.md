@@ -50,7 +50,7 @@ Content-Type:application/x-www-form-urlencoded
 | parentIssueId | int | 課題の親課題のID。<br>課題のIDは[課題情報の取得](./get-issue.md)から取得できます。 |
 | description | string | 課題の詳細。[メンション記法](../guides/tips.md#mention-users-in-text)が使えます。 |
 | statusId | int | 課題の状態のID。<br>状態のIDは[プロジェクトの状態一覧の取得](./get-status-list-of-project.md)から取得できます。 |
-| resolutionId | int | 課題の完了理由のID。<br>完了理由のIDは[完了理由一覧の取得](get-resolution-list)から取得できます。 |
+| resolutionId | int | 課題の完了理由のID。<br>完了理由のIDは[完了理由一覧の取得](./get-resolution-list.md)から取得できます。 |
 | startDate | string | 課題の開始日（yyyy-MM-dd） |
 | dueDate | string | 課題の期限日（yyyy-MM-dd） |
 | estimatedHours | int | 課題の予定時間 |

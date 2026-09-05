@@ -28,7 +28,7 @@ python3 build.py ../../docs/reference/api
 | --- | --- |
 | `fetch.sh` | `ja-links.txt` のページを `raw/` へ並列ダウンロード（3 回リトライ） |
 | `convert.py` | 本文 `div.markdown` を Markdown へ変換。リンクをローカル `.md` へ書き換える |
-| `build.py` | 変換結果から `v2/*.md` `guides/*.md` `endpoints.json` `README.md` を生成 |
+| `build.py` | 変換結果から `v2/*.md` `guides/*.md` `endpoints.json` `README.md` を生成。生成後、出力内の相対リンクがすべて解決できるか検査し、1 件でも壊れていれば失敗する |
 | `ja-links.txt` | 取得対象 160 ページの URL パス一覧 |
 
 `raw/` は生成物なのでコミットしない。
