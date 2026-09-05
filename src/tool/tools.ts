@@ -155,6 +155,19 @@ const boundedCount = (args: Record<string, unknown>, limits: ToolLimits): number
   return Math.min(raw, limits.maxCount);
 };
 
+/**
+ * API へ要求する件数。**返したい数より1件多く要求する。**
+ *
+ * 絞り込みの `count` をそのまま渡すと API は必ず `count` 件までしか返さないので、
+ * `limitCount` の判定が成立しえない。**実際に削っているのは API 側**で、そこを見ないと
+ * 打ち切りを黙って成功として返すことになる（規約 §5.4）。
+ *
+ * 1件多く返ってきたら「まだある」と確定する。余分な1件は `limitCount` が捨てる。
+ * `count` の上限は `maxCount` なので、+1 しても API 側の上限 100 は超えない
+ * (`GET /issues` / `GET /issues/:issueIdOrKey/comments` とも 1〜100)。
+ */
+const probeCount = (count: number): number => count + 1;
+
 // ============================================================================
 // output — フィールドを絞り、第三者のテキストを囲む
 // ============================================================================
@@ -197,6 +210,29 @@ const countOf = (value: unknown): number | undefined =>
   Array.isArray(value) && value.length > 0 ? value.length : undefined;
 
 /**
+ * カスタム属性に値が入っているか。
+ *
+ * 未設定は `value: null`、リスト型の未選択は `[]`（実データで確認）。
+ */
+const hasCustomFieldValue = (value: unknown): boolean =>
+  value != null && !(Array.isArray(value) && value.length === 0);
+
+/**
+ * **値が入っている**カスタム属性の件数。空なら `undefined`（キーごと出さない）。
+ *
+ * `countOf` を使えないのは、`customFields` が**定義されている属性を値の有無に
+ * かかわらず全部並べる**ため。素の件数はプロジェクトの定義数であり、どの課題でも
+ * 同じ値になって、その課題について何も言わない。
+ */
+const filledCustomFieldCount = (value: unknown): number | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const filled = value.filter(item => isRecord(item) && hasCustomFieldValue(item['value'])).length;
+  return filled === 0 ? undefined : filled;
+};
+
+/**
  * 出力から**数値 ID を落とす**。
  *
  * Backlog の `projectId` / `issueId` は連番なので、返すとスコープ外の資源の存在を
@@ -210,17 +246,23 @@ const countOf = (value: unknown): number | undefined =>
  * | --- | --- |
  * | 落とす | `id` / `projectId` / `keyId`（連番。`issueKey` があれば足りる） |
  * | 落とす | `sharedFiles` / `stars`（使わない。`stars[].presenter` はユーザーごと入る） |
- * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 / `customFields` → 件数（下記） |
+ * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 / `customFields` → **値が入っている**件数（下記） |
  *
- * **`customFields` は件数だけ返す。** 仕様書にある — `typeId` の8値（`add-custom-field.md`）も、
- * 値の型（テキスト=文字列 / 数値=数値 / 日付=`yyyy-MM-dd` / **リスト=値のID**、`add-issue.md`）も、
- * 定義の取得（`GET /projects/:projectIdOrKey/customFields`）も。**無いのは課題レスポンスの
- * 配列要素のキー名だけ**で、応答例8箇所すべてが `[]`。
+ * **`customFields` は値が入っている件数だけ返す**（`filledCustomFieldCount`）。
+ * 定義されている属性は値の有無にかかわらず全部並ぶので、素の件数では意味を成さない。
  *
- * 中身を出すなら、**定義を起動時に解決して `itemId → name` に変換するのが必須**になる
- * （リスト型の値は ID なので、素通しすると原則4「ID を LLM に触らせない」に反する）。
- * 要素のキー名を推測して書くと外れたとき型は通ったまま黙って空になるので、**件数だけ返して
- * 「ある」ことは伝える**（規約 §5.4 — 黙って落とさない）。
+ * 要素の形は実データで確認した（2026-09-06。仕様書の応答例は8箇所すべて `[]` で、
+ * ここだけ仕様から決められなかった）。
+ *
+ * ```json
+ * { "id": 692819, "fieldTypeId": 6, "name": "選択リスト",
+ *   "value": [{ "id": 2, "name": "b", "displayOrder": 1 }] }
+ * ```
+ *
+ * **中身を返すかは別の判断として残す。** 属性名は要素の `name` に直接入っており、
+ * リスト型の値も ID ではなく `{ id, name }` だった（仕様書の「リスト=値のID」は
+ * 送信側の話で、応答には当てはまらない）。**定義の起動時解決は要らない。**
+ * 返す段になったら、要素の `id` とリスト項目の `id` の両方を落とすこと。
  */
 const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
@@ -253,8 +295,8 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     // 連番 ID は落とすが、「子課題である」事実は残す
     hasParent: pickNumber(raw['parentIssueId']) !== undefined,
     attachmentCount: countOf(raw['attachments']),
-    // 中身は出さない（要素のキー名が仕様書に無い）。あることは伝える
-    customFieldCount: countOf(raw['customFields']),
+    // 中身は出さない。値が入っている数だけ伝える（定義数ではない）
+    customFieldCount: filledCustomFieldCount(raw['customFields']),
     createdUser: pickName(raw['createdUser']),
     created: pickString(raw['created']),
     updatedUser: pickName(raw['updatedUser']),
@@ -443,7 +485,7 @@ export const planToolCall = (
       // projectId はポリシー由来。引数から受け取る口を作っていない。
       const query: Record<string, unknown> = {
         'projectId[]': scopedProjectIds(context, toolName),
-        count,
+        count: probeCount(count),
         sort: 'updated',
         order: 'desc',
       };
@@ -482,7 +524,7 @@ export const planToolCall = (
         request: {
           endpoint: `/issues/${issueKey}/comments`,
           method: 'GET',
-          query: { count, order: 'desc' },
+          query: { count: probeCount(count), order: 'desc' },
         },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/comments'), count);
