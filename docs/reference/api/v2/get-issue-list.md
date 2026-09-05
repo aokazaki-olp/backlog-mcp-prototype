@@ -37,7 +37,7 @@ GET /api/v2/issues
 | priorityId[]<br>（[複数指定可](../guides/tips.md)） | int | 課題の優先度のID。<br>優先度のIDは[優先度一覧の取得](./get-priority-list.md)から取得できます。 |
 | assigneeId[]<br>（[複数指定可](../guides/tips.md)） | int | 課題の担当者のユーザーのID。<br>ユーザーのIDは[プロジェクトユーザー一覧の取得](./get-project-user-list.md)から取得できます。 |
 | createdUserId[]<br>（[複数指定可](../guides/tips.md)） | int | 課題の登録者のユーザーのID。<br>ユーザーのIDは[プロジェクトユーザー一覧の取得](./get-project-user-list.md)から取得できます。 |
-| resolutionId[]<br>（[複数指定可](../guides/tips.md)） | int | 課題の完了理由のID。<br>完了理由のIDは[完了理由一覧の取得](get-resolution-list)から取得できます。 |
+| resolutionId[]<br>（[複数指定可](../guides/tips.md)） | int | 課題の完了理由のID。<br>完了理由のIDは[完了理由一覧の取得](./get-resolution-list.md)から取得できます。 |
 | parentChild | int | 親子課題の条件。指定が無い場合は0が使われます。<br>・0: すべて<br>・1: 子課題以外<br>・2: 2階層または3階層<br>・3: 階層なし<br>・4: 子課題あり<br>・5: 3階層目<br>・6: 2階層目<br>・7: 最上位<br>・8: 3階層以外<br>・9: 最上位（3階層）以外<br>・10: 最下層 |
 | attachment | boolean | 課題が添付ファイルを含むかどうか。<br>・true：添付ファイルを含む課題<br>・false：添付ファイルを含まない課題 |
 | sharedFile | boolean | 課題が共有ファイルを含むかどうか。<br>・true：共有ファイルを含む課題<br>・false：共有ファイルを含まない課題 |

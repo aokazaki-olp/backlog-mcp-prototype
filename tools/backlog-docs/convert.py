@@ -83,6 +83,10 @@ def rewrite_link(href, kind):
     if '#' in href:
         href, frag = href.split('#', 1)
         frag = '#' + frag
+    if href and re.fullmatch(r'[a-z0-9-]+', href):
+        # 原文にある裸の相対 href（例 href="get-resolution-list"）。
+        # 公式サイトでは現在のページと同じ階層として解決されるので、同じ規則で絶対パス化する
+        href = '/ja/docs/backlog/' + ('api/2/' + href if kind == 'v2' else href)
     m = DOC.match(href)
     if not m:
         return href + frag
