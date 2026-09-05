@@ -28,33 +28,34 @@ Backlog を Claude Code / Claude Desktop から扱う MCP サーバ。**イン�
 
 URL ではなくスペースID を受けるのは、`https` 以外のスキーム・任意ホスト・パス注入を**設定として表現できなくする**ため。接続先は `https://{spaceId}.{domain}` としてサーバ側で組み立てる。
 
-### API キーは暗号化したファイルから読む
+### API キーを env に置かない
 
-**平文の環境変数で渡す口は用意していない。** 避けたい事故が2つあるため。
+**攻撃者を想定した防御ではない。** 秘密鍵は同じディスクに平文で置くので、**両方のファイルを読める相手には効かない**。塞いでいるのは**不注意で漏れる経路**のほうで、そちらのほうが桁違いに起きやすい。
 
 1. 環境変数は LLM のコンテキストに入り込みうる
 2. `.mcp.json` を除外し忘れて追跡される
 
-秘密を env にも `.mcp.json` にも置かなければ、どちらも起きない。
+**env が受け取るのは2つのファイルのパスだけ。** 秘密が env にも `.mcp.json` にも載らないので、どちらの事故も起きない。手段として `.env` の値を公開鍵暗号（dotenvx）にかけ、暗号文と秘密鍵を別の場所へ置く — **片方だけ漏れても意味を成さない**。
 
-```bash
-# 1. 平文で書いて
-echo 'BACKLOG_API_KEY=xxxxxxxx' > .env
+まず `.env` を作り、**エディタで**1行書く。
 
-# 2. 暗号化する（.env の値が置き換わり、.env.keys に秘密鍵が出る）
-npx dotenvx encrypt -f .env
-
-# 3. 秘密鍵をリポジトリの外へ move する
-mv .env.keys ~/.backlog-mcp/.env.keys
+```
+BACKLOG_API_KEY=xxxxxxxx
 ```
 
-> **`encrypt` は `.env.keys` を `-f` の隣ではなくカレントディレクトリに書く。** 実行場所に注意。
+次に暗号化する。**秘密鍵の出力先はここで指定する**（指定しないとカレントディレクトリに書かれる）。
 
-`.env` は暗号文になっているので、置き場所は自由（`.gitignore` は既に `.env*` を無視している）。**秘密鍵とは別の場所に置くこと** — 両方が同じ場所にあると暗号化の意味が無い。
+```bash
+npx dotenvx encrypt -f .env -fk ~/.backlog-mcp/keys/.env.keys
+```
 
-**守れるのは2経路だけ。** 「リポジトリが流出する」「env が覗かれる」。**両方のファイルを読める相手には効かない**（秘密鍵は平文でディスクにある）。「暗号化したから安全」ではない。
+`.env` の値は暗号文に置き換わるので置き場所は自由（`.gitignore` は `.env*` を無視している）。秘密鍵は上のとおり**リポジトリの外**へ出す。
 
-> Windows ではファイルのパーミッションに頼れない。Node のドキュメントによれば `mkdir` の `mode` は **Not supported on Windows**、`chmod` は **書き込み可否しか変えられず、所有者 / グループ / その他の区別は無い**。だから保護は**置き場所と暗号化**で作る。
+> **秘密をコマンドラインに書かない。** シェルは実行した行をファイルに残す。PowerShell の PSReadLine は既定が `HistorySaveStyle = SaveIncrementally` で、**1コマンドごとに** `%APPDATA%\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt` へ追記する（Microsoft のドキュメントで確認）。`password` / `token` / `apikey` / `secret` を含む行を除外する仕組みは入っているが（PSReadLine の `History.cs`）、**`BACKLOG_API_KEY` はどれにも当たらない** — `apikey` にアンダースコアが無いため。`.gitignore` が見ているのはリポジトリだけで、履歴ファイルは見ていない。
+
+**守れるのは2経路だけ。** 「リポジトリが流出する」「env が覗かれる」。それ以上は主張しない。
+
+> Windows ではファイルのパーミッションに頼れない。Node のドキュメントによれば `mkdir` の `mode` は **Not supported on Windows**、`chmod` は **書き込み可否しか変えられず、所有者 / グループ / その他の区別は無い**。だから分けるのは**置き場所**で行う。
 
 ### ポリシー
 
