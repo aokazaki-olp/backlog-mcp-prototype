@@ -503,7 +503,6 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
 
   it('customFields は中身を出さず、件数だけ返す', () => {
     const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
-    // 要素のキー名は仕様書に無いので、中身に何が入っていても読まない
     const shaped = shape({
       ...MIRROR_ISSUE,
       customFields: [
@@ -522,6 +521,77 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     // 値が undefined のキーは Object.keys には残るが JSON では消える。
     // LLM に届くのは JSON なので、そちらで見る
     assert.doesNotMatch(JSON.stringify(shapedIssue()), /customFieldCount/);
+  });
+
+  /**
+   * **定義数ではなく、値が入っている数を返す。**
+   *
+   * `customFields` は定義済みの属性を値の有無にかかわらず全部並べる。素の件数を返すと
+   * どの課題でも同じ値になり、その課題について何も言わないことになる。
+   *
+   * 要素は実データの形をそのまま使う（2026-09-06、`nlabsdbx` の SALES-2 で確認）。
+   */
+  const CUSTOM_FIELDS_UNSET: readonly unknown[] = [
+    { id: 692816, fieldTypeId: 1, name: '文字列', value: null },
+    { id: 692817, fieldTypeId: 2, name: '文章', value: null },
+    { id: 692818, fieldTypeId: 3, name: '数値', value: null },
+    { id: 692819, fieldTypeId: 6, name: '選択リスト', value: [] },
+    { id: 692820, fieldTypeId: 4, name: '日付', value: null },
+  ];
+
+  const CUSTOM_FIELDS_FILLED: readonly unknown[] = [
+    { id: 692816, fieldTypeId: 1, name: '文字列', value: 'a' },
+    { id: 692817, fieldTypeId: 2, name: '文章', value: 'bb\ncc' },
+    { id: 692818, fieldTypeId: 3, name: '数値', value: 2 },
+    {
+      id: 692819,
+      fieldTypeId: 6,
+      name: '選択リスト',
+      value: [{ id: 2, name: 'b', displayOrder: 1 }],
+    },
+    { id: 692820, fieldTypeId: 4, name: '日付', value: '2026-09-25T00:00:00Z' },
+  ];
+
+  const countFor = (customFields: readonly unknown[]): unknown => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    const shaped = shape({ ...MIRROR_ISSUE, customFields }) as Record<string, unknown>;
+    return shaped['customFieldCount'];
+  };
+
+  it('定義されているだけで値が無ければ数えない', () => {
+    assert.equal(countFor(CUSTOM_FIELDS_UNSET), undefined);
+  });
+
+  it('値が入っている数を返す', () => {
+    assert.equal(countFor(CUSTOM_FIELDS_FILLED), 5);
+  });
+
+  it('値の有無が混ざったら入っている数だけ数える', () => {
+    assert.equal(
+      countFor([...CUSTOM_FIELDS_UNSET.slice(0, 3), ...CUSTOM_FIELDS_FILLED.slice(3)]),
+      2,
+    );
+  });
+
+  it('リスト型の未選択（空配列）は値なしとして扱う', () => {
+    assert.equal(countFor([{ id: 1, fieldTypeId: 6, name: 'リスト', value: [] }]), undefined);
+  });
+
+  it('数値の 0 と空文字は値として数える', () => {
+    assert.equal(
+      countFor([
+        { id: 1, fieldTypeId: 3, name: '数値', value: 0 },
+        { id: 2, fieldTypeId: 1, name: '文字列', value: '' },
+      ]),
+      2,
+    );
+  });
+
+  it('値が入っていても中身は出さない', () => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    const shaped = shape({ ...MIRROR_ISSUE, customFields: CUSTOM_FIELDS_FILLED });
+
+    assert.doesNotMatch(JSON.stringify(shaped), /選択リスト|692819|displayOrder|2026-09-25/);
   });
 
   it('id 系・sharedFiles・stars を落とす', () => {
