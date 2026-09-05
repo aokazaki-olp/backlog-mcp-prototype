@@ -7,6 +7,7 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { config as loadEnvFile } from '@dotenvx/dotenvx';
 import { BACKLOG_DOMAINS, ConfigError } from './contract.ts';
+import { resolveAttachmentRoot } from './attach/localFile.ts';
 import { toError } from './shared/toError.ts';
 import type { BacklogDomain, ServerConfig } from './contract.ts';
 
@@ -129,6 +130,20 @@ export interface ConfigOverrides {
 }
 
 /**
+ * 添付を許すディレクトリを決める。**未設定なら `null`（添付の口そのものが開かない）。**
+ *
+ * 既定を置かない。置くと「どこが読めるか」が暗黙になり、設定を書いていない利用者が
+ * 知らないディレクトリを開けてしまう。相対指定の基準は `logDir` と同じくポリシー
+ * ファイルのディレクトリにする（`cwd` は宣言した場所で変わるので基準にしない）。
+ */
+const resolveAttachmentsRoot = (value: string | undefined, policyPath: string): string | null => {
+  if (value === undefined || value === '') {
+    return null;
+  }
+  return resolveAttachmentRoot(dirname(policyPath), value);
+};
+
+/**
  * 環境変数から設定を組み立てる。
  *
  * **URL を受け取らない。** スペースID とドメイン（閉じた3値）だけを受け、
@@ -178,6 +193,7 @@ export const loadConfig = (
     apiKey: (overrides.resolveApiKey ?? decryptApiKey)(env),
     policyPath,
     logDir: resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath),
+    attachmentsRoot: resolveAttachmentsRoot(env['BACKLOG_ATTACHMENTS_ROOT'], policyPath),
     readOnly: rawReadOnly === '1' || rawReadOnly === 'true',
   });
 };

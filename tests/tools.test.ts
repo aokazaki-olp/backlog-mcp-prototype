@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { before, describe, it } from 'node:test';
-import { ScopeDeniedError } from '../src/contract.ts';
+import { AttachmentError, ScopeDeniedError, TOOL_NAMES } from '../src/contract.ts';
 import { resolveMasters } from '../src/domain/masters.ts';
 import { loadPolicy } from '../src/policy/policy.ts';
 import { DEFAULT_LIMITS, buildHandlers, planToolCall } from '../src/tool/tools.ts';
@@ -58,6 +58,24 @@ const contextOf = (source: unknown = POLICY_SOURCE, readOnly = false): PlanConte
   limits: DEFAULT_LIMITS,
 });
 
+/**
+ * `attach`（添付の読み取り）以外は必ずリクエストを持つ。
+ * 添付を伴わないツールを見るテストのために narrow する。
+ */
+const requestOf = (planned: PlannedCall): ResolvedRequest => {
+  if (planned.kind === 'attach') {
+    assert.fail('このツールは添付を伴わないはず');
+  }
+  return planned.request;
+};
+
+/** 組み立てたリクエストだけを見るとき用。 */
+const planRequest = (
+  context: PlanContext,
+  toolName: ToolName,
+  args: Record<string, unknown>,
+): ResolvedRequest => requestOf(planToolCall(context, toolName, args));
+
 /** 1往復で終わるツールの `shape` を取り出す。`chain` が返ったら失敗させる。 */
 const shapeOf = (
   context: PlanContext,
@@ -77,14 +95,14 @@ const shapeOf = (
 
 describe('planToolCall — 絞り込みは引数で広げられない', () => {
   it('search_issues の projectId[] はポリシー由来になる', () => {
-    const { request } = planToolCall(contextOf(), 'search_issues', {});
+    const request = planRequest(contextOf(), 'search_issues', {});
 
     // プロジェクトキーの昇順（INFRA, PROJ, SALES）。順序は決定的にする
     assert.deepEqual(request.query?.['projectId[]'], [103, 101, 102]);
   });
 
   it('引数に projectId を混ぜても採用されない', () => {
-    const { request } = planToolCall(contextOf(), 'search_issues', {
+    const request = planRequest(contextOf(), 'search_issues', {
       projectId: 999,
       'projectId[]': [999],
       projectKey: 'OTHER',
@@ -96,7 +114,7 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
   });
 
   it('list_wiki_pages は projectKey を解決済みの projectId にして送る', () => {
-    const { request } = planToolCall(contextOf(), 'list_wiki_pages', { projectKey: 'PROJ' });
+    const request = planRequest(contextOf(), 'list_wiki_pages', { projectKey: 'PROJ' });
 
     assert.equal(request.query?.['projectIdOrKey'], 101);
   });
@@ -134,8 +152,8 @@ describe('get_wiki_page — 名前 → ID をサーバ内で解決する', () =>
       { id: 113, name: '議事録' },
     ]);
 
-    assert.equal(second.request.endpoint, '/wikis/113');
-    assert.doesNotMatch(JSON.stringify(second.request), /999/);
+    assert.equal(requestOf(second).endpoint, '/wikis/113');
+    assert.doesNotMatch(JSON.stringify(requestOf(second)), /999/);
   });
 
   it('一覧に無い名前は送出する（黙って空を返さない）', () => {
@@ -237,7 +255,7 @@ describe('planToolCall — 許可外は API 到達前に拒否する', () => {
   });
 
   it('許可されたプロジェクトへの書き込みは通る', () => {
-    const { request } = planToolCall(contextOf(), 'add_issue_comment', {
+    const request = planRequest(contextOf(), 'add_issue_comment', {
       issueKey: 'PROJ-1',
       content: 'やあ',
     });
@@ -253,7 +271,7 @@ describe('planToolCall — 許可外は API 到達前に拒否する', () => {
 
 describe('planToolCall — 書き込みに余計なものを載せない', () => {
   it('form は content だけ（通知先も添付も載らない）', () => {
-    const { request } = planToolCall(contextOf(), 'add_issue_comment', {
+    const request = planRequest(contextOf(), 'add_issue_comment', {
       issueKey: 'PROJ-1',
       content: '本文',
       notifiedUserId: [1, 2],
@@ -288,13 +306,13 @@ describe('planToolCall — 上限', () => {
    * 打ち切りが確定する（規約 §5.4 — 黙って削らない）。
    */
   it('API へは返す上限より1件多く要求する', () => {
-    const { request } = planToolCall(contextOf(), 'search_issues', { count: 1000 });
+    const request = planRequest(contextOf(), 'search_issues', { count: 1000 });
 
     assert.equal(request.query?.['count'], DEFAULT_LIMITS.maxCount + 1);
   });
 
   it('コメント取得も1件多く要求する', () => {
-    const { request } = planToolCall(contextOf(), 'get_issue_comments', {
+    const request = planRequest(contextOf(), 'get_issue_comments', {
       issueKey: 'PROJ-1',
       count: 3,
     });
@@ -796,7 +814,7 @@ describe('buildHandlers — tools/call は一覧と独立に確認する', () =>
 
 describe('planToolCall — git のパスはポリシー由来で組み立てる', () => {
   it('projectKey は解決済みの projectId になる（引数の文字列がパスに載らない）', () => {
-    const { request } = planToolCall(contextOf(), 'list_git_repositories', {
+    const request = planRequest(contextOf(), 'list_git_repositories', {
       projectKey: 'PROJ',
     });
 
@@ -856,15 +874,15 @@ describe('planToolCall — git のパスはポリシー由来で組み立てる'
       number: 7,
     });
 
-    assert.equal(detail.request.endpoint, '/projects/101/git/repositories/app/pullRequests/7');
+    assert.equal(requestOf(detail).endpoint, '/projects/101/git/repositories/app/pullRequests/7');
     assert.equal(
-      comments.request.endpoint,
+      requestOf(comments).endpoint,
       '/projects/101/git/repositories/app/pullRequests/7/comments',
     );
   });
 
   it('コメント投稿は POST で、通知先を載せない', () => {
-    const { request } = planToolCall(contextOf(), 'add_pull_request_comment', {
+    const request = planRequest(contextOf(), 'add_pull_request_comment', {
       projectKey: 'PROJ',
       repository: 'app',
       number: 7,
@@ -920,7 +938,7 @@ describe('planToolCall — repository でエンドポイントを差し替えら
 
   it('正当なリポジトリ名は通り、そのままパスに載る', () => {
     for (const repository of ['app', 'my-repo', 'my_repo', 'repo.git', 'a1']) {
-      const { request } = planToolCall(contextOf(), 'list_pull_requests', {
+      const request = planRequest(contextOf(), 'list_pull_requests', {
         projectKey: 'PROJ',
         repository,
       });
@@ -933,7 +951,7 @@ describe('planToolCall — repository でエンドポイントを差し替えら
   });
 
   it('日本語のリポジトリ名はエンコードして載せる', () => {
-    const { request } = planToolCall(contextOf(), 'list_pull_requests', {
+    const request = planRequest(contextOf(), 'list_pull_requests', {
       projectKey: 'PROJ',
       repository: '設計',
     });
@@ -1102,7 +1120,7 @@ describe('shape — 件名も囲む', () => {
 
 describe('planToolCall — document は絞り込みをポリシーで組み立てる', () => {
   it('projectId[] はポリシー由来で、offset は 0 固定', () => {
-    const { request } = planToolCall(contextOf(), 'search_documents', {});
+    const request = planRequest(contextOf(), 'search_documents', {});
 
     assert.equal(request.endpoint, '/documents');
     assert.deepEqual(request.query?.['projectId[]'], [101, 102]);
@@ -1110,7 +1128,7 @@ describe('planToolCall — document は絞り込みをポリシーで組み立�
   });
 
   it('引数で projectId を渡しても採用しない', () => {
-    const { request } = planToolCall(contextOf(), 'search_documents', {
+    const request = planRequest(contextOf(), 'search_documents', {
       'projectId[]': [999],
       offset: 500,
     });
@@ -1152,7 +1170,7 @@ describe('planToolCall — document は絞り込みをポリシーで組み立�
 
 describe('planToolCall — activity', () => {
   it('パスは解決済みの projectId で組み立てる', () => {
-    const { request } = planToolCall(contextOf(), 'list_project_activities', {
+    const request = planRequest(contextOf(), 'list_project_activities', {
       projectKey: 'SALES',
     });
 
@@ -1201,5 +1219,114 @@ describe('planToolCall — activity', () => {
 
     assert.equal(shaped?.['issueKey'], undefined);
     assert.equal(shaped?.['activityTypeId'], 5);
+  });
+});
+
+// ============================================================================
+// 添付 — アップロードしてから貼るまでを1つのツール呼び出しに閉じる
+// ============================================================================
+
+describe('planToolCall — 添付', () => {
+  const withRoot = (): PlanContext => ({ ...contextOf(), attachmentsRoot: '/allowed' });
+
+  it('file を指定しなければ従来どおり1手で送る', () => {
+    const planned = planToolCall(contextOf(), 'add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'コメント',
+    });
+
+    assert.equal(planned.kind, 'send');
+    assert.deepEqual(requestOf(planned).form, { content: 'コメント' });
+  });
+
+  it('file を指定すると、まず読み取りを要求する', () => {
+    const planned = planToolCall(withRoot(), 'add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'レビュー',
+      file: 'review.md',
+    });
+
+    // assert.equal は strict 版なので、ここで kind が絞られる
+    assert.equal(planned.kind, 'attach');
+    assert.equal(planned.localPath, 'review.md');
+  });
+
+  it('読み取り後はアップロード → コメントの順に進み、attachmentId はサーバ内で渡る', () => {
+    const planned = planToolCall(withRoot(), 'add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'レビュー',
+      file: 'review.md',
+    });
+    if (planned.kind !== 'attach') {
+      assert.fail('添付は attach で始まるはず');
+    }
+
+    const upload = planned.next({
+      kind: 'file',
+      filename: 'review.md',
+      contentType: 'text/markdown',
+      data: new Uint8Array([0x61]),
+    });
+    assert.equal(upload.kind, 'chain');
+    assert.equal(requestOf(upload).endpoint, '/space/attachment');
+    assert.equal(requestOf(upload).method, 'POST');
+
+    const comment = upload.next({ id: 4242, name: 'review.md', size: 1 });
+
+    assert.equal(requestOf(comment).endpoint, '/issues/PROJ-1/comments');
+    assert.deepEqual(requestOf(comment).form, { content: 'レビュー', 'attachmentId[]': 4242 });
+  });
+
+  it('アップロードの応答に ID が無ければ送出する（貼られていないのに成功にしない）', () => {
+    const planned = planToolCall(withRoot(), 'add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'レビュー',
+      file: 'review.md',
+    });
+    if (planned.kind !== 'attach') {
+      assert.fail('添付は attach で始まるはず');
+    }
+    const upload = planned.next({
+      kind: 'file',
+      filename: 'review.md',
+      contentType: 'text/markdown',
+      data: new Uint8Array(),
+    });
+    if (upload.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.throws(() => upload.next({ name: 'review.md' }), /ID を受け取れません/);
+  });
+
+  it('ルート未設定のサーバでは file を受け付けない', () => {
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'add_issue_comment', {
+          issueKey: 'PROJ-1',
+          content: 'レビュー',
+          file: 'review.md',
+        }),
+      AttachmentError,
+    );
+  });
+
+  it('PR コメントでも同じ形で添付できる', () => {
+    const planned = planToolCall(withRoot(), 'add_pull_request_comment', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 7,
+      content: 'レビュー',
+      file: 'diff.txt',
+    });
+
+    assert.equal(planned.kind, 'attach');
+  });
+
+  it('添付は独立したツールになっていない（attachmentId を LLM に渡さない）', () => {
+    assert.equal(
+      TOOL_NAMES.some(name => name.includes('attachment') || name.includes('upload')),
+      false,
+    );
   });
 });

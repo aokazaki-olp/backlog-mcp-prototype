@@ -18,6 +18,7 @@ import {
 } from './mcp/audit.ts';
 import { serve } from './mcp/stdio.ts';
 import { explainPolicy, loadPolicy, writableProjectKeys } from './policy/policy.ts';
+import { readAttachment } from './attach/localFile.ts';
 import { DEFAULT_LIMITS, buildHandlers } from './tool/tools.ts';
 import { toError } from './shared/toError.ts';
 import type { ConfigOverrides } from './config.ts';
@@ -122,7 +123,18 @@ export const createHandlers = async (
       writableProjects: writable,
     });
 
-    return withAudit(buildHandlers({ policy, masters, gateway, limits: DEFAULT_LIMITS }), sink);
+    return withAudit(
+      buildHandlers({
+        policy,
+        masters,
+        gateway,
+        limits: DEFAULT_LIMITS,
+        attachmentsRoot: config.attachmentsRoot,
+        // ローカルファイルを読むのはここで組み立てる。tool 層は node:fs を知らない
+        readAttachment,
+      }),
+      sink,
+    );
   } catch (e) {
     // 起動できなかったことも記録に残す。**種類だけ**を書き、理由の本文は stderr に留める
     // （サーバが書いた文字列が混ざりうるので、ログを第三者のテキストの置き場にしない）。

@@ -4,13 +4,19 @@
  * @description MCP ツールの定義とハンドラ。input（検証・ポリシー判定・解決）→ api → output の3段
  */
 
-import { ApiFailureError, ScopeDeniedError, TOOL_NAMES, TOOL_SPECS } from '../contract.ts';
+import {
+  ApiFailureError,
+  AttachmentError,
+  ScopeDeniedError,
+  TOOL_NAMES,
+  TOOL_SPECS,
+} from '../contract.ts';
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
 import { toProjectId, toProjectIds } from '../domain/masters.ts';
 import { limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
 import { toError } from '../shared/toError.ts';
-import type { ResolvedPolicy, ResolvedRequest, ToolName } from '../contract.ts';
+import type { AttachmentFile, ResolvedPolicy, ResolvedRequest, ToolName } from '../contract.ts';
 import type { BacklogGateway } from '../domain/gateway.ts';
 import type { Masters } from '../domain/masters.ts';
 import type { McpHandlers, ToolDefinition, ToolResult } from '../mcp/protocol.ts';
@@ -37,10 +43,14 @@ export interface PlanContext {
   readonly policy: ResolvedPolicy;
   readonly masters: Masters;
   readonly limits: ToolLimits;
+  /** 添付を許すディレクトリ。`null` なら添付の引数そのものを受け付けない。 */
+  readonly attachmentsRoot?: string | null;
 }
 
 export interface ToolContext extends PlanContext {
   readonly gateway: BacklogGateway;
+  /** ローカルファイルの読み取り。**差し替えられる**（規約 §7）。 */
+  readonly readAttachment?: (root: string, requested: string) => Promise<AttachmentFile>;
 }
 
 /**
@@ -55,6 +65,12 @@ export interface ToolContext extends PlanContext {
  *   「一覧の応答 → 次に何を叩くか」を Transport 抜きで検証できる
  */
 export type PlannedCall =
+  | {
+      readonly kind: 'attach';
+      /** 利用者が指定したパス。**ルートの中に収まっているかは読み取り側が検証する。** */
+      readonly localPath: string;
+      readonly next: (file: AttachmentFile) => PlannedCall;
+    }
   | {
       readonly kind: 'send';
       readonly request: ResolvedRequest;
@@ -671,6 +687,50 @@ const listPayload = (
 // ============================================================================
 
 /**
+ * `file` が指定されていれば、**アップロードしてからコメントする**3手に開く。
+ *
+ * 添付は独立したツールにしない。`attachmentId` が LLM の手に渡ると「上げたファイルを
+ * 別プロジェクトの課題に貼る」経路ができるため、**上げた ID はサーバ内に留めて
+ * そのまま貼る**（原則4 と同じ形）。
+ *
+ * **1コメントにつき1件だけ。** 借り物の `ApiClient` はフォームのスカラー配列を
+ * `TypeError` で弾く（通るのはファイルの配列だけ）ので、複数を送るには上流を直す必要がある。
+ * 複数が本当に要る場面が出るまで、**型と実行時が一致している側に寄せる**。
+ * 引数が単数なので、利用者から見て「黙って1件に減らされた」にはならない。
+ */
+const withOptionalAttachment = (
+  context: PlanContext,
+  args: Record<string, unknown>,
+  post: (attachmentId?: number) => PlannedCall,
+): PlannedCall => {
+  const file = optionalString(args, 'file');
+  if (file === undefined) {
+    return post();
+  }
+  if (context.attachmentsRoot == null) {
+    throw new AttachmentError(
+      'このサーバでは添付を受け付けていません（BACKLOG_ATTACHMENTS_ROOT が未設定）',
+    );
+  }
+  return {
+    kind: 'attach',
+    localPath: file,
+    next: attachment => ({
+      kind: 'chain',
+      request: { endpoint: '/space/attachment', method: 'POST', form: { file: attachment } },
+      next: raw => {
+        const id = isRecord(raw) ? pickNumber(raw['id']) : undefined;
+        if (id === undefined) {
+          // 上げたつもりで貼られていない、を作らない（規約 §5.4）
+          throw new Error('添付ファイルの送信に成功しましたが ID を受け取れませんでした');
+        }
+        return post(id);
+      },
+    }),
+  };
+};
+
+/**
  * 引数を検証し、ポリシーを適用し、送るだけの状態まで組み立てる。**純関数**。
  *
  * ここを抜けた時点で絞り込みはポリシー由来の値に確定している。api 層に渡ってから
@@ -893,22 +953,25 @@ export const planToolCall = (
       const repository = requiredPathSegment(args, 'repository');
       const number = requiredPositiveInteger(args, 'number');
       const content = requiredString(args, 'content');
-      return {
+      const post = (attachmentId?: number): PlannedCall => ({
         kind: 'send',
         // notifiedUserId は載せない。LLM に通知先を決めさせない（add_issue_comment と同じ）。
         request: {
           endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}/comments`,
           method: 'POST',
-          form: { content },
+          form:
+            attachmentId === undefined ? { content } : { content, 'attachmentId[]': attachmentId },
         },
         shape: raw => ({
           projectKey,
           repository,
           number,
           posted: true,
+          attached: attachmentId !== undefined,
           created: isRecord(raw) ? pickString(raw['created']) : undefined,
         }),
-      };
+      });
+      return withOptionalAttachment(context, args, post);
     }
 
     case 'search_documents': {
@@ -967,20 +1030,23 @@ export const planToolCall = (
     case 'add_issue_comment': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const content = requiredString(args, 'content');
-      return {
+      const post = (attachmentId?: number): PlannedCall => ({
         kind: 'send',
         // notifiedUserId は載せない。LLM に通知先を決めさせない。
         request: {
           endpoint: `/issues/${issueKey}/comments`,
           method: 'POST',
-          form: { content },
+          form:
+            attachmentId === undefined ? { content } : { content, 'attachmentId[]': attachmentId },
         },
         shape: raw => ({
           issueKey,
           posted: true,
+          attached: attachmentId !== undefined,
           created: isRecord(raw) ? pickString(raw['created']) : undefined,
         }),
-      };
+      });
+      return withOptionalAttachment(context, args, post);
     }
 
     default: {
@@ -1019,7 +1085,11 @@ const sendRequest = async (context: ToolContext, request: ResolvedRequest): Prom
  * **I/O はここだけ。** 何を送り、応答をどう読むかは `planToolCall` が持つ純関数が決める。
  *
  * `chain` が返るあいだ往復を続ける。上限に達したら送出する（規約 §5.4 — 打ち切りを
- * 黙って成功にしない）。今の最長は2往復（Wiki の一覧 → 本文）。
+ * 黙って成功にしない）。今の最長は3手（添付の読み取り → アップロード → コメント）。
+ *
+ * **ローカルファイルを読むのもここだけ。** `planToolCall` は純関数のままにしたいので、
+ * 「どのパスを読むか」だけを `attach` で返させ、実際の読み取りは差し替え可能な依存に渡す。
+ * 検証（ルート配下か・拡張子と中身が釣り合うか）はその依存が持つ（`attach/localFile.ts`）。
  */
 const runTool = async (
   context: ToolContext,
@@ -1029,13 +1099,25 @@ const runTool = async (
   let planned = planToolCall(context, toolName, args);
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
+    if (planned.kind === 'attach') {
+      const root = context.attachmentsRoot;
+      if (root == null) {
+        throw new AttachmentError('添付は設定されていません（BACKLOG_ATTACHMENTS_ROOT が未設定）');
+      }
+      const read = context.readAttachment;
+      if (read === undefined) {
+        throw new AttachmentError('添付の読み取りが組み立てられていません');
+      }
+      planned = planned.next(await read(root, planned.localPath));
+      continue;
+    }
     const raw = await sendRequest(context, planned.request);
     if (planned.kind === 'send') {
       return planned.shape(raw);
     }
     planned = planned.next(raw);
   }
-  throw new Error(`${toolName} が ${String(MAX_HOPS)} 往復で終わりませんでした`);
+  throw new Error(`${toolName} が ${String(MAX_HOPS)} 手で終わりませんでした`);
 };
 
 // ============================================================================
@@ -1046,6 +1128,12 @@ const COUNT_PROPERTY = {
   type: 'integer',
   minimum: 1,
   description: '取得件数の希望値。サーバ側の上限で切り下げられます。',
+} as const;
+
+const FILE_PROPERTY = {
+  type: 'string',
+  description:
+    '添付するファイル。サーバに設定されたディレクトリからの相対パス。1コメントにつき1件。省略可。',
 } as const;
 
 const PROJECT_KEY_PROPERTY = {
@@ -1116,6 +1204,7 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
     properties: {
       issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
       content: { type: 'string', description: 'コメント本文（Markdown）' },
+      file: FILE_PROPERTY,
     },
     required: ['issueKey', 'content'],
     additionalProperties: false,
@@ -1178,6 +1267,7 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       repository: REPOSITORY_PROPERTY,
       number: PULL_REQUEST_NUMBER_PROPERTY,
       content: { type: 'string', description: 'コメント本文（Markdown）' },
+      file: FILE_PROPERTY,
     },
     required: ['projectKey', 'repository', 'number', 'content'],
     additionalProperties: false,

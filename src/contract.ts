@@ -233,9 +233,22 @@ export interface ResolvedPolicy {
  * ここはスカラーだけにしてある。`notifiedUserId[]` のような配列が要るのは次段階なので、
  * **そのとき上流を直すか回避するかを決める**（今決めても使わない）。
  */
-export type FormValue = string | number | boolean;
+export type FormValue = string | number | boolean | AttachmentFile;
 
 export type FormFields = Readonly<Record<string, FormValue>>;
+
+/**
+ * multipart に載せるファイル。**借り物の `FilePart` と同じ形にしてある。**
+ *
+ * `libs/` の型をそのまま使わないのは、tool 層が `libs/` を import できないため
+ * （lint で禁止している）。形を合わせてあるので gateway でそのまま渡せる。
+ */
+export interface AttachmentFile {
+  readonly kind: 'file';
+  readonly filename: string;
+  readonly contentType: string;
+  readonly data: Uint8Array;
+}
 
 /**
  * input 層が組み立てて api 層へ渡す、解決済みのリクエスト。
@@ -249,6 +262,15 @@ export interface ResolvedRequest {
   readonly method: 'GET' | 'POST' | 'PATCH';
   readonly query?: Readonly<Record<string, unknown>>;
   readonly form?: FormFields;
+}
+
+/**
+ * 添付ファイルを受け付けられない。**API に到達する前に返す。**
+ *
+ * ルート外・未知の拡張子・中身と拡張子の不一致・サイズ超過をまとめて表す。
+ */
+export class AttachmentError extends Error {
+  override readonly name = 'AttachmentError';
 }
 
 /** ポリシー違反。API に到達する前に返す。 */
@@ -324,5 +346,13 @@ export interface ServerConfig {
    * ポリシーは必須なので、基準が無い状態が作れない。
    */
   readonly logDir: string;
+  /**
+   * 添付を許すディレクトリ（絶対パス）。**未設定なら添付機能そのものが無い。**
+   *
+   * 既定を置かないのは、置いた瞬間に「どこが読めるか」が暗黙になるため。MCP 仕様 2026-07-28 で
+   * `roots` が非推奨になり、**クライアントから受け取る道も塞がれている**（SEP-2577）ので、
+   * 設定で明示する以外に安全な決め方が無い。相対指定はポリシーファイルのディレクトリから解決する。
+   */
+  readonly attachmentsRoot: string | null;
   readonly readOnly: boolean;
 }
