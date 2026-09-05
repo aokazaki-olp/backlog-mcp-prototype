@@ -23,8 +23,13 @@ export type Can = (typeof CAN_LEVELS)[number];
  *
  * `user` / `space` / `priority` / `resolution` は含まない。プロジェクトに属さず
  * スコープで表現できないため、起動時に解決して内部マスタとして持つ（ツールにしない）。
+ *
+ * **`notification` も同じ理由で含まない。** `GET /notifications` はプロジェクトの
+ * 絞り込みパラメータを持たず（`minId` / `maxId` / `count` / `order` / `senderId` のみ。
+ * ミラーで確認）、スペース全体の自分宛て通知を返す。**3軸で表現できないので載せない**
+ * （原則3）。語彙に残すと「書けるのに何も許可されない」ポリシーが作れてしまう。
  */
-export const TOOLSETS = ['issue', 'wiki', 'document', 'git', 'notification', 'activity'] as const;
+export const TOOLSETS = ['issue', 'wiki', 'document', 'git', 'activity'] as const;
 
 export type Toolset = (typeof TOOLSETS)[number];
 
@@ -39,6 +44,8 @@ export const TOOL_NAMES = [
   'list_pull_requests',
   'get_pull_request',
   'get_pull_request_comments',
+  'search_documents',
+  'list_project_activities',
   'add_issue_comment',
   'add_pull_request_comment',
 ] as const;
@@ -154,6 +161,24 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: 'プルリクエストのコメントを取得する',
     description:
       'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメント一覧を取得する。',
+    readOnly: true,
+  },
+  search_documents: {
+    toolset: 'document',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'ドキュメントを検索する',
+    description:
+      '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
+    readOnly: true,
+  },
+  list_project_activities: {
+    toolset: 'activity',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'プロジェクトの最近の活動を取得する',
+    description:
+      'プロジェクトキーを指定して最近の活動を取得する。関連する課題があれば issueKey を返すので、詳細は get_issue で取得する。',
     readOnly: true,
   },
   add_issue_comment: {

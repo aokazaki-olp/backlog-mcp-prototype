@@ -74,7 +74,7 @@ npx dotenvx encrypt -f .env -fk ~/.backlog-mcp/keys/.env.keys
 - `SALES` / `PROJ` / `INFRA` は**架空のプロジェクトキー**（Backlog 側に実在するもの。`PROJ-123` の接頭辞）。ポリシーの語彙ではない
 - **文字列で書いたら `read`。** 細かくしたいときだけオブジェクトにする
 - `can` は `read` < `comment` < `write` の単一値。**削除はこの語彙に存在しない**
-- `toolsets` は `issue` / `wiki` / `document` / `git` / `notification` / `activity`。省略すると全部
+- `toolsets` は `issue` / `wiki` / `document` / `git` / `activity`。省略すると全部。**語彙にある語はすべてツールを持つ**（持たない語は載せない — 書けるのに何も許可されないポリシーを作れなくするため）
 - **`projects` は必須で、ワイルドカードは用意しない。** 対象は列挙する
 
 未知の項目・未知の値・空の `projects`・解決できないプロジェクトキーは、いずれも**起動失敗**にする。タイポが黙って既定に落ちない。
@@ -152,10 +152,16 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `get_pull_request`          | git       | read         |
 | `get_pull_request_comments` | git       | read         |
 | `add_pull_request_comment`  | git       | comment      |
+| `search_documents`          | document  | read         |
+| `list_project_activities`   | activity  | read         |
 
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
 
 **行ごとのレビューコメントは作れない。** Backlog のプルリクエストコメント API のパラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけで、ファイル名も行番号も position も無い（ミラーで確認）。1レビュー = 1コメントとして、本文に `src/main.ts:42` の形で参照を書く。
+
+**通知（`GET /notifications`）はツールにしない。** 絞り込みパラメータが `minId` / `maxId` / `count` / `order` / `senderId` しか無く、スペース全体の自分宛て通知を返す。**プロジェクトで絞る手段が無いので、3軸で表現できない**（原則3）。`toolsets` の語彙からも外してある。
+
+**ドキュメントは単体取得のツールを作っていない。** `GET /documents/:documentId` と一覧は応答の形が同じで、**一覧に本文（`plain`）が入っている**。Wiki と違って2往復が要らない。
 
 **リポジトリ名はパスに載るので検証している。** 借り物の URL 組み立ては文字列連結で、正規化は URL パーサが行う。`..` を素通しすると `/projects/101/git/repositories/../../../../space/pullRequests` が `/api/v2/space/pullRequests` になり、**別のエンドポイントに到達する**（手元で確認）。`/` `\\` `?` `#` `%` と `.` `..` を弾き、残りは `encodeURIComponent` で載せる。
 

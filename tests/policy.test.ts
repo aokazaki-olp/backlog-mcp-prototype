@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { PolicyError } from '../src/contract.ts';
+import { PolicyError, TOOLSETS } from '../src/contract.ts';
 import {
   explainPolicy,
   isAllowed,
@@ -72,6 +72,17 @@ describe('loadPolicy — fail-closed', () => {
 
   it('未知の toolset は送出する', () => {
     rejects({ projects: [{ key: 'PROJ', toolsets: ['issues'] }] }, 'toolset のタイポ');
+    // notification はスコープを表現できないので語彙から外した（原則3）。
+    // 「書けるのに何も許可されない」ポリシーが作れないことを固定する
+    rejects({ projects: [{ key: 'PROJ', toolsets: ['notification'] }] }, '語彙から外した toolset');
+  });
+
+  it('語彙にあるすべての toolset が、ツールを1つ以上持つ', () => {
+    // 空集合を黙って作る toolset を語彙に残さない（規約 §5.4）
+    for (const toolset of TOOLSETS) {
+      const policy = loadPolicy({ projects: [{ key: 'PROJ', can: 'write', toolsets: [toolset] }] });
+      assert.ok(listedTools(policy).size > 0, `toolset ${toolset} に対応するツールが1つも無い`);
+    }
   });
 
   it('未知の項目は送出する', () => {
@@ -131,7 +142,7 @@ describe('正規形', () => {
         {
           key: 'SALES',
           can: 'read',
-          toolsets: ['issue', 'wiki', 'document', 'git', 'notification', 'activity'],
+          toolsets: ['issue', 'wiki', 'document', 'git', 'activity'],
         },
       ],
     });

@@ -1095,3 +1095,111 @@ describe('shape — 件名も囲む', () => {
     assert.match(String(shaped['summary']), /<untrusted source="backlog:issue:PROJ-1:summary"/);
   });
 });
+
+// ============================================================================
+// document / activity toolset
+// ============================================================================
+
+describe('planToolCall — document は絞り込みをポリシーで組み立てる', () => {
+  it('projectId[] はポリシー由来で、offset は 0 固定', () => {
+    const { request } = planToolCall(contextOf(), 'search_documents', {});
+
+    assert.equal(request.endpoint, '/documents');
+    assert.deepEqual(request.query?.['projectId[]'], [101, 102]);
+    assert.equal(request.query['offset'], 0);
+  });
+
+  it('引数で projectId を渡しても採用しない', () => {
+    const { request } = planToolCall(contextOf(), 'search_documents', {
+      'projectId[]': [999],
+      offset: 500,
+    });
+
+    assert.deepEqual(request.query?.['projectId[]'], [101, 102]);
+    assert.equal(request.query['offset'], 0);
+  });
+
+  it('本文と表題を囲み、id / projectId / json は返さない', () => {
+    const shape = shapeOf(contextOf(), 'search_documents', {});
+    const shaped = (
+      shape([
+        {
+          id: '01939983409c79d5a06a49859789e38f',
+          projectId: 1,
+          title: 'ドキュメント機能へようこそ',
+          plain: 'hello',
+          json: '{}',
+          statusId: 1,
+          emoji: '\u{1F389}',
+          attachments: [],
+          tags: [{ id: 1, name: 'Backlog' }],
+          createdUser: MIRROR_USER,
+          created: '2024-12-06T01:08:56Z',
+        },
+      ]) as { items: Record<string, unknown>[] }
+    ).items[0];
+
+    assert.match(String(shaped?.['title']), /<untrusted source="backlog:document:/);
+    assert.match(String(shaped?.['content']), /hello/);
+    assert.deepEqual(shaped?.['tags'], ['Backlog']);
+
+    const json = JSON.stringify(shaped);
+    assert.doesNotMatch(json, /01939983409c79d5a06a49859789e38f/);
+    assert.doesNotMatch(json, /projectId|statusId|"json"/);
+    assert.doesNotMatch(json, /mailAddress/);
+  });
+});
+
+describe('planToolCall — activity', () => {
+  it('パスは解決済みの projectId で組み立てる', () => {
+    const { request } = planToolCall(contextOf(), 'list_project_activities', {
+      projectKey: 'SALES',
+    });
+
+    assert.equal(request.endpoint, '/projects/102/activities');
+  });
+
+  it('許可外のプロジェクトは拒否する', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'list_project_activities', { projectKey: 'OTHER' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('key_id は課題キーに組み直し、project の設定一式は返さない', () => {
+    const shape = shapeOf(contextOf(), 'list_project_activities', { projectKey: 'PROJ' });
+    const shaped = (
+      shape([
+        {
+          id: 3153,
+          project: { id: 92, projectKey: 'SUB', name: 'サブタスク', useGit: true, archived: false },
+          type: 2,
+          content: { id: 4809, key_id: 121, summary: 'コメント', description: '' },
+          notifications: [],
+          createdUser: MIRROR_USER,
+          created: '2013-05-30T09:11:36Z',
+        },
+      ]) as { items: Record<string, unknown>[] }
+    ).items[0];
+
+    assert.equal(shaped?.['issueKey'], 'PROJ-121');
+    assert.equal(shaped['activityTypeId'], 2);
+
+    const json = JSON.stringify(shaped);
+    // 引数の projectKey で組む。応答の project は使わない（許可外のキーを載せない）
+    assert.doesNotMatch(json, /SUB|useGit|archived|3153|4809/);
+    assert.doesNotMatch(json, /mailAddress/);
+  });
+
+  it('課題に紐づかない活動でも落ちない（issueKey が出ないだけ）', () => {
+    const shape = shapeOf(contextOf(), 'list_project_activities', { projectKey: 'PROJ' });
+    const shaped = (
+      shape([{ type: 5, content: { name: 'Home' }, createdUser: MIRROR_USER }]) as {
+        items: Record<string, unknown>[];
+      }
+    ).items[0];
+
+    assert.equal(shaped?.['issueKey'], undefined);
+    assert.equal(shaped?.['activityTypeId'], 5);
+  });
+});

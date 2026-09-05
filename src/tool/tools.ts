@@ -548,6 +548,85 @@ const shapePullRequest = (
   };
 };
 
+/**
+ * ドキュメントの1件。**一覧に本文（`plain`）が入っている。**
+ *
+ * `GET /documents/:documentId` は一覧と同じ形を返す（ミラーで確認）ので、Wiki のような
+ * 2往復も、単体取得のツールも要らない。したがって `id` を返す必要も無い
+ * （返した値が別の操作への入口にならないこと）。
+ *
+ * `json` は本文の構造化表現で `plain` と重複するため落とす。`statusId` / `emoji` /
+ * `projectId` も落とす（状態の名前はミラーに無く、番号のままでは意味を成さない）。
+ *
+ * > **未確認**: 一覧の `plain` が本文の全文かどうかは実データで見ていない。ミラーの
+ * > 応答例は一覧・単体とも同じ短い値で、切り詰めの気配は無い。
+ */
+const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: 'ドキュメントの形が想定と違います' };
+  }
+  const title = pickString(raw['title']);
+  const plain = pickString(raw['plain']);
+  const wrap = (text: string, field: string): string =>
+    wrapUntrusted(text, {
+      source: `backlog:document:${title ?? '(無題)'}:${field}`,
+      maxLength: limits.maxTextLength,
+    });
+
+  return {
+    tags: pickNames(raw['tags']),
+    attachmentCount: countOf(raw['attachments']),
+    createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+    updatedUser: pickName(raw['updatedUser']),
+    updated: pickString(raw['updated']),
+    // 表題も本文も第三者が書ける
+    title: title === undefined ? undefined : wrap(title, 'title'),
+    content: plain === undefined || plain === '' ? undefined : wrap(plain, 'content'),
+  };
+};
+
+/**
+ * 活動の1件。
+ *
+ * **`content` の形は活動の種別ごとに違う**（課題・Wiki・PR などで別物）。全種別を推測で
+ * 読むと外れたとき黙って空になるので、**どの種別にもある値だけ**を取り、それ以外は返さない。
+ *
+ * `content.key_id` は**プロジェクト内の連番**なので、`projectKey` と組めば課題キーになる。
+ * 数値 ID を渡す代わりに `issueKey` を返し、詳細は `get_issue` へ繋ぐ（原則4）。
+ * `id` / `project` / `notifications` は落とす（`project` はプロジェクトの設定一式が入っている）。
+ *
+ * > **未確認**: 活動種別 ID（1〜49）と名前の対応表はミラーに無い。番号のまま返す。
+ */
+const shapeActivity = (
+  raw: unknown,
+  projectKey: string,
+  limits: ToolLimits,
+): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: '活動の形が想定と違います' };
+  }
+  const content = raw['content'];
+  const summary = isRecord(content) ? pickString(content['summary']) : undefined;
+  const keyId = isRecord(content) ? pickNumber(content['key_id']) : undefined;
+
+  return {
+    // Backlog の活動種別 ID。名前の対応表は API ドキュメントに無いので番号のまま返す
+    activityTypeId: pickNumber(raw['type']),
+    // key_id はプロジェクト内の連番。projectKey と組めば課題キーになり、get_issue へ繋がる
+    issueKey: keyId === undefined ? undefined : `${projectKey}-${String(keyId)}`,
+    createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+    summary:
+      summary === undefined || summary === ''
+        ? undefined
+        : wrapUntrusted(summary, {
+            source: `backlog:activity:${projectKey}:summary`,
+            maxLength: limits.maxTextLength,
+          }),
+  };
+};
+
 const asArray = (value: unknown, where: string): readonly unknown[] => {
   if (!Array.isArray(value)) {
     throw new Error(`${where} の応答が配列ではありません`);
@@ -832,6 +911,59 @@ export const planToolCall = (
       };
     }
 
+    case 'search_documents': {
+      const count = boundedCount(args, limits);
+      // projectId はポリシー由来。引数から受け取る口を作っていない。
+      const query: Record<string, unknown> = {
+        'projectId[]': scopedProjectIds(context, toolName),
+        // offset は API の必須パラメータ（ミラーで確認）。ページングの口は開けない
+        offset: 0,
+        count: probeCount(count),
+        sort: 'updated',
+        order: 'desc',
+      };
+      const keyword = optionalString(args, 'keyword');
+      if (keyword !== undefined) {
+        query['keyword'] = keyword;
+      }
+      return {
+        kind: 'send',
+        request: { endpoint: '/documents', method: 'GET', query },
+        shape: raw => {
+          const { items, truncated } = limitCount(asArray(raw, 'GET /documents'), count);
+          return listPayload(
+            items.map(item => shapeDocument(item, limits)),
+            truncated,
+            count,
+          );
+        },
+      };
+    }
+
+    case 'list_project_activities': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const count = boundedCount(args, limits);
+      return {
+        kind: 'send',
+        request: {
+          endpoint: `/projects/${String(projectId)}/activities`,
+          method: 'GET',
+          query: { count: probeCount(count), order: 'desc' },
+        },
+        shape: raw => {
+          const { items, truncated } = limitCount(
+            asArray(raw, 'GET /projects/*/activities'),
+            count,
+          );
+          return listPayload(
+            items.map(item => shapeActivity(item, projectKey, limits)),
+            truncated,
+            count,
+          );
+        },
+      };
+    }
+
     case 'add_issue_comment': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const content = requiredString(args, 'content');
@@ -991,6 +1123,20 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
   list_git_repositories: {
     type: 'object',
     properties: { projectKey: PROJECT_KEY_PROPERTY },
+    required: ['projectKey'],
+    additionalProperties: false,
+  },
+  search_documents: {
+    type: 'object',
+    properties: {
+      keyword: { type: 'string', description: '検索キーワード' },
+      count: COUNT_PROPERTY,
+    },
+    additionalProperties: false,
+  },
+  list_project_activities: {
+    type: 'object',
+    properties: { projectKey: PROJECT_KEY_PROPERTY, count: COUNT_PROPERTY },
     required: ['projectKey'],
     additionalProperties: false,
   },
