@@ -789,3 +789,296 @@ describe('buildHandlers — tools/call は一覧と独立に確認する', () =>
     );
   });
 });
+
+// ============================================================================
+// git toolset — パスがポリシー由来で組み立てられる
+// ============================================================================
+
+describe('planToolCall — git のパスはポリシー由来で組み立てる', () => {
+  it('projectKey は解決済みの projectId になる（引数の文字列がパスに載らない）', () => {
+    const { request } = planToolCall(contextOf(), 'list_git_repositories', {
+      projectKey: 'PROJ',
+    });
+
+    assert.equal(request.endpoint, '/projects/101/git/repositories');
+  });
+
+  it('許可外のプロジェクトは API 到達前に拒否する', () => {
+    for (const toolName of [
+      'list_git_repositories',
+      'list_pull_requests',
+      'get_pull_request',
+      'get_pull_request_comments',
+    ] as const) {
+      assert.throws(
+        () =>
+          planToolCall(contextOf(), toolName, {
+            projectKey: 'OTHER',
+            repository: 'app',
+            number: 1,
+          }),
+        ScopeDeniedError,
+        `${toolName} は拒否されるべき`,
+      );
+    }
+  });
+
+  it('toolsets で git を外したプロジェクトでは拒否する', () => {
+    // INFRA は can: comment だが toolsets: ['issue']
+    assert.throws(
+      () => planToolCall(contextOf(), 'list_git_repositories', { projectKey: 'INFRA' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('read だけのプロジェクトでは PR にコメントできない', () => {
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'add_pull_request_comment', {
+          projectKey: 'SALES',
+          repository: 'app',
+          number: 1,
+          content: 'レビュー',
+        }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('PR の取得とコメント取得のパスが仕様どおりに組み上がる', () => {
+    const detail = planToolCall(contextOf(), 'get_pull_request', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 7,
+    });
+    const comments = planToolCall(contextOf(), 'get_pull_request_comments', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 7,
+    });
+
+    assert.equal(detail.request.endpoint, '/projects/101/git/repositories/app/pullRequests/7');
+    assert.equal(
+      comments.request.endpoint,
+      '/projects/101/git/repositories/app/pullRequests/7/comments',
+    );
+  });
+
+  it('コメント投稿は POST で、通知先を載せない', () => {
+    const { request } = planToolCall(contextOf(), 'add_pull_request_comment', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 7,
+      content: 'レビューです',
+    });
+
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(request.form, { content: 'レビューです' });
+  });
+});
+
+// ============================================================================
+// repository はパスに載るので、エンドポイントを差し替えられないこと
+// ============================================================================
+
+describe('planToolCall — repository でエンドポイントを差し替えられない', () => {
+  /**
+   * 借り物の `buildUrl` は文字列連結で、正規化は URL パーサが行う。
+   * `..` を素通しすると**別のエンドポイントに到達する**（手元で確認済み）。
+   */
+  const rejects = (repository: string): void => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'list_pull_requests', { projectKey: 'PROJ', repository }),
+      TypeError,
+      `拒否されるべき: ${JSON.stringify(repository)}`,
+    );
+  };
+
+  it('パスを遡る指定を弾く', () => {
+    rejects('..');
+    rejects('.');
+    rejects('../../../../space');
+    rejects('app/../../../space');
+  });
+
+  it('区切り・クエリ・フラグメント・エンコードを弾く', () => {
+    rejects('a/b');
+    rejects('a\\b');
+    rejects('app?x=1');
+    rejects('app#f');
+    rejects('%2e%2e');
+    rejects('');
+  });
+
+  it('弾けなかった場合に到達する先を示す（この検査が無いと何が起きるか）', () => {
+    // 検証を通さずに組み立てると URL の正規化で別のエンドポイントになる
+    const naive = new URL(
+      'https://example.backlog.jp/api/v2/projects/101/git/repositories/../../../../space/pullRequests',
+    );
+
+    assert.equal(naive.pathname, '/api/v2/space/pullRequests');
+  });
+
+  it('正当なリポジトリ名は通り、そのままパスに載る', () => {
+    for (const repository of ['app', 'my-repo', 'my_repo', 'repo.git', 'a1']) {
+      const { request } = planToolCall(contextOf(), 'list_pull_requests', {
+        projectKey: 'PROJ',
+        repository,
+      });
+      assert.equal(
+        request.endpoint,
+        `/projects/101/git/repositories/${repository}/pullRequests`,
+        `通るべき: ${repository}`,
+      );
+    }
+  });
+
+  it('日本語のリポジトリ名はエンコードして載せる', () => {
+    const { request } = planToolCall(contextOf(), 'list_pull_requests', {
+      projectKey: 'PROJ',
+      repository: '設計',
+    });
+
+    assert.equal(
+      request.endpoint,
+      `/projects/101/git/repositories/${encodeURIComponent('設計')}/pullRequests`,
+    );
+  });
+
+  it('number は 1 以上の整数だけを受ける', () => {
+    for (const number of [0, -1, 1.5, '1', null]) {
+      assert.throws(
+        () =>
+          planToolCall(contextOf(), 'get_pull_request', {
+            projectKey: 'PROJ',
+            repository: 'app',
+            number,
+          }),
+        TypeError,
+        `拒否されるべき: ${JSON.stringify(number)}`,
+      );
+    }
+  });
+});
+
+// ============================================================================
+// git の出力 — 数値 ID と認証情報を含む URL を落とす
+// ============================================================================
+
+describe('shape — Git リポジトリ', () => {
+  it('name は返し、id / projectId / URL は返さない', () => {
+    const shape = shapeOf(contextOf(), 'list_git_repositories', { projectKey: 'PROJ' });
+    const json = JSON.stringify(
+      shape([
+        {
+          id: 1,
+          projectId: 151,
+          name: 'app',
+          description: '',
+          hookUrl: null,
+          httpUrl: 'https://xx.backlog.jp/git/BLG/app.git',
+          sshUrl: 'xx@xx.git.backlog.jp:/BLG/app.git',
+          displayOrder: 0,
+          createdUser: MIRROR_USER,
+        },
+      ]),
+    );
+
+    assert.match(json, /"name":"app"/);
+    assert.doesNotMatch(json, /projectId|httpUrl|sshUrl|hookUrl|displayOrder/);
+    assert.doesNotMatch(json, /151/);
+  });
+});
+
+describe('shape — プルリクエスト', () => {
+  const MIRROR_PULL_REQUEST = {
+    id: 2,
+    projectId: 3,
+    repositoryId: 5,
+    number: 1,
+    summary: 'test',
+    description: 'test data',
+    base: 'master',
+    branch: 'develop',
+    status: { id: 1, name: 'Open' },
+    assignee: MIRROR_USER,
+    issue: { id: 1234, issueKey: 'PROJ-9', summary: '関連課題' },
+    baseCommit: null,
+    branchCommit: null,
+    mergeCommit: null,
+    closeAt: null,
+    mergeAt: null,
+    createdUser: MIRROR_USER,
+    created: '2015-04-23T03:04:14Z',
+    updatedUser: MIRROR_USER,
+    updated: '2015-04-23T03:04:14Z',
+    attachments: [],
+    stars: [],
+  };
+
+  it('番号と状態は返し、連番 ID は落とす', () => {
+    const shape = shapeOf(contextOf(), 'get_pull_request', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 1,
+    });
+    const shaped = shape(MIRROR_PULL_REQUEST) as Record<string, unknown>;
+
+    assert.equal(shaped['number'], 1);
+    assert.equal(shaped['status'], 'Open');
+    assert.equal(shaped['base'], 'master');
+    assert.equal(shaped['relatedIssueKey'], 'PROJ-9');
+
+    const json = JSON.stringify(shaped);
+    assert.doesNotMatch(json, /repositoryId|projectId|"id"/);
+    assert.doesNotMatch(json, /1234/);
+  });
+
+  it('件名と本文は untrusted で囲む', () => {
+    const shape = shapeOf(contextOf(), 'get_pull_request', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 1,
+    });
+    const shaped = shape(MIRROR_PULL_REQUEST) as Record<string, unknown>;
+
+    assert.match(String(shaped['summary']), /<untrusted source="backlog:pr:PROJ\/app#1:summary"/);
+    assert.match(
+      String(shaped['description']),
+      /<untrusted source="backlog:pr:PROJ\/app#1:description"/,
+    );
+  });
+
+  it('ユーザーは name しか出さない（課題と同じ経路）', () => {
+    const shape = shapeOf(contextOf(), 'get_pull_request', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 1,
+    });
+    const json = JSON.stringify(shape(MIRROR_PULL_REQUEST));
+
+    assert.doesNotMatch(json, /mailAddress|nulabAccount|roleType|lastLoginTime|userId/);
+  });
+
+  it('PR のコメントも課題と同じ shape を通る（changeLog を落とさない）', () => {
+    const shape = shapeOf(contextOf(), 'get_pull_request_comments', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      number: 1,
+    });
+    const json = JSON.stringify(
+      shape([
+        {
+          id: 35,
+          content: null,
+          changeLog: [{ field: 'dependentIssue', newValue: 'GIT-3', originalValue: null }],
+          createdUser: MIRROR_USER,
+          created: '2015-05-14T01:53:38Z',
+        },
+      ]),
+    );
+
+    assert.match(json, /dependentIssue/);
+    assert.match(json, /backlog:pr:PROJ\/app#1:comment:changeLog/);
+    assert.doesNotMatch(json, /mailAddress/);
+  });
+});

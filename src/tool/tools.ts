@@ -144,6 +144,59 @@ const scopedProjectIds = (context: PlanContext, toolName: ToolName): readonly nu
   return toProjectIds(context.masters, projectKeys);
 };
 
+/**
+ * URL のパス1区画として受け取る。**引数がエンドポイントを差し替えられないようにする。**
+ *
+ * 借り物の `buildUrl` は `baseUrl + endpoint` の文字列連結で、正規化は URL パーサが行う。
+ * つまり `..` を含む区画を素通しすると**別のエンドポイントに到達する**（手元で確認:
+ * `/projects/1/git/repositories/../../../../space/pullRequests` → `/api/v2/space/pullRequests`）。
+ * MCP の CVE で最多のパス検証バイパスと同型なので、組み立てる前に弾く。
+ *
+ * 拒むのは**URL の意味を変えうる文字だけ**（`spaceId` の DNS ラベル検証と同じ立て方）。
+ * Backlog 側の命名規則には寄せない — 正当なリポジトリ名を弾く方が害が大きい。
+ */
+const PATH_SEGMENT_PATTERN = /^[^/\\?#%]+$/;
+
+const requiredPathSegment = (args: Record<string, unknown>, name: string): string => {
+  const value = requiredString(args, name);
+  if (!PATH_SEGMENT_PATTERN.test(value) || value === '.' || value === '..') {
+    throw new TypeError(
+      `${name} に URL の意味を変える文字は使えません（/ \\ ? # % と . .. は不可）`,
+    );
+  }
+  return encodeURIComponent(value);
+};
+
+/** 1 以上の整数として受け取る。**ID ではなくプロジェクト内の連番**（プルリクエスト番号）。 */
+const requiredPositiveInteger = (args: Record<string, unknown>, name: string): number => {
+  const value = args[name];
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new TypeError(`${name} には 1 以上の整数を指定してください`);
+  }
+  return value;
+};
+
+/**
+ * 引数のプロジェクトキーをポリシーに照らし、**解決済みの projectId** を返す。
+ *
+ * 許可の確認と ID 解決を1つにしてあるので、**確認しないまま ID を得る書き方ができない**。
+ */
+const resolveProjectKey = (
+  context: PlanContext,
+  toolName: ToolName,
+  args: Record<string, unknown>,
+): { readonly projectKey: string; readonly projectId: number } => {
+  const projectKey = requiredString(args, 'projectKey');
+  if (!isAllowed(context.policy, projectKey, toolName)) {
+    throw new ScopeDeniedError(
+      `プロジェクト ${projectKey} では ${toolName} を実行できません`,
+      toolName,
+      projectKey,
+    );
+  }
+  return { projectKey, projectId: toProjectId(context.masters, projectKey) };
+};
+
 const boundedCount = (args: Record<string, unknown>, limits: ToolLimits): number => {
   const raw = args['count'];
   if (raw === undefined || raw === null) {
@@ -339,10 +392,15 @@ const renderChangeLog = (raw: unknown): string | undefined => {
  * だけが並び、呼び出し側からは空のコメントに見える（規約 §5.4 の沈黙の失敗）。
  *
  * `id` / `projectId` / `issueId` / `stars` / `notifications` は落とす。
+ *
+ * **課題とプルリクエストで応答の形が同じ**なので共用する（ミラーの `get-comment-list.md` と
+ * `get-pull-request-comment.md` で確認）。違うのは出所ラベルだけなので引数で受ける。
+ *
+ * @param source - `<untrusted>` に載せる出所（例: `backlog:issue:PROJ-1`）
  */
 const shapeComment = (
   raw: unknown,
-  issueKey: string,
+  source: string,
   limits: ToolLimits,
 ): Record<string, unknown> => {
   if (!isRecord(raw)) {
@@ -350,7 +408,7 @@ const shapeComment = (
   }
   const wrap = (text: string, field: string): string =>
     wrapUntrusted(text, {
-      source: `backlog:issue:${issueKey}:${field}`,
+      source: `${source}:${field}`,
       maxLength: limits.maxTextLength,
     });
   const content = pickString(raw['content']);
@@ -413,6 +471,78 @@ const shapeWikiPageDetail = (
       source: `backlog:wiki:${projectKey}:${name}:content`,
       maxLength: limits.maxTextLength,
     }),
+  };
+};
+
+/**
+ * Git リポジトリの1件。**`name` が次のツールへ渡す識別子**になる。
+ *
+ * `id` / `projectId` は落とす。`repoIdOrName` は名前を受けるので、数値 ID を返す必要が無い
+ * （原則4 — 名前で受け、ID はサーバ内に留める）。`sshUrl` / `httpUrl` は落とす —
+ * 認証情報を含みうる形をそのまま LLM へ渡さない。
+ */
+const shapeRepository = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: 'Git リポジトリの形が想定と違います' };
+  }
+  const name = pickString(raw['name']);
+  const description = pickString(raw['description']);
+  return {
+    name,
+    // 説明は第三者が書ける
+    description:
+      description === undefined || description === ''
+        ? undefined
+        : wrapUntrusted(description, {
+            source: `backlog:repository:${name ?? '(不明)'}:description`,
+            maxLength: limits.maxTextLength,
+          }),
+    pushedAt: pickString(raw['pushedAt']),
+    created: pickString(raw['created']),
+    updated: pickString(raw['updated']),
+  };
+};
+
+/**
+ * プルリクエストの1件。
+ *
+ * `number` は**リポジトリ内の連番**で、パスがポリシー由来（プロジェクト → リポジトリ）
+ * なので、これを返しても別プロジェクトへの入口にならない。逆に `id` / `projectId` /
+ * `repositoryId` はスペース全体で連番なので落とす。
+ *
+ * `issue` は関連課題。`issueKey` だけ拾えば課題側のツールへ繋がる（数値 ID は載せない）。
+ */
+const shapePullRequest = (
+  raw: unknown,
+  source: string,
+  limits: ToolLimits,
+): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: 'プルリクエストの形が想定と違います' };
+  }
+  const wrap = (text: string, field: string): string =>
+    wrapUntrusted(text, { source: `${source}:${field}`, maxLength: limits.maxTextLength });
+  const summary = pickString(raw['summary']);
+  const description = pickString(raw['description']);
+  const issue = raw['issue'];
+
+  return {
+    number: pickNumber(raw['number']),
+    status: pickName(raw['status']),
+    base: pickString(raw['base']),
+    branch: pickString(raw['branch']),
+    assignee: pickName(raw['assignee']),
+    relatedIssueKey: isRecord(issue) ? pickString(issue['issueKey']) : undefined,
+    createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+    updatedUser: pickName(raw['updatedUser']),
+    updated: pickString(raw['updated']),
+    closeAt: pickString(raw['closeAt']),
+    mergeAt: pickString(raw['mergeAt']),
+    attachmentCount: countOf(raw['attachments']),
+    // 件名も本文も第三者が書ける
+    summary: summary === undefined ? undefined : wrap(summary, 'summary'),
+    description: description === undefined ? undefined : wrap(description, 'description'),
   };
 };
 
@@ -529,7 +659,7 @@ export const planToolCall = (
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/comments'), count);
           return listPayload(
-            items.map(item => shapeComment(item, issueKey, limits)),
+            items.map(item => shapeComment(item, `backlog:issue:${issueKey}`, limits)),
             truncated,
             count,
           );
@@ -585,6 +715,117 @@ export const planToolCall = (
           // 2本目の id は 1本目の応答からしか採らない。引数で渡す口は作っていない。
           request: { endpoint: `/wikis/${String(findWikiId(raw, name))}`, method: 'GET' },
           shape: detail => shapeWikiPageDetail(detail, projectKey, limits),
+        }),
+      };
+    }
+
+    case 'list_git_repositories': {
+      const { projectId } = resolveProjectKey(context, toolName, args);
+      return {
+        kind: 'send',
+        request: { endpoint: `/projects/${String(projectId)}/git/repositories`, method: 'GET' },
+        shape: raw => {
+          const { items, truncated } = limitCount(
+            asArray(raw, 'GET /projects/*/git/repositories'),
+            limits.maxCount,
+          );
+          return listPayload(
+            items.map(item => shapeRepository(item, limits)),
+            truncated,
+            limits.maxCount,
+          );
+        },
+      };
+    }
+
+    case 'list_pull_requests': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const repository = requiredPathSegment(args, 'repository');
+      const count = boundedCount(args, limits);
+      return {
+        kind: 'send',
+        request: {
+          endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests`,
+          method: 'GET',
+          query: { count: probeCount(count) },
+        },
+        shape: raw => {
+          const { items, truncated } = limitCount(
+            asArray(raw, 'GET /projects/*/git/repositories/*/pullRequests'),
+            count,
+          );
+          return listPayload(
+            items.map(item =>
+              shapePullRequest(item, `backlog:pr:${projectKey}/${repository}`, limits),
+            ),
+            truncated,
+            count,
+          );
+        },
+      };
+    }
+
+    case 'get_pull_request': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const repository = requiredPathSegment(args, 'repository');
+      const number = requiredPositiveInteger(args, 'number');
+      return {
+        kind: 'send',
+        request: {
+          endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}`,
+          method: 'GET',
+        },
+        shape: raw =>
+          shapePullRequest(raw, `backlog:pr:${projectKey}/${repository}#${String(number)}`, limits),
+      };
+    }
+
+    case 'get_pull_request_comments': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const repository = requiredPathSegment(args, 'repository');
+      const number = requiredPositiveInteger(args, 'number');
+      const count = boundedCount(args, limits);
+      return {
+        kind: 'send',
+        request: {
+          endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}/comments`,
+          method: 'GET',
+          query: { count: probeCount(count), order: 'desc' },
+        },
+        shape: raw => {
+          const { items, truncated } = limitCount(
+            asArray(raw, 'GET /projects/*/git/repositories/*/pullRequests/*/comments'),
+            count,
+          );
+          const source = `backlog:pr:${projectKey}/${repository}#${String(number)}`;
+          return listPayload(
+            items.map(item => shapeComment(item, source, limits)),
+            truncated,
+            count,
+          );
+        },
+      };
+    }
+
+    case 'add_pull_request_comment': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const repository = requiredPathSegment(args, 'repository');
+      const number = requiredPositiveInteger(args, 'number');
+      const content = requiredString(args, 'content');
+      return {
+        kind: 'send',
+        // notifiedUserId は載せない。LLM に通知先を決めさせない（add_issue_comment と同じ）。
+        request: {
+          endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}/comments`,
+          method: 'POST',
+          form: { content },
+        },
+        shape: raw => ({
+          projectKey,
+          repository,
+          number,
+          posted: true,
+          created: isRecord(raw) ? pickString(raw['created']) : undefined,
         }),
       };
     }
@@ -673,6 +914,22 @@ const COUNT_PROPERTY = {
   description: '取得件数の希望値。サーバ側の上限で切り下げられます。',
 } as const;
 
+const PROJECT_KEY_PROPERTY = {
+  type: 'string',
+  description: 'プロジェクトキー（例: PROJ）。許可されていなければ拒否されます。',
+} as const;
+
+const REPOSITORY_PROPERTY = {
+  type: 'string',
+  description: 'リポジトリ名。list_git_repositories が返す name をそのまま渡します。',
+} as const;
+
+const PULL_REQUEST_NUMBER_PROPERTY = {
+  type: 'integer',
+  minimum: 1,
+  description: 'プルリクエスト番号。list_pull_requests が返す number をそのまま渡します。',
+} as const;
+
 const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
   search_issues: {
     type: 'object',
@@ -727,6 +984,54 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       content: { type: 'string', description: 'コメント本文（Markdown）' },
     },
     required: ['issueKey', 'content'],
+    additionalProperties: false,
+  },
+  list_git_repositories: {
+    type: 'object',
+    properties: { projectKey: PROJECT_KEY_PROPERTY },
+    required: ['projectKey'],
+    additionalProperties: false,
+  },
+  list_pull_requests: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      count: COUNT_PROPERTY,
+    },
+    required: ['projectKey', 'repository'],
+    additionalProperties: false,
+  },
+  get_pull_request: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      number: PULL_REQUEST_NUMBER_PROPERTY,
+    },
+    required: ['projectKey', 'repository', 'number'],
+    additionalProperties: false,
+  },
+  get_pull_request_comments: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      number: PULL_REQUEST_NUMBER_PROPERTY,
+      count: COUNT_PROPERTY,
+    },
+    required: ['projectKey', 'repository', 'number'],
+    additionalProperties: false,
+  },
+  add_pull_request_comment: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      number: PULL_REQUEST_NUMBER_PROPERTY,
+      content: { type: 'string', description: 'コメント本文（Markdown）' },
+    },
+    required: ['projectKey', 'repository', 'number', 'content'],
     additionalProperties: false,
   },
 };

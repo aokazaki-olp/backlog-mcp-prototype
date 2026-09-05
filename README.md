@@ -139,16 +139,25 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 ## ツール
 
-| ツール               | 必要な `can` |
-| -------------------- | ------------ |
-| `search_issues`      | read         |
-| `get_issue`          | read         |
-| `get_issue_comments` | read         |
-| `list_wiki_pages`    | read         |
-| `get_wiki_page`      | read         |
-| `add_issue_comment`  | comment      |
+| ツール                      | `toolset` | 必要な `can` |
+| --------------------------- | --------- | ------------ |
+| `search_issues`             | issue     | read         |
+| `get_issue`                 | issue     | read         |
+| `get_issue_comments`        | issue     | read         |
+| `add_issue_comment`         | issue     | comment      |
+| `list_wiki_pages`           | wiki      | read         |
+| `get_wiki_page`             | wiki      | read         |
+| `list_git_repositories`     | git       | read         |
+| `list_pull_requests`        | git       | read         |
+| `get_pull_request`          | git       | read         |
+| `get_pull_request_comments` | git       | read         |
+| `add_pull_request_comment`  | git       | comment      |
 
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
+
+**行ごとのレビューコメントは作れない。** Backlog のプルリクエストコメント API のパラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけで、ファイル名も行番号も position も無い（ミラーで確認）。1レビュー = 1コメントとして、本文に `src/main.ts:42` の形で参照を書く。
+
+**リポジトリ名はパスに載るので検証している。** 借り物の URL 組み立ては文字列連結で、正規化は URL パーサが行う。`..` を素通しすると `/projects/101/git/repositories/../../../../space/pullRequests` が `/api/v2/space/pullRequests` になり、**別のエンドポイントに到達する**（手元で確認）。`/` `\\` `?` `#` `%` と `.` `..` を弾き、残りは `encodeURIComponent` で載せる。
 
 ### 数値 ID を受け取るツールは作らない
 

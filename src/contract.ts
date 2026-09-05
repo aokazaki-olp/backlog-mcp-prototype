@@ -35,7 +35,12 @@ export const TOOL_NAMES = [
   'get_issue_comments',
   'list_wiki_pages',
   'get_wiki_page',
+  'list_git_repositories',
+  'list_pull_requests',
+  'get_pull_request',
+  'get_pull_request_comments',
   'add_issue_comment',
+  'add_pull_request_comment',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -116,12 +121,56 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
       'プロジェクトキーとページ名を指定して Wiki ページの本文を取得する。ページ名は list_wiki_pages が返す name をそのまま渡す。',
     readOnly: true,
   },
+  list_git_repositories: {
+    toolset: 'git',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'Git リポジトリ一覧を取得する',
+    description: '許可されたプロジェクトの Git リポジトリ一覧を取得する。',
+    readOnly: true,
+  },
+  list_pull_requests: {
+    toolset: 'git',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'プルリクエスト一覧を取得する',
+    description:
+      'プロジェクトキーとリポジトリ名を指定してプルリクエスト一覧を取得する。リポジトリ名は list_git_repositories が返す name をそのまま渡す。',
+    readOnly: true,
+  },
+  get_pull_request: {
+    toolset: 'git',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'プルリクエストを取得する',
+    description:
+      'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定して取得する。番号は list_pull_requests が返す number をそのまま渡す。',
+    readOnly: true,
+  },
+  get_pull_request_comments: {
+    toolset: 'git',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: 'プルリクエストのコメントを取得する',
+    description:
+      'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメント一覧を取得する。',
+    readOnly: true,
+  },
   add_issue_comment: {
     toolset: 'issue',
     requires: 'comment',
     scopeKind: 'key',
     title: '課題にコメントする',
     description: '課題キー（例: PROJ-123）を指定してコメントを追加する。',
+    readOnly: false,
+  },
+  add_pull_request_comment: {
+    toolset: 'git',
+    requires: 'comment',
+    scopeKind: 'filter',
+    title: 'プルリクエストにコメントする',
+    description:
+      'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメントを追加する。行ごとのコメントは Backlog API に存在しないので、本文に src/main.ts:42 の形で参照を書く。',
     readOnly: false,
   },
 };
