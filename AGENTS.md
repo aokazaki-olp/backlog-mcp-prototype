@@ -25,7 +25,9 @@
 
 ### 完了報告の前に `npm run check` を通す
 
-規約 §8.3 が要求する束ねたコマンド。`lint` / `format`（検査モード）/ `typecheck` / `test` を1本で回す。
+規約 §8.3 が要求する束ねたコマンド。`lint` / `format`（検査モード）/ `typecheck` / `test` / `build` を1本で回す。
+
+**`build` を束ねているのは配布物を作るため**（§8.3）。ただし**出力の中身はコマンドの合否に現れない**ので、配る前には `npm pack` して中身を見る。
 
 ```bash
 npm run check

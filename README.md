@@ -99,9 +99,41 @@ npx dotenvx encrypt -f .env -fk ~/.backlog-mcp/keys/.env.keys
 }
 ```
 
-`node` は **24.12 以降**が要る（`package.json` の `engines` を参照。型注釈除去が stable な版）。**ビルドは要らない** — Node が `.ts` を直接実行する。`src/libs/` は生成物ごとコミットしてあるので `npm ci` だけで動く。
+`node` は **24.12 以降**が要る（`package.json` の `engines` を参照。型注釈除去が stable な版）。リポジトリを clone して使う場合は**ビルドが要らない** — Node が `.ts` を直接実行し、`src/libs/` は生成物ごとコミットしてあるので `npm ci` だけで動く。**配る場合は下記の tgz を使う。**
 
 起動時に stderr へ接続先・展開したポリシー・書き込みを許可したプロジェクトを出す。
+
+### 配る — `npm pack` した tgz を `npx` で使う
+
+**配布物にはビルドが要る。** Node は **`node_modules` の下にある `.ts` を型注釈除去しない**（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`。手元で確認）。`npx` で入れたパッケージは必ず `node_modules` に置かれるので、**`.ts` のままでは配れない**。
+
+```bash
+npm run build   # dist/ を作る（check にも束ねてある）
+npm pack        # backlog-mcp-0.1.0.tgz ができる
+```
+
+受け取る側は `.mcp.json` からこう起動する。**tgz のパスは `--package=` で渡し、コマンド名を別に書く**（`npx <tgz>` だと npx が tgz を実行ファイルとして扱って失敗する）。
+
+```json
+{
+  "mcpServers": {
+    "backlog": {
+      "command": "npx",
+      "args": ["--yes", "--package=C:/share/backlog-mcp-0.1.0.tgz", "backlog-mcp"],
+      "env": {
+        "BACKLOG_SPACE_ID": "example",
+        "BACKLOG_ENV_FILE": "${LOCALAPPDATA}/backlog-mcp/.env",
+        "BACKLOG_ENV_KEYS_FILE": "${LOCALAPPDATA}/backlog-mcp/keys/.env.keys",
+        "BACKLOG_POLICY": "C:/work/backlog-policy.json"
+      }
+    }
+  }
+}
+```
+
+**受け取る側も設定は自分で書く。** tgz に入るのは `dist/` だけで、**API キーもポリシーも含まれない**（`files` を `dist` に限ってある）。ポリシーを書かなければ起動しないので、「配ったら全開放」にはならない。
+
+> **`package.json` の `private: true` は外していない。** `npm pack` はこれでも動く。外すと公開レジストリへ `npm publish` できてしまうので、**事故防止としてそのまま残す**。
 
 ### 初回の接続確認
 
@@ -278,9 +310,11 @@ ID ではなく `{ id, name }` だった（仕様書の「リスト=値のID」�
 ## 開発
 
 ```bash
-npm run check         # lint / format 検査 / typecheck / test
+npm run check         # lint / format 検査 / typecheck / test / build
 npm run verify:rules  # 規約 §8.1 の各要求が実際に効いているかを確かめる
 ```
+
+`build` を `check` に束ねてあるのは規約 §8.3 の要求（**配布物を作るなら `build` も束ねる** — §8.1 には出力時にしか現れない要求がある）。実際、束ねる前は**`src/libs/` が dist に入らない**ことと**テストが dist に混ざる**ことに気づけなかった。**出力の中身はコマンドの合否に現れない**ので、配る前には `npm pack` して中身を見る。
 
 `npm run check` が緑にならないうちは完了と扱わない。設定や依存を変えたら `verify:rules` も回す（**警告ゼロで通ることは「守られている」の証拠にならない**）。
 

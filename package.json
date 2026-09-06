@@ -11,7 +11,8 @@
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "node --test",
-    "check": "npm run lint && npm run format && npm run typecheck && npm run test",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-libs.mjs",
+    "check": "npm run lint && npm run format && npm run typecheck && npm run test && npm run build",
     "verify:rules": "bash scripts/verify-rules.sh"
   },
   "dependencies": {
@@ -28,5 +29,11 @@
     "prettier": "^3.9.6",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.69.0"
-  }
+  },
+  "bin": {
+    "backlog-mcp": "dist/main.js"
+  },
+  "files": [
+    "dist"
+  ]
 }
