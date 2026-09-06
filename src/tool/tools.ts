@@ -1929,29 +1929,58 @@ export const planToolCall = (
 };
 
 /**
- * gateway を呼び、失敗したら**下から来たメッセージを囲んで**投げ直す。
+ * gateway を呼ぶ**唯一の口**。`runTool` はこれしか持たない。
+ *
+ * `readAttachment` / `receiveAttachment` と同じ形で、**capability ではなく操作を渡す**。
+ * tool 層が `node:fs` を知らないのと同じく、**`runTool` は生の `BacklogGateway` を知らない**。
+ */
+interface GatewayCalls {
+  call(request: ResolvedRequest): Promise<unknown>;
+  callBytes(request: ResolvedRequest): Promise<Uint8Array>;
+}
+
+/** `runTool` が受け取る文脈。**生の gateway を持たない**。 */
+type RunContext = Omit<ToolContext, 'gateway'> & GatewayCalls;
+
+/**
+ * gateway を呼び、失敗したら**下から来たメッセージを囲んで**投げ直す形に包む。
  *
  * `planToolCall` が投げるのはこちらが書いた文言（`ScopeDeniedError` 等）だが、
- * `send` が投げるのは Backlog サーバが書いた文字列を含む（`Backlog API エラー: …`）。
+ * gateway が投げるのは Backlog サーバが書いた文字列を含む（`Backlog API エラー: …`）。
  * 課題本文と同じ untrusted なので、そのまま LLM へ返さない。
  *
+ * **包むのは呼ぶ枝ごとではなく、口そのもの。** 以前は `send` を包む関数を用意して
+ * 各枝から呼んでいたが、`sendBytes` を足したときに `download` の枝が貼り忘れた
+ * （囲まれていない Backlog 由来の文字列が LLM へ流れた）。**貼り忘れられる形をやめる。**
+ *
  * **層で分けているので、エラー名の一覧を持たなくてよい** — この try の内側から
- * 出てきたものは定義上すべて「下から来たもの」。
+ * 出てきたものは定義上すべて「下から来たもの」。**口を全部ここで包むので、この等式は
+ * 条件付きではなく構造から出る。**
  */
-const sendRequest = async (context: ToolContext, request: ResolvedRequest): Promise<unknown> => {
-  try {
-    return await context.gateway.send(request);
-  } catch (e) {
-    const original = toError(e);
-    const wrapped = wrapUntrusted(original.message, {
-      source: { subject: 'backlog', field: 'error' },
-      maxLength: context.limits.maxTextLength,
-    });
-    // cause で元を残す（規約 §6.2）。監査ログと stderr には元の形で辿れる
-    throw new ApiFailureError(`Backlog API の呼び出しに失敗しました:\n${wrapped}`, {
-      cause: original,
-    });
-  }
+const guardGateway = (gateway: BacklogGateway, limits: ToolLimits): GatewayCalls => {
+  // 型パラメータは**値を作らず素通しするだけ**なので、規約 §2.7 の「検証を伴わない
+  // 型パラメータ」には当たらない（`unknown` を `T` へ洗浄していない。`T` は呼び出し先の
+  // 戻り値型そのもの）。
+  const guarded = async <T>(run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run();
+    } catch (e) {
+      const original = toError(e);
+      const wrapped = wrapUntrusted(original.message, {
+        source: { subject: 'backlog', field: 'error' },
+        maxLength: limits.maxTextLength,
+      });
+      // cause で元を残す（規約 §6.2）。監査ログと stderr には元の形で辿れる
+      throw new ApiFailureError(`Backlog API の呼び出しに失敗しました:\n${wrapped}`, {
+        cause: original,
+      });
+    }
+  };
+
+  return {
+    call: request => guarded(() => gateway.send(request)),
+    callBytes: request => guarded(() => gateway.sendBytes(request)),
+  };
 };
 
 /**
@@ -1965,7 +1994,7 @@ const sendRequest = async (context: ToolContext, request: ResolvedRequest): Prom
  * 検証（ルート配下か・拡張子と中身が釣り合うか）はその依存が持つ（`attach/localFile.ts`）。
  */
 const runTool = async (
-  context: ToolContext,
+  context: RunContext,
   toolName: ToolName,
   args: Record<string, unknown>,
 ): Promise<unknown> => {
@@ -1992,18 +2021,18 @@ const runTool = async (
       if (receive === undefined) {
         throw new AttachmentError('添付の受け取りが組み立てられていません');
       }
-      const bytes = await context.gateway.sendBytes(planned.request);
+      const bytes = await context.callBytes(planned.request);
       return planned.shape(await receive(bytes, planned.fileName));
     }
     if (planned.kind === 'both') {
       // 互いに独立なので並列に投げる（規約 §5.3）
       const [first, second] = await Promise.all([
-        sendRequest(context, planned.requests[0]),
-        sendRequest(context, planned.requests[1]),
+        context.call(planned.requests[0]),
+        context.call(planned.requests[1]),
       ]);
       return planned.shape(first, second);
     }
-    const raw = await sendRequest(context, planned.request);
+    const raw = await context.call(planned.request);
     if (planned.kind === 'send') {
       return planned.shape(raw);
     }
@@ -2437,6 +2466,9 @@ const toDefinition = (toolName: ToolName, attachable: boolean): ToolDefinition =
  * @returns MCP プロトコル層に渡すハンドラ
  */
 export const buildHandlers = (context: ToolContext): McpHandlers => {
+  // **生の gateway をここから先へ渡さない。** `runTool` が受け取るのは包んだ操作だけ
+  const { gateway, ...rest } = context;
+  const runContext: RunContext = { ...rest, ...guardGateway(gateway, context.limits) };
   const listed = listedTools(context.policy);
   const attachable = context.attachmentsRoot != null;
   // env は**絞る方向にしか効かない**。ポリシーが許していても設定が無ければ出さない
@@ -2470,7 +2502,7 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
       }
 
       try {
-        const payload = await runTool(context, toolName, isRecord(args) ? args : {});
+        const payload = await runTool(runContext, toolName, isRecord(args) ? args : {});
         return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
       } catch (e) {
         const message = Error.isError(e) ? e.message : String(e);
