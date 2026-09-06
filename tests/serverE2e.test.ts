@@ -279,6 +279,8 @@ describe('サーバ1本の通し — 監査ログ', () => {
     const records = auditLines(logDir);
     assert.equal(records.length, 3);
     assert.equal(records[0]?.['event'], 'startup');
+    // 配った先のログだけで「どの版で動いていたか」が分かること
+    assert.match(String(records[0]['version']), /^\d+\.\d+\.\d+/);
     // 正規形のハッシュ。権限が変われば必ず変わる値が起動時に残る
     assert.match(String(records[0]['policyHash']), /^[0-9a-f]{16}$/);
     assert.deepEqual(records[0]['projects'], ['PROJ']);
@@ -336,6 +338,8 @@ describe('サーバ1本の通し — 起動できないとき', () => {
     assert.equal(records.length, 1);
     assert.equal(records[0]?.['event'], 'startup-failed');
     assert.equal(records[0]['error'], 'PolicyError');
+    // 失敗の報告を受けたときに版が分かること
+    assert.match(String(records[0]['version']), /^\d+\.\d+\.\d+/);
   });
 
   it('ポリシーのプロジェクトを解決できなければ起動しない', async () => {

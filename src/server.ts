@@ -5,6 +5,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import packageJson from '../package.json' with { type: 'json' };
 import { loadConfig, describeConfig } from './config.ts';
 import { PolicyError } from './contract.ts';
 import { createBacklogGateway } from './domain/backlogGateway.ts';
@@ -39,7 +40,9 @@ import type { StdioChannel } from './mcp/stdio.ts';
  */
 export const SERVER_INFO: ServerInfo = {
   name: 'backlog-mcp',
-  version: '0.1.0',
+  // 版の出所は package.json ひとつ。ここにリテラルを書くと、tgz の名前だけ進んで
+  // クライアントが見る版が古いまま、という食い違いが起きる
+  version: packageJson.version,
   instructions: [
     'Backlog の課題・Wiki を、ポリシーで許可されたプロジェクトの範囲だけ操作できます。',
     '対象プロジェクトはサーバ側で決まっており、引数で広げることはできません。',
@@ -127,6 +130,9 @@ export const createHandlers = async (
 
     writeAudit(sink, {
       event: 'startup',
+      // 配った先のログだけで「どの版がどのポリシーで動いていたか」が分かるようにする。
+      // 版は package.json が唯一の出所（`SERVER_INFO`）
+      version: SERVER_INFO.version,
       space: config.baseUrl,
       readOnly: config.readOnly,
       policyHash: policy.hash,
@@ -151,6 +157,8 @@ export const createHandlers = async (
     // （サーバが書いた文字列が混ざりうるので、ログを第三者のテキストの置き場にしない）。
     writeAudit(sink, {
       event: 'startup-failed',
+      // 失敗の報告を受けたときこそ「どの版か」が要る
+      version: SERVER_INFO.version,
       space: config.baseUrl,
       error: toError(e).name,
     });

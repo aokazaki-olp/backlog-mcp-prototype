@@ -108,9 +108,21 @@ npx dotenvx encrypt -f .env -fk ~/.backlog-mcp/keys/.env.keys
 **配布物にはビルドが要る。** Node は **`node_modules` の下にある `.ts` を型注釈除去しない**（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`。手元で確認）。`npx` で入れたパッケージは必ず `node_modules` に置かれるので、**`.ts` のままでは配れない**。
 
 ```bash
-npm run build   # dist/ を作る（check にも束ねてある）
-npm pack        # backlog-mcp-0.1.0.tgz ができる
+npm run dist    # build → pack → dist-package/ に一式を集める
 ```
+
+`dist-package/` に4点そろう。**あとは手で zip して渡す**（Windows なら `Compress-Archive -Path dist-package\* -DestinationPath backlog-mcp-0.1.0.zip`）。
+
+| 中身                          | 用途                                                 |
+| ----------------------------- | ---------------------------------------------------- |
+| `backlog-mcp-<version>.tgz`   | 本体。`npx --package=` に渡す                        |
+| `README.md`                   | これ                                                 |
+| `.env.example`                | API キーのひな型。**暗号化の手順もここに書いてある** |
+| `backlog-policy.example.json` | ポリシーのひな型                                     |
+
+**圧縮までは自動化していない。** Node に zip が無く、クロスプラットフォームに書くと割に合わないため。集めるところだけ script にしてあるのは自動化のためではなく、**版がずれた一式を配らないため**（tgz の名前は `package.json` の版で決まるので、手で集めると古い tgz と新しい README が混ざる）。
+
+**版を上げるときは `npm version patch` → `npm run check` → `npm run dist`。** 版の出所は `package.json` ひとつなので、これだけで tgz の名前・`initialize` が返す `serverInfo.version`・監査ログの3つが揃う。
 
 受け取る側は `.mcp.json` からこう起動する。**tgz のパスは `--package=` で渡し、コマンド名を別に書く**（`npx <tgz>` だと npx が tgz を実行ファイルとして扱って失敗する）。
 

@@ -2,8 +2,9 @@ node_modules/
 dist/
 *.log
 
-# npm pack の出力（配る実体。ビルドし直せるのでコミットしない）
+# npm pack の出力と、配る一式を集めたフォルダ（作り直せるのでコミットしない）
 *.tgz
+dist-package/
 
 # tools/sync-libs.sh が使う一時ディレクトリ（借り物の .ts ソース）
 .libs-src/

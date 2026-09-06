@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --test",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-libs.mjs",
+    "dist": "npm run build && npm pack && node scripts/make-dist.mjs",
     "check": "npm run lint && npm run format && npm run typecheck && npm run test && npm run build",
     "verify:rules": "bash scripts/verify-rules.sh"
   },
