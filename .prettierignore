@@ -20,3 +20,7 @@ tools/
 
 # 借り物 — 正本は aokazaki-olp/libraries（ローカル編集禁止）
 src/libs/
+
+# ローカル設定 — 共有しないので検査もしない（`.git/info/exclude` で追跡から外している）
+# 追跡している `backlog-policy.example.json` は対象のまま残す。
+/backlog-policy.json
