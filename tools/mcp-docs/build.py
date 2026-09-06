@@ -237,7 +237,9 @@ if mdx:
              '（Markdown ビューアでは描画されない）。内訳は次のとおり。\n')
     L.append('| コンポーネント | ページ数 |')
     L.append('| --- | --- |')
-    for tag, n in mdx.most_common():
+    # 件数が同じ行の順序を確定させる。most_common() は同数を挿入順で並べ、その挿入順は
+    # set の反復順（hash 乱数化に依存）から来るので、揃えないと実行ごとに出力が変わる。
+    for tag, n in sorted(mdx.items(), key=lambda kv: (-kv[1], kv[0])):
         L.append(f'| `<{tag}>` | {n} |')
     L.append('')
 

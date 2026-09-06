@@ -219,20 +219,20 @@ MDX コンポーネントは原文のまま残している（Markdown ビュー�
 | `<CardGroup>` | 37 |
 | `<Warning>` | 37 |
 | `<Frame>` | 28 |
-| `<Steps>` | 17 |
 | `<Step>` | 17 |
+| `<Steps>` | 17 |
 | `<CodeGroup>` | 16 |
-| `<Tabs>` | 15 |
 | `<Tab>` | 15 |
+| `<Tabs>` | 15 |
 | `<Info>` | 10 |
 | `<Accordion>` | 9 |
 | `<Tip>` | 9 |
 | `<AccordionGroup>` | 6 |
 | `<Icon>` | 4 |
-| `<Tooltip>` | 3 |
 | `<Badge>` | 3 |
-| `<Tree>` | 1 |
+| `<Tooltip>` | 3 |
 | `<CHECK>` | 1 |
+| `<Tree>` | 1 |
 
 ## 原文側の癖
 
