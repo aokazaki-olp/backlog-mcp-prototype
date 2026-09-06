@@ -204,6 +204,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `create_pull_request`       | git       | write        |
 | `update_pull_request`       | git       | write        |
 | `search_documents`          | document  | read         |
+| `create_document`           | document  | write        |
 | `list_project_activities`   | activity  | read         |
 
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
@@ -275,7 +276,9 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 **通知（`GET /notifications`）はツールにしない。** 絞り込みパラメータが `minId` / `maxId` / `count` / `order` / `senderId` しか無く、スペース全体の自分宛て通知を返す。**プロジェクトで絞る手段が無いので、3軸で表現できない**（原則3）。`toolsets` の語彙からも外してある。
 
-**ドキュメントは単体取得のツールを作っていない。** `GET /documents/:documentId` と一覧は応答の形が同じで、**一覧に本文（`plain`）が入っている**。Wiki と違って2往復が要らない。
+**ドキュメントは単体取得のツールを作っていない。** `GET /documents/:documentId` と一覧は応答の形が同じで、**一覧に本文（`plain`）が入っている**。Wiki と違って2往復が要らない。`plain` が本文の全文であることは実スペースで確認済み（約1,300文字のドキュメントが末尾まで入っていた）。
+
+**ドキュメントは作成できるが、更新はできない。** Backlog の API に `PATCH` / `PUT` が無い（`POST /documents` が唯一の書き込み）。`create_document` は `parentId` / `addLast` / `emoji` を受け取らない — `parentId` はドキュメントの ID そのもので、数値 ID を触らせない方針に反する。タグの付け外し（`POST` / `DELETE /documents/:documentId/tags`）と削除も `documentId` 直指定なので作らない。
 
 **リポジトリ名はパスに載るので検証している。** 借り物の URL 組み立ては文字列連結で、正規化は URL パーサが行う。`..` を素通しすると `/projects/101/git/repositories/../../../../space/pullRequests` が `/api/v2/space/pullRequests` になり、**別のエンドポイントに到達する**（手元で確認）。`/` `\\` `?` `#` `%` と `.` `..` を弾き、残りは `encodeURIComponent` で載せる。
 
@@ -336,6 +339,8 @@ ID ではなく `{ id, name }` だった（仕様書の「リスト=値のID」�
 課題・コメント・Wiki の本文は**第三者が書ける untrusted な入力**で、MCP サーバ側でインジェクションを防ぐことはできない。
 
 このサーバが返す本文は `<untrusted>` で囲み、`instructions` とツール説明にも扱いを書いてあるが、**これは緩和であって防御ではない**。効くかどうかはクライアントとモデル次第で、保証にならない。**「対策済み」として数えないこと。**
+
+囲みの `source`（`backlog:document:設計メモ:title` のような由来）には**第三者が書いた文字列が入る** — Wiki のページ名・Git リポジトリ名・ドキュメントのタイトルはいずれも Backlog の利用者が決める。素通しすると `"` や改行で属性が壊れるので、`wrapUntrusted` の中で許可した文字だけに落とし、120文字で切っている（**本文の側は落とさない**）。
 
 実際に効くのは次の2つで、囲みは3つ目の気休めに当たる。
 

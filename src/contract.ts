@@ -52,6 +52,7 @@ export const TOOL_NAMES = [
   'create_pull_request',
   'update_pull_request',
   'add_pull_request_comment',
+  'create_document',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -175,6 +176,15 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
     readOnly: true,
+  },
+  create_document: {
+    toolset: 'document',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: 'ドキュメントを作成する',
+    description:
+      'プロジェクトキー・タイトル・本文を指定してドキュメントを作成する。本文は Markdown。Backlog に更新の API が無いので、作成したドキュメントを後から書き換えることはできない。',
+    readOnly: false,
   },
   list_project_activities: {
     toolset: 'activity',

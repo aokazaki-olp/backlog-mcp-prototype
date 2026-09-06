@@ -30,6 +30,34 @@ export interface WrapOptions {
 }
 
 /**
+ * `source` に載せてよくない文字。**許可した文字以外**を拾う（拒否リストにしない）。
+ *
+ * `\p{L}` が漢字・かなを含むので、日本語のタイトルは読める形のまま残る。
+ */
+const UNSAFE_IN_SOURCE = /[^\p{L}\p{N} :._/#@()+-]/gu;
+
+/** `source` の最大文字数。囲みのヘッダが本文より長くなる状態を作らせない。 */
+const MAX_SOURCE_LENGTH = 120;
+
+/**
+ * `source` を属性値に載せてよい形へ落とす。
+ *
+ * **`source` には第三者が書いた文字列が入る** — Wiki のページ名・Git リポジトリ名・
+ * ドキュメントのタイトルはいずれも Backlog の利用者が決める。素通しすると `"` や改行で
+ * **囲みの属性が壊れる**ので、ここで落とす。
+ *
+ * 呼び出し側それぞれで落とさないのは、**ここが境界だから**（規約 §1.1）。1箇所で塞げば
+ * 既存の呼び出しも、これから足す呼び出しも同時に守られる。
+ *
+ * 落とした文字は `_` に置き換える（消すと語が繋がって別の語に見える）。
+ */
+const sanitizeSource = (source: string): string => {
+  const cleaned = source.replaceAll(UNSAFE_IN_SOURCE, '_');
+  // 切ったことが見えるようにする（黙って削らない。規約 §5.4）
+  return cleaned.length > MAX_SOURCE_LENGTH ? `${cleaned.slice(0, MAX_SOURCE_LENGTH)}…` : cleaned;
+};
+
+/**
  * 第三者が書いたテキストを、境界の見える形で囲む。
  *
  * 区切りは呼び出しごとの乱数で作る。本文が閉じタグを含んでいても囲みを抜けられない
@@ -46,9 +74,11 @@ export const wrapUntrusted = (text: string, options: WrapOptions): string => {
 
   // 乱数の区切りが本文に現れることは実質ないが、現れたら囲みが破れるので落としておく。
   const safe = body.replaceAll(nonce, '');
+  // 由来には第三者が書いた文字列が入る。属性を壊せる文字を通さない
+  const source = sanitizeSource(options.source);
 
   return [
-    `<untrusted source="${options.source}" nonce="${nonce}">`,
+    `<untrusted source="${source}" nonce="${nonce}">`,
     `<!-- ${UNTRUSTED_NOTICE} -->`,
     safe,
     `</untrusted nonce="${nonce}">`,

@@ -530,6 +530,30 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
     assert.match(activities, /PROJ-5/);
   });
 
+  it('create_document は POST /documents になり、監査に projectKey が残る', async () => {
+    const { written, logDir, urls } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'create_document',
+          arguments: { projectKey: 'PROJ', title: '設計メモ', content: '# 見出し' },
+        }),
+      ],
+      WRITE_POLICY,
+    );
+
+    assert.equal(
+      (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result.isError,
+      undefined,
+    );
+    assert.equal(
+      urls.some(url => new URL(url).pathname === '/api/v2/documents'),
+      true,
+    );
+    const call = auditLines(logDir).find(record => record['event'] === 'tools/call');
+    assert.equal(call?.['tool'], 'create_document');
+    assert.equal(call['projectKey'], 'PROJ');
+  });
+
   it('全ツールが tools/list に出せる（定義が壊れていない）', async () => {
     const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
     const tools = (
@@ -538,7 +562,7 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
       }
     ).result.tools;
 
-    assert.equal(tools.length, 17);
+    assert.equal(tools.length, 18);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
     }

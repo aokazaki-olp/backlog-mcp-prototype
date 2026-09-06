@@ -657,8 +657,8 @@ const shapePullRequest = (
  * `json` は本文の構造化表現で `plain` と重複するため落とす。`statusId` / `emoji` /
  * `projectId` も落とす（状態の名前はミラーに無く、番号のままでは意味を成さない）。
  *
- * > **未確認**: 一覧の `plain` が本文の全文かどうかは実データで見ていない。ミラーの
- * > 応答例は一覧・単体とも同じ短い値で、切り詰めの気配は無い。
+ * **一覧の `plain` は本文の全文である**（実スペースで確認。約1,300文字のドキュメントが
+ * 末尾まで入っており、切り詰めは無かった）。ミラーの応答例だけでは決まらなかった点。
  */
 const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
@@ -1121,6 +1121,25 @@ export const planToolCall = (
       };
     }
 
+    case 'create_document': {
+      const { projectId } = resolveProjectKey(context, toolName, args);
+      // title / content は API では任意だが、こちらでは必須にする。
+      // 無題・空のドキュメントを作れる口を開けない（規約 §5.4）
+      const form: Record<string, FormValue> = {
+        projectId,
+        title: requiredString(args, 'title'),
+        content: requiredString(args, 'content'),
+      };
+      // parentId は載せない（ドキュメントの ID。原則2・原則4）。addLast はそれとセット、
+      // emoji は表示上の飾りなので、いずれもツール面に出さない。
+      // 添付も載せない — POST /documents は attachmentId[] を受け付けない（ミラーで確認）
+      return {
+        kind: 'send',
+        request: { endpoint: '/documents', method: 'POST', form },
+        shape: raw => shapeDocument(raw, limits),
+      };
+    }
+
     case 'list_project_activities': {
       const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
       const count = boundedCount(args, limits);
@@ -1546,6 +1565,16 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       keyword: { type: 'string', description: '検索キーワード' },
       count: COUNT_PROPERTY,
     },
+    additionalProperties: false,
+  },
+  create_document: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      title: { type: 'string', description: 'ドキュメントのタイトル' },
+      content: { type: 'string', description: 'ドキュメントの本文（Markdown）' },
+    },
+    required: ['projectKey', 'title', 'content'],
     additionalProperties: false,
   },
   list_project_activities: {
