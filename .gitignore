@@ -9,6 +9,10 @@ dist-package/
 # tools/sync-libs.sh が使う一時ディレクトリ（借り物の .ts ソース）
 .libs-src/
 
+# ミラー生成スクリプトが取得した原文と、Python のバイトコード（いずれも生成物）
+tools/*/raw/
+__pycache__/
+
 # ローカル設定・秘密
 .env
 .env.*
