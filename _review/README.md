@@ -19,11 +19,12 @@
 `.claude/skills/` / `.agents/skills/` に置かないのは、borrowed 側の README が書いているとおり
 **置いた瞬間にスキルとして自動検出される**ため。「指摘修正のあり方」はスキルとして登録するか未定。
 
-| ファイル                                 | 出自                       |
-| ---------------------------------------- | -------------------------- |
-| `multi-angle-review.SKILL.md`            | 借りもの（実験的・未安定） |
-| `multi-angle-review.指摘修正のあり方.md` | 自作ドラフト               |
-| `README.md`                              | 上2つの関係を説明          |
+| ファイル                                   | 出自                               |
+| ------------------------------------------ | ---------------------------------- |
+| `multi-angle-review.SKILL.md`              | 借りもの（実験的・未安定）         |
+| `multi-angle-review.指摘修正のあり方.md`   | 自作ドラフト                       |
+| `multi-angle-review.指摘をコードで直す.md` | 自作ドラフト（C-1 の実測から抽出） |
+| `README.md`                                | 上2つの関係を説明                  |
 
 > `multi-angle-review.SKILL.md` は `.claude/skills/multi-angle-review/SKILL.md` にも仮置きされて
 > おり、**内容は同一**（`diff` で確認済み）。スキルとして有効なのは `.claude/skills/` のほう。
