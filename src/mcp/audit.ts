@@ -99,25 +99,42 @@ export const createFileAuditSink = (dir: string): AuditSink => {
 };
 
 /**
- * 記録する引数。**本文は記録しない。**
+ * 記録する引数。**「何に触ったか」だけ。本文は記録しない。**
  *
  * 「誰がどの資源に触ったか」は監査に要るが、コメント本文まで落とすとログが
- * 第三者の書いたテキストの置き場になる（本文の長さだけを別に記録する）。
+ * 第三者の書いたテキストの置き場になる。だから `content` / `summary` / `description` /
+ * `comment` は載せない。
+ *
+ * **`file` は別扱いで載せる。** これは利用者が書いたパスであって第三者のテキストではなく、
+ * しかも**ローカルのファイルを Backlog へ送り出す**操作を指す。監査の目的そのものなので、
+ * 拒否された場合も含めて「何を送ろうとしたか」を残す。
+ *
+ * `repository` と `number` はプルリクエストの識別子。これが無いと「どの PR にコメントしたか」が
+ * 残らない。
  */
-const IDENTIFYING_ARGS = ['issueKey', 'projectKey'] as const;
+const IDENTIFYING_ARGS = ['issueKey', 'projectKey', 'repository', 'number', 'file'] as const;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const identify = (args: unknown): Record<string, string> => {
+/**
+ * 識別子だけを取り出す。**文字列と数値の両方を拾う**（PR 番号は数値）。
+ *
+ * 値は64文字で切る。長さで記録が壊れないようにするためで、識別子としてはこれで足りる。
+ */
+const identify = (args: unknown): Record<string, string | number> => {
   if (!isRecord(args)) {
     return {};
   }
-  const result: Record<string, string> = {};
+  const result: Record<string, string | number> = {};
   for (const name of IDENTIFYING_ARGS) {
     const value = args[name];
     if (typeof value === 'string') {
       result[name] = value.slice(0, 64);
+      continue;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      result[name] = value;
     }
   }
   return result;

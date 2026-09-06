@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
@@ -32,6 +32,41 @@ const MASTER_RESPONSES: Record<string, unknown> = {
     projectId: 101,
     name: 'Home',
     content: 'Wiki の本文。ここも第三者が書ける',
+  },
+  '/api/v2/projects/101/issueTypes': [
+    { id: 1, name: 'バグ' },
+    { id: 2, name: 'タスク' },
+  ],
+  '/api/v2/projects/101/statuses': [
+    { id: 1, name: '未対応' },
+    { id: 3, name: '処理中' },
+  ],
+  '/api/v2/projects/101/categories': [],
+  '/api/v2/projects/101/versions': [],
+  '/api/v2/projects/101/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
+  '/api/v2/documents': [
+    {
+      id: 'abc',
+      projectId: 101,
+      title: '設計メモ',
+      plain: '本文',
+      createdUser: { id: 1, name: 'u' },
+    },
+  ],
+  '/api/v2/projects/101/activities': [
+    {
+      id: 1,
+      type: 2,
+      content: { key_id: 5, summary: 'コメント' },
+      createdUser: { id: 1, name: 'u' },
+    },
+  ],
+  '/api/v2/space/attachment': { id: 4242, name: 'review.md', size: 3 },
+  '/api/v2/issues': { id: 778, issueKey: 'PROJ-2', summary: '新しい課題' },
+  '/api/v2/issues/PROJ-1/comments': { id: 9, created: '2026-09-06T00:00:00Z' },
+  '/api/v2/projects/101/git/repositories/app/pullRequests/7/comments': {
+    id: 1,
+    created: '2026-09-06T00:00:00Z',
   },
   '/api/v2/issues/PROJ-1': {
     id: 777,
@@ -70,10 +105,20 @@ interface Run {
 const run = async (
   lines: readonly string[],
   policy: unknown = { projects: ['PROJ'] },
+  attachments?: Readonly<Record<string, string>>,
 ): Promise<Run> => {
   const root = mkdtempSync(join(tmpdir(), 'backlog-mcp-e2e-'));
   const policyPath = join(root, 'backlog-policy.json');
   writeFileSync(policyPath, JSON.stringify(policy));
+
+  // 添付はモックにしない。実ファイルを置いて readAttachment を通す
+  const attachmentsRoot = join(root, 'files');
+  if (attachments !== undefined) {
+    mkdirSync(attachmentsRoot, { recursive: true });
+    for (const [name, body] of Object.entries(attachments)) {
+      writeFileSync(join(attachmentsRoot, name), body);
+    }
+  }
 
   const transport = makeTransport();
   const written: string[] = [];
@@ -89,6 +134,7 @@ const run = async (
       BACKLOG_SPACE_ID: 'example',
 
       BACKLOG_POLICY: policyPath,
+      ...(attachments === undefined ? {} : { BACKLOG_ATTACHMENTS_ROOT: attachmentsRoot }),
     },
     { gateway: { transport, maxRetries: 0 }, config: { resolveApiKey: () => 'secret-key-value' } },
   );
@@ -318,5 +364,179 @@ describe('サーバ1本の通し — 起動できないとき', () => {
     );
 
     assert.equal(auditLines(join(root, 'logs'))[0]?.['error'], 'MasterDataError');
+  });
+});
+
+// ============================================================================
+// 増えたツールの配線 — 各層のテストでは見えない「組み立て」を通しで見る
+// ============================================================================
+
+/** 書き込みまで許すポリシー。プロジェクト単位のマスタが引かれる。 */
+const WRITE_POLICY = { projects: [{ key: 'PROJ', can: 'write' }] };
+
+describe('サーバ1本の通し — 書き込み系', () => {
+  it('create_issue は名前を ID に直して POST する', async () => {
+    const { written, urls } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'create_issue',
+          arguments: {
+            projectKey: 'PROJ',
+            summary: '新しい課題',
+            issueType: 'バグ',
+            priority: '高',
+            assignee: '山田太郎',
+          },
+        }),
+      ],
+      WRITE_POLICY,
+    );
+
+    const result = (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result;
+    assert.equal(result.isError, undefined);
+    assert.equal(
+      urls.some(url => new URL(url).pathname === '/api/v2/issues'),
+      true,
+    );
+  });
+
+  it('update_issue は PATCH になり、監査に issueKey が残る', async () => {
+    const { written, logDir } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'update_issue',
+          arguments: { issueKey: 'PROJ-1', status: '処理中' },
+        }),
+      ],
+      WRITE_POLICY,
+    );
+
+    assert.equal(
+      (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result.isError,
+      undefined,
+    );
+    const call = auditLines(logDir).find(record => record['event'] === 'tools/call');
+    assert.equal(call?.['tool'], 'update_issue');
+    assert.equal(call['issueKey'], 'PROJ-1');
+  });
+
+  it('書き込みを許したプロジェクトのマスタだけを起動時に引く', async () => {
+    const writable = await run([request(1, 'ping')], WRITE_POLICY);
+    const readOnly = await run([request(1, 'ping')], { projects: ['PROJ'] });
+
+    const perProject = (urls: readonly string[]): string[] =>
+      urls
+        .map(url => new URL(url).pathname)
+        .filter(path => path.startsWith('/api/v2/projects/101/'));
+
+    assert.equal(perProject(writable.urls).length, 5);
+    assert.equal(perProject(readOnly.urls).length, 0);
+  });
+});
+
+describe('サーバ1本の通し — 監査に「何に触ったか」が残る', () => {
+  it('PR コメントは repository と number が残る', async () => {
+    const { logDir } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'add_pull_request_comment',
+          arguments: { projectKey: 'PROJ', repository: 'app', number: 7, content: 'レビュー' },
+        }),
+      ],
+      { projects: [{ key: 'PROJ', can: 'comment' }] },
+    );
+
+    const call = auditLines(logDir).find(record => record['event'] === 'tools/call');
+    assert.equal(call?.['ok'], true);
+    assert.equal(call['projectKey'], 'PROJ');
+    assert.equal(call['repository'], 'app');
+    assert.equal(call['number'], 7);
+    // 本文は残さない
+    assert.equal(JSON.stringify(call).includes('レビュー'), false);
+  });
+
+  it('添付は「何を送ったか」が残り、3手でもツール呼び出しは1件', async () => {
+    const { written, urls, logDir } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'add_issue_comment',
+          arguments: { issueKey: 'PROJ-1', content: '添付します', file: 'review.md' },
+        }),
+      ],
+      { projects: [{ key: 'PROJ', can: 'comment' }] },
+      { 'review.md': '# レビュー\n' },
+    );
+
+    assert.equal(
+      (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result.isError,
+      undefined,
+    );
+    // アップロード → コメントの2本が出ている
+    const paths = urls.map(url => new URL(url).pathname);
+    assert.equal(paths.includes('/api/v2/space/attachment'), true);
+    assert.equal(paths.includes('/api/v2/issues/PROJ-1/comments'), true);
+
+    const calls = auditLines(logDir).filter(record => record['event'] === 'tools/call');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0]?.['file'], 'review.md');
+    assert.equal(calls[0]['issueKey'], 'PROJ-1');
+    assert.equal(JSON.stringify(calls[0]).includes('添付します'), false);
+  });
+
+  it('添付が拒否されても「何を送ろうとしたか」は残る', async () => {
+    const { written, logDir } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'add_issue_comment',
+          arguments: { issueKey: 'PROJ-1', content: 'x', file: '../outside.md' },
+        }),
+      ],
+      { projects: [{ key: 'PROJ', can: 'comment' }] },
+      { 'review.md': 'ok' },
+    );
+
+    assert.equal(
+      (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result.isError,
+      true,
+    );
+    const call = auditLines(logDir).find(record => record['event'] === 'tools/call');
+    assert.equal(call?.['ok'], false);
+    assert.equal(call['file'], '../outside.md');
+  });
+});
+
+describe('サーバ1本の通し — 残りのツールセット', () => {
+  it('search_documents と list_project_activities が配線されている', async () => {
+    const { written } = await run([
+      request(1, 'tools/call', { name: 'search_documents', arguments: {} }),
+      request(2, 'tools/call', {
+        name: 'list_project_activities',
+        arguments: { projectKey: 'PROJ' },
+      }),
+    ]);
+
+    for (const line of written) {
+      const result = (JSON.parse(line) as { result: { isError?: boolean } }).result;
+      assert.equal(result.isError, undefined);
+    }
+    const activities =
+      (JSON.parse(written[1] ?? '{}') as { result: { content: { text: string }[] } }).result
+        .content[0]?.text ?? '';
+    // key_id 5 が projectKey と組み合わさって課題キーになる
+    assert.match(activities, /PROJ-5/);
+  });
+
+  it('全ツールが tools/list に出せる（定義が壊れていない）', async () => {
+    const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
+    const tools = (
+      JSON.parse(written[0] ?? '{}') as {
+        result: { tools: { name: string; inputSchema: unknown }[] };
+      }
+    ).result.tools;
+
+    assert.equal(tools.length, 15);
+    for (const tool of tools) {
+      assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
+    }
   });
 });
