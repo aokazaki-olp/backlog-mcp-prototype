@@ -1159,6 +1159,60 @@ export const planToolCall = (
       };
     }
 
+    case 'create_wiki_page': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      // mailNotify は載せない。LLM に通知の要否を決めさせない（notifiedUserId と同じ扱い）
+      const form: Record<string, FormValue> = {
+        projectId,
+        name: requiredString(args, 'name'),
+        content: requiredString(args, 'content'),
+      };
+      return {
+        kind: 'send',
+        request: { endpoint: '/wikis', method: 'POST', form },
+        shape: raw => shapeWikiPageDetail(raw, projectKey, limits),
+      };
+    }
+
+    case 'update_wiki_page': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const name = requiredString(args, 'name');
+
+      const form: Record<string, FormValue> = {};
+      // 改名は newName で受ける。name は「どのページか」を指す引数なので兼用しない
+      const newName = optionalString(args, 'newName');
+      if (newName !== undefined) {
+        form['name'] = newName;
+      }
+      const content = optionalString(args, 'content');
+      if (content !== undefined) {
+        form['content'] = content;
+      }
+      if (Object.keys(form).length === 0) {
+        // 「成功したが何も変わっていない」を作らない（規約 §5.4）
+        throw new TypeError('newName または content のどちらかを指定してください');
+      }
+
+      return {
+        kind: 'chain',
+        // get_wiki_page と同じ形。id は許可プロジェクトで絞った一覧の応答からしか採らない
+        request: {
+          endpoint: '/wikis',
+          method: 'GET',
+          query: { projectIdOrKey: projectId },
+        },
+        next: raw => ({
+          kind: 'send',
+          request: {
+            endpoint: `/wikis/${String(findWikiId(raw, name))}`,
+            method: 'PATCH',
+            form,
+          },
+          shape: detail => shapeWikiPageDetail(detail, projectKey, limits),
+        }),
+      };
+    }
+
     case 'list_git_repositories': {
       const { projectId } = resolveProjectKey(context, toolName, args);
       return {
@@ -1332,7 +1386,9 @@ export const planToolCall = (
           issueTypes: [...project.issueTypeIds.keys()],
           categories: [...project.categoryIds.keys()],
           milestones: [...project.versionIds.keys()],
-          assignees: [...project.userIds.keys()],
+          // 1人につき1件。userIds は表示名とログイン名の両方をキーに持つので、
+          // そのまま並べると人数が二重に見える（実データで踏んだ）
+          assignees: project.members,
           priorities: [...masters.priorityIds.keys()],
           resolutions: [...masters.resolutionIds.keys()],
           // 同名が複数いて表示名では指せないもの。黙って落とさない（規約 §5.4）
@@ -1341,7 +1397,7 @@ export const planToolCall = (
           note:
             project.ambiguousUserNames.size === 0
               ? undefined
-              : 'ambiguousUserNames の表示名は同名が複数いるため使えません。assignees に並ぶログイン名で指定してください',
+              : 'ambiguousUserNames の表示名は同名が複数いるため使えません。assignees の loginName で指定してください',
         },
       };
     }
@@ -1810,6 +1866,30 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       content: { type: 'string', description: 'ドキュメントの本文（Markdown）' },
     },
     required: ['projectKey', 'title', 'content'],
+    additionalProperties: false,
+  },
+  create_wiki_page: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      name: { type: 'string', description: 'ページ名' },
+      content: { type: 'string', description: 'ページの内容（Backlog 記法または Markdown）' },
+    },
+    required: ['projectKey', 'name', 'content'],
+    additionalProperties: false,
+  },
+  update_wiki_page: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      name: {
+        type: 'string',
+        description: '書き換える対象のページ名。list_wiki_pages が返す name をそのまま渡す',
+      },
+      newName: { type: 'string', description: '新しいページ名。改名しないなら省略する' },
+      content: { type: 'string', description: '新しい内容。変えないなら省略する' },
+    },
+    required: ['projectKey', 'name'],
     additionalProperties: false,
   },
   list_project_masters: {

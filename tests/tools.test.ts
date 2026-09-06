@@ -267,6 +267,101 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
 // 原則2・原則4 — 数値 ID しか受けない経路へは、名前をサーバ内で解決して届く
 // ============================================================================
 
+describe('planToolCall — Wiki の作成・更新', () => {
+  it('create_wiki_page はポリシー由来の projectId で POST する', () => {
+    const request = planRequest(contextOf(), 'create_wiki_page', {
+      projectKey: 'PROJ',
+      name: '議事録',
+      content: '# 2026-09-06',
+    });
+
+    assert.equal(request.endpoint, '/wikis');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(request.form, { projectId: 101, name: '議事録', content: '# 2026-09-06' });
+  });
+
+  it('mailNotify を受け取る口が無い（通知の要否を LLM に決めさせない）', () => {
+    const request = planRequest(contextOf(), 'create_wiki_page', {
+      projectKey: 'PROJ',
+      name: '議事録',
+      content: '本文',
+      mailNotify: true,
+    });
+
+    assert.equal('mailNotify' in (request.form ?? {}), false);
+  });
+
+  it('update_wiki_page は名前 → ID を解決してから PATCH する', () => {
+    const planned = planToolCall(contextOf(), 'update_wiki_page', {
+      projectKey: 'PROJ',
+      name: 'Home',
+      content: '書き換えた本文',
+      // 引数に wikiId を混ぜても組み立てに使う口が無い
+      wikiId: 999,
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('update_wiki_page は一覧を経由するはず');
+    }
+
+    assert.equal(planned.request.endpoint, '/wikis');
+    assert.equal(planned.request.query?.['projectIdOrKey'], 101);
+
+    const second = requestOf(planned.next([{ id: 112, name: 'Home' }]));
+    assert.equal(second.endpoint, '/wikis/112');
+    assert.equal(second.method, 'PATCH');
+    assert.deepEqual(second.form, { content: '書き換えた本文' });
+    assert.doesNotMatch(JSON.stringify(second), /999/);
+  });
+
+  it('改名は newName で受ける（name は対象を指す引数なので兼用しない）', () => {
+    const planned = planToolCall(contextOf(), 'update_wiki_page', {
+      projectKey: 'PROJ',
+      name: 'Home',
+      newName: 'ホーム',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.deepEqual(requestOf(planned.next([{ id: 112, name: 'Home' }])).form, { name: 'ホーム' });
+  });
+
+  it('何も指定しない更新は送出する（成功したが何も変わらない、を作らない）', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'update_wiki_page', { projectKey: 'PROJ', name: 'Home' }),
+      { name: 'TypeError', message: /newName または content/ },
+    );
+  });
+
+  it('read だけ・wiki を外したプロジェクトでは組み立てない', () => {
+    for (const projectKey of ['SALES', 'INFRA', 'OTHER']) {
+      assert.throws(
+        () =>
+          planToolCall(contextOf(), 'create_wiki_page', {
+            projectKey,
+            name: 'x',
+            content: 'y',
+          }),
+        ScopeDeniedError,
+        `${projectKey} が通ってしまう`,
+      );
+    }
+  });
+
+  it('一覧に無い名前は API 到達前ではなく2本目の手前で送出する', () => {
+    const planned = planToolCall(contextOf(), 'update_wiki_page', {
+      projectKey: 'PROJ',
+      name: '存在しないページ',
+      content: 'x',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.throws(() => planned.next([{ id: 112, name: 'Home' }]), /存在しないページ/);
+  });
+});
+
 describe('get_wiki_page — 名前 → ID をサーバ内で解決する', () => {
   /** `chain` であることを確かめて取り出す。`send` が返ったら設計が変わっている。 */
   const planChain = (
@@ -1448,22 +1543,26 @@ describe('planToolCall — list_project_masters', () => {
   it('数値 ID を1つも返さない（原則4）', () => {
     const result = mastersOf('PROJ');
 
-    // 値はすべて文字列。マイルストーン名の "v1.0" のように数字を含む名前はあるので、
+    // マイルストーン名の "v1.0" のように数字を含む名前はあるので、
     // 文字列に現れる数字ではなく「JSON の数値が出ないこと」で見る
-    for (const value of Object.values(result)) {
-      for (const name of Array.isArray(value) ? value : []) {
-        assert.equal(typeof name, 'string');
-      }
-    }
     assert.doesNotMatch(JSON.stringify(result), /:\s*-?\d/);
+  });
+
+  it('参加者は1人につき1件（人数が二重に見えないようにする）', () => {
+    const result = mastersOf('PROJ');
+
+    // userIds は表示名とログイン名の両方をキーに持つが、ここには1人1件だけ出す
+    assert.deepEqual(result['assignees'], [
+      { name: '山田太郎', loginName: 'yamada' },
+      { name: '鈴木', loginName: 'suzuki' },
+    ]);
   });
 
   it('read だけのプロジェクトでも引ける', () => {
     const result = mastersOf('SALES');
 
     assert.deepEqual(result['issueTypes'], ['問い合わせ']);
-    // 表示名とログイン名の両方が並ぶ
-    assert.deepEqual((result['assignees'] as string[]).toSorted(), ['sato', '佐藤']);
+    assert.deepEqual(result['assignees'], [{ name: '佐藤', loginName: 'sato' }]);
   });
 
   it('許可外のプロジェクトは拒否する', () => {

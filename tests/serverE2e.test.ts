@@ -571,6 +571,29 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
     assert.equal(call['projectKey'], 'PROJ');
   });
 
+  it('create_wiki_page と update_wiki_page が通しで動く', async () => {
+    const { written, urls } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'create_wiki_page',
+          arguments: { projectKey: 'PROJ', name: '議事録', content: '# 2026-09-06' },
+        }),
+        request(2, 'tools/call', {
+          name: 'update_wiki_page',
+          arguments: { projectKey: 'PROJ', name: 'Home', content: '書き換えた' },
+        }),
+      ],
+      WRITE_POLICY,
+    );
+
+    for (const line of written) {
+      const result = (JSON.parse(line) as { result: { isError?: boolean } }).result;
+      assert.equal(result.isError, undefined);
+    }
+    // 作成は1本、更新は一覧 → 本体の2本
+    assert.deepEqual(toolPaths(urls), ['/api/v2/wikis', '/api/v2/wikis', '/api/v2/wikis/112']);
+  });
+
   it('list_project_masters は API に行かず、名前だけを返す', async () => {
     const { written, urls } = await run([
       request(1, 'tools/call', {
@@ -600,7 +623,7 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
       }
     ).result.tools;
 
-    assert.equal(tools.length, 19);
+    assert.equal(tools.length, 21);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
     }

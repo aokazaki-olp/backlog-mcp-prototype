@@ -54,6 +54,8 @@ export const TOOL_NAMES = [
   'add_pull_request_comment',
   'create_document',
   'list_project_masters',
+  'create_wiki_page',
+  'update_wiki_page',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -195,6 +197,23 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトで使える状態・課題種別・カテゴリー・マイルストーン・担当者と、スペース共通の優先度・完了理由の名前を返す。課題の作成・更新・検索でこれらを名前で指定する前に引く。',
     readOnly: true,
+  },
+  create_wiki_page: {
+    toolset: 'wiki',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: 'Wiki ページを作成する',
+    description: 'プロジェクトキー・ページ名・本文を指定して Wiki ページを追加する。',
+    readOnly: false,
+  },
+  update_wiki_page: {
+    toolset: 'wiki',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: 'Wiki ページを更新する',
+    description:
+      'プロジェクトキーとページ名で既存の Wiki ページを指定し、ページ名または本文を書き換える。数値 ID は受け付けない。',
+    readOnly: false,
   },
   list_project_activities: {
     toolset: 'activity',

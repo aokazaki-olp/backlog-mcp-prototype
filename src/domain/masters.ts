@@ -60,6 +60,19 @@ export interface ProjectMasters {
   readonly userIds: ReadonlyMap<string, number>;
   /** 表示名が重複していて引けないもの。案内のために持つ。 */
   readonly ambiguousUserNames: ReadonlySet<string>;
+  /**
+   * **1人につき1件**の参加者。`userIds` は表示名とログイン名の両方をキーに持つので、
+   * そのまま並べると人数が二重に見える（実データで踏んだ）。数え上げにはこちらを使う。
+   */
+  readonly members: readonly ProjectMember[];
+}
+
+/** プロジェクトの参加者1人。**数値 ID は持たない。** */
+export interface ProjectMember {
+  /** 表示名。**一意とは限らない**（同名は `ambiguousUserNames` に入る）。 */
+  readonly name: string;
+  /** ログイン名（Backlog の `userId`）。一意。 */
+  readonly loginName: string;
 }
 
 // ============================================================================
@@ -110,7 +123,11 @@ const toNameToIdAllowingEmpty = (value: unknown, where: string): ReadonlyMap<str
 const toUserIds = (
   value: unknown,
   where: string,
-): { readonly userIds: ReadonlyMap<string, number>; readonly ambiguous: ReadonlySet<string> } => {
+): {
+  readonly userIds: ReadonlyMap<string, number>;
+  readonly ambiguous: ReadonlySet<string>;
+  readonly members: readonly ProjectMember[];
+} => {
   if (!Array.isArray(value)) {
     throw new MasterDataError(`${where} の応答が配列ではありません`);
   }
@@ -118,6 +135,7 @@ const toUserIds = (
   const byName = new Map<string, number>();
   const ambiguous = new Set<string>();
   const result = new Map<string, number>();
+  const members: ProjectMember[] = [];
 
   for (const item of value) {
     if (!isNamedId(item)) {
@@ -132,6 +150,7 @@ const toUserIds = (
     // ログイン名は一意。表示名が曖昧でも、こちらでは必ず指せる
     if (isRecord(item) && typeof item['userId'] === 'string' && item['userId'] !== '') {
       result.set(item['userId'], item.id);
+      members.push(Object.freeze({ name: item.name, loginName: item['userId'] }));
     }
   }
 
@@ -144,7 +163,11 @@ const toUserIds = (
   if (result.size === 0) {
     throw new MasterDataError(`${where} の応答が空です`);
   }
-  return { userIds: freezeMap(result), ambiguous: Object.freeze(ambiguous) };
+  return {
+    userIds: freezeMap(result),
+    ambiguous: Object.freeze(ambiguous),
+    members: Object.freeze(members),
+  };
 };
 
 interface BacklogProject {
@@ -234,7 +257,7 @@ const resolveProjectMasters = async (
     gateway.send({ endpoint: `${base}/users`, method: 'GET' }),
   ]);
 
-  const { userIds, ambiguous } = toUserIds(users, `GET ${base}/users（${projectKey}）`);
+  const { userIds, ambiguous, members } = toUserIds(users, `GET ${base}/users（${projectKey}）`);
 
   return Object.freeze({
     // 種別と状態はプロジェクトに必ず1つ以上ある。空なら応答の形を疑う
@@ -244,6 +267,7 @@ const resolveProjectMasters = async (
     versionIds: toNameToIdAllowingEmpty(versions, `GET ${base}/versions（${projectKey}）`),
     userIds,
     ambiguousUserNames: ambiguous,
+    members,
   });
 };
 

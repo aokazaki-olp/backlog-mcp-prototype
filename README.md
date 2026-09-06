@@ -197,6 +197,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `update_issue`              | issue     | write        |
 | `list_wiki_pages`           | wiki      | read         |
 | `get_wiki_page`             | wiki      | read         |
+| `create_wiki_page`          | wiki      | write        |
+| `update_wiki_page`          | wiki      | write        |
 | `list_git_repositories`     | git       | read         |
 | `list_pull_requests`        | git       | read         |
 | `get_pull_request`          | git       | read         |
@@ -254,6 +256,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 **選べる名前は `list_project_masters` で引ける。** 名前で受ける設計は「何を書けるか分からない」という穴とセットなので、起動時に持っているものをそのまま返すツールを1本置いてある（API へは行かない）。名前だけを返し、数値 ID は返さない。同名が複数いて表示名では指せないユーザーは、理由を添えて別に返す。
 
+**参加者は1人につき1件返す**（`{ name, loginName }`）。内部の名前 → ID の表は表示名とログイン名の両方をキーに持つので、そのまま並べると**人数が二重に見える**（実データで踏んだ。3件返って実際は2人）。指定する側はどちらでも通るが、LLM が人数を数える経路になる。
+
 **載せていないもの**: `parentIssueId`（数値 ID しか受けない。親を指定するなら1往復増える）／`notifiedUserId[]`（LLM に通知先を決めさせない）。`categoryId[]` と `milestoneId[]` は**単数で受ける**（借り物がスカラーの配列を弾くため。引数が単数なので黙って減らされることはない）。
 
 **`update_issue` は指定した項目だけ変える。** 何も指定しない更新は「成功したが何も変わっていない」になるので送出する。
@@ -309,6 +313,14 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 **ドキュメントは作成できるが、更新はできない。** Backlog の API に `PATCH` / `PUT` が無い（`POST /documents` が唯一の書き込み）。`create_document` は `parentId` / `addLast` / `emoji` を受け取らない — `parentId` はドキュメントの ID そのもので、数値 ID を触らせない方針に反する。タグの付け外し（`POST` / `DELETE /documents/:documentId/tags`）と削除も `documentId` 直指定なので作らない。
 
 **リポジトリ名はパスに載るので検証している。** 借り物の URL 組み立ては文字列連結で、正規化は URL パーサが行う。`..` を素通しすると `/projects/101/git/repositories/../../../../space/pullRequests` が `/api/v2/space/pullRequests` になり、**別のエンドポイントに到達する**（手元で確認）。`/` `\\` `?` `#` `%` と `.` `..` を弾き、残りは `encodeURIComponent` で載せる。
+
+### Wiki は作成・更新まで持つ
+
+**Backlog は2026年7月14日から新規スペースで Wiki を提供しておらず、将来的に廃止予定**（ミラーの告知）。それでも作成・更新を入れているのは、**既存スペースでは今も動いていて、ドキュメント側に更新の API が無い**ため — 「AI が書いた文書を後から直す」経路がスペース全体で唯一ここにしかない。
+
+`update_wiki_page` は `PATCH /wikis/:wikiId` を叩くが、`wikiId` を引数で受ける口は無い。`get_wiki_page` と同じく**プロジェクトで絞った一覧の応答から `id` を採る**（後述）。改名は `newName` で受ける — `name` は「どのページか」を指す引数なので兼用しない。`newName` も `content` も無い更新は送出する。
+
+`mailNotify` は載せていない（`notifiedUserId[]` と同じく、LLM に通知の要否を決めさせない）。
 
 ### 数値 ID を受け取るツールは作らない
 
