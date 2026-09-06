@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
-import { withAudit } from '../src/mcp/audit.ts';
+import { AuditUnwritableError, withAudit } from '../src/mcp/audit.ts';
 import {
   DEFAULT_PROTOCOL_VERSION,
   RPC_ERROR,
@@ -236,5 +236,150 @@ describe('withAudit', () => {
     await withAudit(denying, sink).callTool('add_issue_comment', {});
 
     assert.equal((JSON.parse(sink.lines[0] ?? '{}') as { ok: boolean }).ok, false);
+  });
+});
+
+// ============================================================================
+// 監査に書けなくなったとき（L1-3・L4-4）
+// ============================================================================
+
+/** 稼働中に書けなくなったシンク。起動時ではなく `write` で落ちる。 */
+const unwritableSink = (): AuditSink => ({
+  write(): void {
+    throw Object.assign(new Error('ENOSPC: no space left on device, write'), { code: 'ENOSPC' });
+  },
+});
+
+describe('withAudit — 監査に書けなくなったとき', () => {
+  it('ツールの結果を捨てずに載せて送出する', async () => {
+    const handlers = withAudit(makeHandlers(), unwritableSink());
+
+    await assert.rejects(
+      () => handlers.callTool('get_issue', { issueKey: 'PROJ-1' }),
+      (e: unknown) => {
+        assert.ok(e instanceof AuditUnwritableError);
+        assert.deepEqual(e.result?.content, [{ type: 'text', text: 'ok' }]);
+        return true;
+      },
+    );
+  });
+
+  it('シンクの失敗を cause に残す', async () => {
+    const handlers = withAudit(makeHandlers(), unwritableSink());
+
+    await assert.rejects(
+      () => handlers.callTool('get_issue', {}),
+      (e: unknown) => {
+        assert.ok(e instanceof AuditUnwritableError);
+        assert.ok(Error.isError(e.cause));
+        assert.match(e.cause.message, /ENOSPC/);
+        return true;
+      },
+    );
+  });
+
+  // L4-4（根F から移動）。実配線では buildHandlers が全経路 return するので到達しないが、
+  // `withAudit` の契約としては成立していなければならない
+  it('包んだハンドラが投げたら、記録してから元の例外を投げ直す', async () => {
+    const sink = collectAudit();
+    const boom = new Error('下から来た');
+    const throwing: McpHandlers = {
+      listTools: () => [],
+      callTool: () => Promise.reject(boom),
+    };
+
+    await assert.rejects(
+      () => withAudit(throwing, sink).callTool('get_issue', {}),
+      (e: unknown) => e === boom,
+    );
+    assert.equal((JSON.parse(sink.lines[0] ?? '{}') as { ok: boolean }).ok, false);
+  });
+
+  it('ハンドラが投げ、記録も失敗したら、元の例外を落とさない', async () => {
+    const boom = new Error('下から来た');
+    const throwing: McpHandlers = {
+      listTools: () => [],
+      callTool: () => Promise.reject(boom),
+    };
+
+    await assert.rejects(
+      () => withAudit(throwing, unwritableSink()).callTool('get_issue', {}),
+      (e: unknown) => {
+        assert.ok(e instanceof AuditUnwritableError);
+        assert.equal(e.suppressed, boom);
+        return true;
+      },
+    );
+  });
+});
+
+// ============================================================================
+// serve — 1件のリクエストには必ず1件の応答が返る（L1-2）
+// ============================================================================
+
+describe('serve — 1リクエストに必ず1応答', () => {
+  it('ハンドラが投げても INTERNAL を返して読み続ける', async () => {
+    const throwing: McpHandlers = {
+      listTools: () => [TOOL],
+      callTool: () => {
+        throw new Error('内部で壊れた');
+      },
+    };
+
+    const written = await runLines(
+      [
+        JSON.stringify(request(1, 'tools/call', { name: 'get_issue' })),
+        JSON.stringify(request(2, 'ping')),
+      ],
+      throwing,
+    );
+
+    assert.equal(written.length, 2);
+    const failed = JSON.parse(written[0] ?? '{}') as { id: number; error: { code: number } };
+    assert.equal(failed.id, 1);
+    assert.equal(failed.error.code, RPC_ERROR.INTERNAL);
+    // 後続の行を読み続ける
+    assert.equal((JSON.parse(written[1] ?? '{}') as { id: number }).id, 2);
+  });
+
+  it('監査に書けなくなったら、結果と告知を1件書いて止まる', async () => {
+    const written = await runLines(
+      [
+        JSON.stringify(request(1, 'tools/call', { name: 'get_issue' })),
+        JSON.stringify(request(2, 'ping')),
+      ],
+      withAudit(makeHandlers(), unwritableSink()),
+    );
+
+    // 止まるので後続は処理しない
+    assert.equal(written.length, 1);
+
+    const response = JSON.parse(written[0] ?? '{}') as {
+      id: number;
+      result: { content: { text: string }[]; isError?: boolean };
+    };
+    assert.equal(response.id, 1);
+    // 成功を失敗に化けさせない（L1-3 の壊れ方1 を再生産しない）
+    assert.notEqual(response.result.isError, true);
+    assert.equal(response.result.content[0]?.text, 'ok');
+    // 利用者への告知が同じ応答に載る
+    const notice = response.result.content.map(block => block.text).join('\n');
+    assert.match(notice, /監査/);
+    assert.match(notice, /再実行/);
+  });
+
+  it('書き出し先が壊れていても、例外を外へ出さずに止まる', async () => {
+    await assert.doesNotReject(() =>
+      serve(
+        {
+          input: Readable.from([`${JSON.stringify(request(1, 'ping'))}\n`]),
+          write(): void {
+            throw Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+          },
+        },
+        makeHandlers(),
+        SERVER_INFO,
+      ),
+    );
   });
 });

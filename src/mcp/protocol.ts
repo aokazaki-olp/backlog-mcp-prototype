@@ -114,6 +114,20 @@ const parseRequest = (message: unknown): RpcRequest | null => {
   };
 };
 
+/**
+ * 応答に使う id を引き直す。
+ *
+ * **`handleMessage` が投げたときのためにある。** 投げてしまうと応答の id が取れないが、
+ * 1件のリクエストには必ず1件の応答を返さなければならない。
+ *
+ * @param message - `JSON.parse` した結果（未検証の外部データ）
+ * @returns 応答に使う id。通知（`id` を持たない）なら `undefined`
+ */
+export const rpcIdOf = (message: unknown): RpcId | undefined => {
+  const request = parseRequest(message);
+  return request === null ? null : request.id;
+};
+
 const success = (id: RpcId, result: unknown): RpcSuccess => ({
   jsonrpc: JSONRPC_VERSION,
   id,

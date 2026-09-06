@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import {
+  closeSync,
   mkdtempSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   statSync,
   writeFileSync,
+  writeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -200,5 +203,86 @@ describe('multiAuditSink', () => {
 
     assert.deepEqual(a, ['{"event":"x"}']);
     assert.deepEqual(b, ['{"event":"x"}']);
+  });
+});
+
+// ============================================================================
+// 日付が変わって出力先を開けなくなったとき（L1-1）
+//
+// **判定は「書いた内容がどのファイルに入ったか」で行う。** 記述子の番号は解放された
+// 直後に再利用されるので、「fd が生きているか」を見ると素通りする（実測済み）。
+// ============================================================================
+
+/** その日ぶんのファイルを開けなくする。同名のディレクトリを置けば `open` が失敗する。 */
+const blockDate = (dir: string, date: string): void => {
+  mkdirSync(join(dir, `audit-${date}.jsonl`), { recursive: true });
+};
+
+describe('createFileAuditSink — 日付が変わって開けなくなったとき', () => {
+  it('無関係のファイルの記述子を巻き込まない', () => {
+    const root = makeRoot();
+    const dir = join(root, 'logs');
+    let today = '2026-09-06T12:00:00.000Z';
+    const sink = createFileAuditSink(dir, () => new Date(today));
+
+    sink.write('{"event":"day06"}');
+
+    blockDate(dir, '2026-09-07');
+    today = '2026-09-07T12:00:00.000Z';
+    assert.throws(() => {
+      sink.write('{"event":"day07"}');
+    });
+
+    // 解放された番号を他人が取る。ここで閉じ済みの記述子を閉じにいくのが L1-1
+    const markerPath = join(root, 'marker.txt');
+    const marker = openSync(markerPath, 'w');
+    try {
+      assert.throws(() => {
+        sink.write('{"event":"day07-2"}');
+      });
+
+      writeSync(marker, 'MARKER-OWN-DATA\n');
+      assert.match(readFileSync(markerPath, 'utf8'), /MARKER-OWN-DATA/);
+      assert.doesNotMatch(
+        readFileSync(join(dir, 'audit-2026-09-06.jsonl'), 'utf8'),
+        /MARKER-OWN-DATA/,
+      );
+    } finally {
+      try {
+        closeSync(marker);
+      } catch {
+        assert.fail('marker の記述子が横から閉じられている');
+      }
+    }
+  });
+
+  it('開けなかった日の行を、前日のファイルへ混ぜない', () => {
+    const dir = join(makeRoot(), 'logs');
+    let today = '2026-09-06T12:00:00.000Z';
+    const sink = createFileAuditSink(dir, () => new Date(today));
+
+    sink.write('{"event":"day06"}');
+    blockDate(dir, '2026-09-07');
+    today = '2026-09-07T12:00:00.000Z';
+    assert.throws(() => {
+      sink.write('{"event":"day07"}');
+    });
+
+    const lines = readFileSync(join(dir, 'audit-2026-09-06.jsonl'), 'utf8').trimEnd().split('\n');
+    assert.deepEqual(lines, ['{"event":"day06"}']);
+  });
+
+  // 過剰に直していないことの記録。正常なローテーションは変えない
+  it('日付が変われば新しいファイルへ書く', () => {
+    const dir = join(makeRoot(), 'logs');
+    let today = '2026-09-06T12:00:00.000Z';
+    const sink = createFileAuditSink(dir, () => new Date(today));
+
+    sink.write('{"event":"day06"}');
+    today = '2026-09-07T12:00:00.000Z';
+    sink.write('{"event":"day07"}');
+
+    assert.deepEqual(readdirSync(dir).sort(), ['audit-2026-09-06.jsonl', 'audit-2026-09-07.jsonl']);
+    assert.match(readFileSync(join(dir, 'audit-2026-09-07.jsonl'), 'utf8'), /day07/);
   });
 });

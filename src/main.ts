@@ -32,7 +32,13 @@ const describeFailure = (value: unknown): string => {
 };
 
 try {
-  await runServer(stdioChannel, process.env);
+  const outcome = await runServer(stdioChannel, process.env);
+  // **起動の失敗と言い分ける。** セッション中盤の障害を「起動に失敗しました」と出すと、
+  // 読んだ人が原因を取り違える
+  if (outcome.kind === 'stopped') {
+    process.stderr.write(`サーバを停止しました\n  ${describeFailure(outcome.reason)}\n`);
+    process.exitCode = 1;
+  }
 } catch (e) {
   process.stderr.write(`起動に失敗しました\n  ${describeFailure(toError(e))}\n`);
   process.exitCode = 1;

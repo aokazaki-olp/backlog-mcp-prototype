@@ -25,7 +25,7 @@ import { toError } from './shared/toError.ts';
 import type { ConfigOverrides } from './config.ts';
 import type { GatewayOverrides } from './domain/backlogGateway.ts';
 import type { McpHandlers, ServerInfo } from './mcp/protocol.ts';
-import type { StdioChannel } from './mcp/stdio.ts';
+import type { ServeOutcome, StdioChannel } from './mcp/stdio.ts';
 
 /**
  * LLM へ渡すガイダンス。仕様が `instructions` にこの用途を想定している。
@@ -171,14 +171,16 @@ export const createHandlers = async (
 /**
  * 組み立ててから通信路を回す。**起動に失敗したら `serve` に入らない。**
  *
+ * **起動の失敗（送出）と、稼働中に止めたこと（戻り値）を言い分ける。**
+ * どちらも「例外」にすると、セッション中盤の障害が起動失敗として報告される。
+ *
  * @param channel - 入力ストリームと書き出し先
  * @param env - 環境変数
  * @param overrides - 差し替える依存（テスト用）
+ * @returns ループが終わった理由
  */
 export const runServer = async (
   channel: StdioChannel,
   env: NodeJS.ProcessEnv,
   overrides: ServerOverrides = {},
-): Promise<void> => {
-  await serve(channel, await createHandlers(env, overrides), SERVER_INFO);
-};
+): Promise<ServeOutcome> => serve(channel, await createHandlers(env, overrides), SERVER_INFO);
