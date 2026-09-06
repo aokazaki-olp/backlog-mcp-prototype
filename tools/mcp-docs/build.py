@@ -286,10 +286,11 @@ if alias:
 
 open(f'{OUT}/README.md', 'w', encoding='utf-8').write('\n'.join(L))
 
-# ---- 出力内の相対リンクが解決できることを確かめる ----
-# 書き換えを取りこぼすとミラー内で辿れないリンクになるが、生成そのものは
-# 成功してしまうので明示的に検査する。
-broken = []
+# ---- 出力のリンクを検査する ----
+# 検査は 2 つある。`rewrite_target` は page_map に無いパスを必ず絶対 URL に落とすので、
+# 書き換えの取りこぼしは「壊れた相対リンク」ではなく「ミラー内へ張れるはずなのに絶対 URL
+# のまま」という形で現れる。前者だけを見ても発火しない。
+broken, escaped = [], []
 for root, _, names in os.walk(OUT):
     for name in names:
         if not name.endswith('.md'):
@@ -307,7 +308,15 @@ for root, _, names in os.walk(OUT):
                 continue  # 出力の外を指すリンクは生成側の責任範囲外
             if not os.path.exists(target):
                 broken.append(f'{os.path.relpath(src, OUT)}: [{label}]({href})')
+        # front matter の `source` は原文の所在なので、絶対 URL のままが正しい
+        body = re.sub(r'\A---\n.*?\n---\n', '', text, flags=re.S)
+        for ref in re.findall(re.escape(SITE) + r'(/[^)\s"\']*)', body):
+            path = C.normalize_path(ref.split('#')[0])
+            if C.normalize_path(redirects.get(path, path)) in page_map:
+                escaped.append(f'{os.path.relpath(src, OUT)}: {SITE}{ref}')
 if broken:
     raise SystemExit('解決できない相対リンク:\n  ' + '\n  '.join(broken))
+if escaped:
+    raise SystemExit('ミラー内へ張れるはずが絶対 URL のまま:\n  ' + '\n  '.join(escaped))
 
 print(f'pages={len(pages)} schema={len(schema_files)} redirects={len(redirects)} dead={len(dead)}')
