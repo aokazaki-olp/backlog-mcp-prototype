@@ -24,3 +24,7 @@ src/libs/
 # ローカル設定 — 共有しないので検査もしない（`.git/info/exclude` で追跡から外している）
 # 追跡している `backlog-policy.example.json` は対象のまま残す。
 /backlog-policy.json
+
+# Obsidian vault — Obsidian が書く場所であって、こちらが整形する対象ではない
+# （表の桁揃えや箇条書きの記法を書き換えると、Obsidian 側の表示と食い違う）
+obsidian/

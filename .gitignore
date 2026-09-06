@@ -19,5 +19,7 @@ __pycache__/
 backlog-policy.local.json
 
 # 監査ログ（既定の出力先は <policy dir>/logs/。ポリシーをリポジトリ直下に置く場合に当たる）
-logs/
+# `logs/` と書くと配下のどの階層にも当たり、`obsidian/ai/logs/`（作業ログ）まで巻き込む。
+# 塞ぎたいのはリポジトリ直下だけなので先頭に `/` を付ける。
+/logs/
 audit-*.jsonl
