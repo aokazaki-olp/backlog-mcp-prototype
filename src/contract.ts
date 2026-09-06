@@ -49,6 +49,8 @@ export const TOOL_NAMES = [
   'add_issue_comment',
   'create_issue',
   'update_issue',
+  'create_pull_request',
+  'update_pull_request',
   'add_pull_request_comment',
 ] as const;
 
@@ -207,6 +209,24 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: '課題を更新する',
     description:
       '課題キー（例: PROJ-123）を指定して課題を更新する。状態・完了理由・優先度・担当者は**名前**で指定する。指定した項目だけが変わる。',
+    readOnly: false,
+  },
+  create_pull_request: {
+    toolset: 'git',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: 'プルリクエストを作成する',
+    description:
+      'プロジェクトキーとリポジトリ名を指定してプルリクエストを作成する。担当者は名前で、関連課題は課題キー（例: PROJ-123）で指定する（数値 ID は受け付けない）。',
+    readOnly: false,
+  },
+  update_pull_request: {
+    toolset: 'git',
+    requires: 'write',
+    scopeKind: 'filter',
+    title: 'プルリクエストを更新する',
+    description:
+      'プルリクエスト番号を指定して更新する。指定した項目だけが変わる。担当者は名前で、関連課題は課題キーで指定する。',
     readOnly: false,
   },
   add_pull_request_comment: {

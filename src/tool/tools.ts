@@ -90,11 +90,13 @@ export type PlannedCall =
     };
 
 /**
- * 1回のツール呼び出しで許す往復の上限。
+ * 1回のツール呼び出しで許す手数の上限。
  *
- * 今使うのは2（一覧 → 本文）。上限に達したら黙って止めず送出する（規約 §5.4）。
+ * **暴走を止めるための箱であって、予算ではない。** 今の最長は4手
+ * （添付の読み取り → アップロード → 関連課題の ID 解決 → 本体）で、上限ちょうどにしない。
+ * 上限に達したら黙って止めず送出する（規約 §5.4）。
  */
-const MAX_HOPS = 4;
+const MAX_HOPS = 6;
 
 // ============================================================================
 // input — 引数の検証（外部入力なので unknown で受ける。規約 §4.6）
@@ -768,6 +770,41 @@ const listPayload = (
 // ============================================================================
 
 /**
+ * `relatedIssueKey` が指定されていれば、**課題キーを ID に直してから**本体を送る。
+ *
+ * `issueId` は数値なので、そのまま受けると原則4（数値 ID を LLM に触らせない）に反する。
+ * 課題キーで受けて `GET /issues/:issueKey` の応答から `id` を採る（Wiki の名前 → ID と同じ形）。
+ *
+ * **関連課題の側もポリシーで確認する。** `resolveIssueKey` を通すので、**その課題の
+ * プロジェクトでも同じツールが許可されていなければ拒否**される。Backlog 自体はもっと緩いが、
+ * **ポリシーが覆っていないプロジェクトへ読みに行かない**方を採る。
+ */
+const withRelatedIssue = (
+  context: PlanContext,
+  toolName: ToolName,
+  args: Record<string, unknown>,
+  send: (issueId?: number) => PlannedCall,
+): PlannedCall => {
+  const relatedIssueKey = optionalString(args, 'relatedIssueKey');
+  if (relatedIssueKey === undefined) {
+    return send();
+  }
+  const { issueKey } = resolveIssueKey(context, toolName, relatedIssueKey);
+  return {
+    kind: 'chain',
+    request: { endpoint: `/issues/${issueKey}`, method: 'GET' },
+    next: raw => {
+      const id = isRecord(raw) ? pickNumber(raw['id']) : undefined;
+      if (id === undefined) {
+        // 関連づけたつもりで付いていない、を作らない（規約 §5.4）
+        throw new Error(`関連課題 ${issueKey} の ID を受け取れませんでした`);
+      }
+      return send(id);
+    },
+  };
+};
+
+/**
  * `file` が指定されていれば、**アップロードしてからコメントする**3手に開く。
  *
  * 添付は独立したツールにしない。`attachmentId` が LLM の手に渡ると「上げたファイルを
@@ -1209,6 +1246,86 @@ export const planToolCall = (
       return withOptionalAttachment(context, args, post);
     }
 
+    case 'create_pull_request': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const project = projectMastersOf(masters, projectKey);
+      const repository = requiredPathSegment(args, 'repository');
+
+      const form: Record<string, FormValue> = {
+        summary: requiredString(args, 'summary'),
+        description: requiredString(args, 'description'),
+        // ブランチ名はフォームに載る（パスではない）ので、空でないことだけを見る
+        base: requiredString(args, 'base'),
+        branch: requiredString(args, 'branch'),
+      };
+      putResolved(form, 'assigneeId', optionalString(args, 'assignee'), name =>
+        resolveAssignee(project, name),
+      );
+
+      const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests`;
+      const post = (attachmentId?: number): PlannedCall =>
+        withRelatedIssue(context, toolName, args, issueId => ({
+          kind: 'send',
+          // notifiedUserId は載せない。LLM に通知先を決めさせない
+          request: {
+            endpoint,
+            method: 'POST',
+            form: {
+              ...form,
+              ...(issueId === undefined ? {} : { issueId }),
+              ...(attachmentId === undefined ? {} : { 'attachmentId[]': attachmentId }),
+            },
+          },
+          shape: raw => shapePullRequest(raw, `backlog:pr:${projectKey}/${repository}`, limits),
+        }));
+      return withOptionalAttachment(context, args, post);
+    }
+
+    case 'update_pull_request': {
+      const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
+      const project = projectMastersOf(masters, projectKey);
+      const repository = requiredPathSegment(args, 'repository');
+      const number = requiredPositiveInteger(args, 'number');
+
+      const form: Record<string, FormValue> = {};
+      for (const name of ['summary', 'description', 'comment'] as const) {
+        const value = optionalString(args, name);
+        if (value !== undefined) {
+          form[name] = value;
+        }
+      }
+      putResolved(form, 'assigneeId', optionalString(args, 'assignee'), name =>
+        resolveAssignee(project, name),
+      );
+
+      // 何も指定されていない更新は「成功したが何も変わっていない」になる（規約 §5.4）
+      if (
+        Object.keys(form).length === 0 &&
+        optionalString(args, 'relatedIssueKey') === undefined &&
+        optionalString(args, 'file') === undefined
+      ) {
+        throw new TypeError('変更する項目を1つ以上指定してください');
+      }
+
+      const source = `backlog:pr:${projectKey}/${repository}#${String(number)}`;
+      const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}`;
+      const post = (attachmentId?: number): PlannedCall =>
+        withRelatedIssue(context, toolName, args, issueId => ({
+          kind: 'send',
+          request: {
+            endpoint,
+            method: 'PATCH',
+            form: {
+              ...form,
+              ...(issueId === undefined ? {} : { issueId }),
+              ...(attachmentId === undefined ? {} : { 'attachmentId[]': attachmentId }),
+            },
+          },
+          shape: raw => shapePullRequest(raw, source, limits),
+        }));
+      return withOptionalAttachment(context, args, post);
+    }
+
     case 'add_issue_comment': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const content = requiredString(args, 'content');
@@ -1330,6 +1447,12 @@ const SCHEDULE_PROPERTIES = {
   dueDate: { type: 'string', description: '期限日（yyyy-MM-dd）' },
   estimatedHours: { type: 'number', minimum: 0, description: '予定時間' },
   actualHours: { type: 'number', minimum: 0, description: '実績時間' },
+} as const;
+
+const RELATED_ISSUE_KEY_PROPERTY = {
+  type: 'string',
+  description:
+    '関連づける課題のキー（例: PROJ-123）。数値 ID は不可。その課題のプロジェクトも許可されている必要があります。',
 } as const;
 
 const FILE_PROPERTY = {
@@ -1497,6 +1620,38 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       file: FILE_PROPERTY,
     },
     required: ['issueKey'],
+    additionalProperties: false,
+  },
+  create_pull_request: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      summary: { type: 'string', description: 'プルリクエストの件名' },
+      description: { type: 'string', description: '本文（Markdown）' },
+      base: { type: 'string', description: 'マージ先のブランチ名' },
+      branch: { type: 'string', description: 'マージされるブランチ名' },
+      assignee: NAMED_PROPERTIES.assignee,
+      relatedIssueKey: RELATED_ISSUE_KEY_PROPERTY,
+      file: FILE_PROPERTY,
+    },
+    required: ['projectKey', 'repository', 'summary', 'description', 'base', 'branch'],
+    additionalProperties: false,
+  },
+  update_pull_request: {
+    type: 'object',
+    properties: {
+      projectKey: PROJECT_KEY_PROPERTY,
+      repository: REPOSITORY_PROPERTY,
+      number: PULL_REQUEST_NUMBER_PROPERTY,
+      summary: { type: 'string', description: 'プルリクエストの件名' },
+      description: { type: 'string', description: '本文（Markdown）' },
+      comment: { type: 'string', description: '変更と一緒に残すコメント' },
+      assignee: NAMED_PROPERTIES.assignee,
+      relatedIssueKey: RELATED_ISSUE_KEY_PROPERTY,
+      file: FILE_PROPERTY,
+    },
+    required: ['projectKey', 'repository', 'number'],
     additionalProperties: false,
   },
   add_pull_request_comment: {

@@ -538,7 +538,7 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
       }
     ).result.tools;
 
-    assert.equal(tools.length, 15);
+    assert.equal(tools.length, 17);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
     }

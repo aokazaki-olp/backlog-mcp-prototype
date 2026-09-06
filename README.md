@@ -201,6 +201,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `get_pull_request`          | git       | read         |
 | `get_pull_request_comments` | git       | read         |
 | `add_pull_request_comment`  | git       | comment      |
+| `create_pull_request`       | git       | write        |
+| `update_pull_request`       | git       | write        |
 | `search_documents`          | document  | read         |
 | `list_project_activities`   | activity  | read         |
 
@@ -266,6 +268,10 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 **テキストとバイナリで求めるものが逆になる。** バイナリはマジックバイトが拡張子と一致すること、テキストは**バイナリを示さないこと** + UTF-8 として読めること。`file-type` 22.0.2 で実機確認した（2026-09-05）— `.txt` `.md` `.csv` `.json` `.log` は空ファイル・BOM つき・HTML を入れても `undefined` が返る。**ただし中身が `<?xml` で始まると `xml` と判定される**ので、「判定不能だけを許す」と正当なテキストを弾く。許容する型として `xml` を名前で挙げてある。
 
 **1コメントにつき1件まで。** 借り物の `ApiClient` はフォームのスカラー配列を `TypeError` で弾く（通るのはファイルの配列だけ）ので、複数を送るには上流を直す必要がある。引数が単数なので、利用者から見て「黙って減らされた」にはならない。
+
+**プルリクエストの関連課題は課題キーで受ける。** `issueId` は数値なので、`relatedIssueKey: "PROJ-123"` を受けてサーバ内で `GET /issues/PROJ-123` を引き、`id` を採る（Wiki の名前 → ID と同じ形）。
+
+**関連課題の側もポリシーで確認する** — その課題のプロジェクトでも同じツールが許可されていなければ拒否する。Backlog 自体はもっと緩いが、**ポリシーが覆っていないプロジェクトへ読みに行かない**方を採っている。
 
 **通知（`GET /notifications`）はツールにしない。** 絞り込みパラメータが `minId` / `maxId` / `count` / `order` / `senderId` しか無く、スペース全体の自分宛て通知を返す。**プロジェクトで絞る手段が無いので、3軸で表現できない**（原則3）。`toolsets` の語彙からも外してある。
 

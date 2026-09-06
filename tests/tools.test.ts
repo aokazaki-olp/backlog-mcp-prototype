@@ -1568,3 +1568,178 @@ describe('tools/list — write 系はポリシーに従う', () => {
     assert.equal(readOnly.has('update_issue'), false);
   });
 });
+
+// ============================================================================
+// プルリクエストの作成・更新
+// ============================================================================
+
+describe('planToolCall — create_pull_request', () => {
+  const base = {
+    projectKey: 'PROJ',
+    repository: 'app',
+    summary: '直しました',
+    description: '詳細',
+    base: 'main',
+    branch: 'feature/x',
+  };
+
+  it('必須はそのままフォームに載る（ブランチ名は ID 解決が要らない）', () => {
+    const request = planRequest(contextOf(), 'create_pull_request', base);
+
+    assert.equal(request.endpoint, '/projects/101/git/repositories/app/pullRequests');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(request.form, {
+      summary: '直しました',
+      description: '詳細',
+      base: 'main',
+      branch: 'feature/x',
+    });
+  });
+
+  it('担当者は名前で受けて ID に直す', () => {
+    const request = planRequest(contextOf(), 'create_pull_request', {
+      ...base,
+      assignee: '山田太郎',
+    });
+
+    assert.equal(request.form?.['assigneeId'], 7);
+  });
+
+  it('通知先を受ける口が無い', () => {
+    const request = planRequest(contextOf(), 'create_pull_request', {
+      ...base,
+      notifiedUserId: [1, 2],
+      assigneeId: 999,
+    });
+
+    assert.equal(JSON.stringify(request.form).includes('notifiedUserId'), false);
+    assert.equal(request.form?.['assigneeId'], undefined);
+  });
+
+  it('repository でエンドポイントを差し替えられない', () => {
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'create_pull_request', {
+          ...base,
+          repository: '../../../../space',
+        }),
+      TypeError,
+    );
+  });
+
+  it('write を許していないプロジェクトは拒否する', () => {
+    for (const projectKey of ['SALES', 'INFRA', 'OTHER']) {
+      assert.throws(
+        () => planToolCall(contextOf(), 'create_pull_request', { ...base, projectKey }),
+        ScopeDeniedError,
+        `${projectKey} は拒否されるべき`,
+      );
+    }
+  });
+
+  it('関連課題はキーで受け、ID をサーバ内で解決する', () => {
+    const planned = planToolCall(contextOf(), 'create_pull_request', {
+      ...base,
+      relatedIssueKey: 'PROJ-9',
+    });
+
+    assert.equal(planned.kind, 'chain');
+    assert.equal(requestOf(planned).endpoint, '/issues/PROJ-9');
+
+    // assert.equal は strict 版なので、ここで kind が絞られる
+    const final = planned.next({ id: 4321, issueKey: 'PROJ-9' });
+    assert.equal(requestOf(final).endpoint, '/projects/101/git/repositories/app/pullRequests');
+    assert.equal(requestOf(final).form?.['issueId'], 4321);
+  });
+
+  it('関連課題のプロジェクトも許可されていなければ API 到達前に拒否する', () => {
+    for (const relatedIssueKey of ['SALES-1', 'OTHER-1']) {
+      assert.throws(
+        () => planToolCall(contextOf(), 'create_pull_request', { ...base, relatedIssueKey }),
+        ScopeDeniedError,
+        `${relatedIssueKey} は拒否されるべき`,
+      );
+    }
+  });
+
+  it('関連課題の応答に id が無ければ送出する（付いていないのに成功にしない）', () => {
+    const planned = planToolCall(contextOf(), 'create_pull_request', {
+      ...base,
+      relatedIssueKey: 'PROJ-9',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.throws(() => planned.next({ issueKey: 'PROJ-9' }), /ID を受け取れません/);
+  });
+
+  it('数値の課題 ID は受け付けない', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'create_pull_request', { ...base, relatedIssueKey: '4321' }),
+      TypeError,
+    );
+  });
+});
+
+describe('planToolCall — update_pull_request', () => {
+  const base = { projectKey: 'PROJ', repository: 'app', number: 7 };
+
+  it('指定した項目だけを PATCH で送る', () => {
+    const request = planRequest(contextOf(), 'update_pull_request', {
+      ...base,
+      summary: '件名を直す',
+    });
+
+    assert.equal(request.endpoint, '/projects/101/git/repositories/app/pullRequests/7');
+    assert.equal(request.method, 'PATCH');
+    assert.deepEqual(request.form, { summary: '件名を直す' });
+  });
+
+  it('何も指定しない更新は送出する', () => {
+    assert.throws(() => planToolCall(contextOf(), 'update_pull_request', base), TypeError);
+  });
+
+  it('関連課題だけの指定でも更新として成立する', () => {
+    const planned = planToolCall(contextOf(), 'update_pull_request', {
+      ...base,
+      relatedIssueKey: 'PROJ-9',
+    });
+
+    assert.equal(planned.kind, 'chain');
+  });
+
+  it('添付と関連課題を両方指定しても上限に達しない', async () => {
+    // attach → upload → 課題の解決 → 本体 の4手。MAX_HOPS はこれより大きい
+    const gateway = makeGateway({
+      '/space/attachment': { id: 4242 },
+      '/issues/PROJ-9': { id: 4321, issueKey: 'PROJ-9' },
+      '/projects/101/git/repositories/app/pullRequests/7': { number: 7, summary: 'ok' },
+    });
+    const handlers = buildHandlers({
+      ...contextOf(),
+      gateway,
+      attachmentsRoot: '/allowed',
+      readAttachment: () =>
+        Promise.resolve({
+          kind: 'file',
+          filename: 'diff.txt',
+          contentType: 'text/plain',
+          data: new Uint8Array([0x61]),
+        }),
+    });
+
+    const result = await handlers.callTool('update_pull_request', {
+      ...base,
+      relatedIssueKey: 'PROJ-9',
+      file: 'diff.txt',
+      comment: 'ログを添付します',
+    });
+
+    assert.equal(result.isError, undefined);
+    assert.deepEqual(
+      gateway.calls.map(c => c.endpoint),
+      ['/space/attachment', '/issues/PROJ-9', '/projects/101/git/repositories/app/pullRequests/7'],
+    );
+  });
+});
