@@ -423,7 +423,7 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
   const issueKey = pickString(raw['issueKey']) ?? '(不明)';
   const wrap = (text: string, field: string): string =>
     wrapUntrusted(text, {
-      source: `backlog:issue:${issueKey}:${field}`,
+      source: { subject: `backlog:issue:${issueKey}`, field },
       maxLength: limits.maxTextLength,
     });
   const summary = pickString(raw['summary']);
@@ -497,11 +497,11 @@ const renderChangeLog = (raw: unknown): string | undefined => {
  * **課題とプルリクエストで応答の形が同じ**なので共用する（ミラーの `get-comment-list.md` と
  * `get-pull-request-comment.md` で確認）。違うのは出所ラベルだけなので引数で受ける。
  *
- * @param source - `<untrusted>` に載せる出所（例: `backlog:issue:PROJ-1`）
+ * @param subject - `<untrusted>` に載せる出所の骨格（例: `backlog:issue:PROJ-1`）
  */
 const shapeComment = (
   raw: unknown,
-  source: string,
+  subject: string,
   limits: ToolLimits,
 ): Record<string, unknown> => {
   if (!isRecord(raw)) {
@@ -509,7 +509,7 @@ const shapeComment = (
   }
   const wrap = (text: string, field: string): string =>
     wrapUntrusted(text, {
-      source: `${source}:${field}`,
+      source: { subject, field },
       maxLength: limits.maxTextLength,
     });
   const content = pickString(raw['content']);
@@ -569,7 +569,7 @@ const shapeWikiPageDetail = (
     updatedUser: pickName(raw['updatedUser']),
     updated: pickString(raw['updated']),
     content: wrapUntrusted(pickString(raw['content']) ?? '', {
-      source: `backlog:wiki:${projectKey}:${name}:content`,
+      source: { subject: `backlog:wiki:${projectKey}`, name, field: 'content' },
       maxLength: limits.maxTextLength,
     }),
   };
@@ -595,7 +595,7 @@ const shapeRepository = (raw: unknown, limits: ToolLimits): Record<string, unkno
       description === undefined || description === ''
         ? undefined
         : wrapUntrusted(description, {
-            source: `backlog:repository:${name ?? '(不明)'}:description`,
+            source: { subject: 'backlog:repository', name: name ?? '(不明)', field: 'description' },
             maxLength: limits.maxTextLength,
           }),
     pushedAt: pickString(raw['pushedAt']),
@@ -615,14 +615,14 @@ const shapeRepository = (raw: unknown, limits: ToolLimits): Record<string, unkno
  */
 const shapePullRequest = (
   raw: unknown,
-  source: string,
+  subject: string,
   limits: ToolLimits,
 ): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: 'プルリクエストの形が想定と違います' };
   }
   const wrap = (text: string, field: string): string =>
-    wrapUntrusted(text, { source: `${source}:${field}`, maxLength: limits.maxTextLength });
+    wrapUntrusted(text, { source: { subject, field }, maxLength: limits.maxTextLength });
   const summary = pickString(raw['summary']);
   const description = pickString(raw['description']);
   const issue = raw['issue'];
@@ -668,7 +668,7 @@ const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown
   const plain = pickString(raw['plain']);
   const wrap = (text: string, field: string): string =>
     wrapUntrusted(text, {
-      source: `backlog:document:${title ?? '(無題)'}:${field}`,
+      source: { subject: 'backlog:document', name: title ?? '(無題)', field },
       maxLength: limits.maxTextLength,
     });
 
@@ -720,7 +720,7 @@ const shapeActivity = (
       summary === undefined || summary === ''
         ? undefined
         : wrapUntrusted(summary, {
-            source: `backlog:activity:${projectKey}:summary`,
+            source: { subject: `backlog:activity:${projectKey}`, field: 'summary' },
             maxLength: limits.maxTextLength,
           }),
   };
@@ -1389,7 +1389,7 @@ const sendRequest = async (context: ToolContext, request: ResolvedRequest): Prom
   } catch (e) {
     const original = toError(e);
     const wrapped = wrapUntrusted(original.message, {
-      source: 'backlog:error',
+      source: { subject: 'backlog', field: 'error' },
       maxLength: context.limits.maxTextLength,
     });
     // cause で元を残す（規約 §6.2）。監査ログと stderr には元の形で辿れる
