@@ -229,6 +229,7 @@ L.append('| `<div id="enable-section-numbers" />` | 落とす（Mintlify の描�
 L.append('| サイト絶対パスのリンク | 対象内はミラー内の相対パスへ、対象外は絶対 URL へ書き換える |')
 L.append(f'| `schema` ページの typedoc HTML | 型ごとの見出し・シグネチャ・説明に組み直す。'
          f'見出しは原文の `` ### `型名` `` を保つので `schema#型名` のアンカーは解決する。'
+         f'非推奨メンバーは原文が取り消し線で示すので `(deprecated)` と付記する。'
          f'メンバー個別のアンカー（`#tool-description` 等）は失われるので、'
          f'厳密に追うときは [schema.ts](schema/{LATEST}/schema.ts) を見る |')
 L.append('')
