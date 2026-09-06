@@ -76,6 +76,7 @@ const MASTER_RESPONSES: Record<string, unknown> = {
     id: 1,
     created: '2026-09-06T00:00:00Z',
   },
+  '/api/v2/issues/PROJ-1/attachments': [{ id: 8, name: 'error.log', size: 12 }],
   '/api/v2/issues/PROJ-1': {
     id: 777,
     projectId: 101,
@@ -97,6 +98,16 @@ const BY_METHOD: Record<string, Record<string, unknown>> = {
   },
 };
 
+/**
+ * バイト列で返す経路。**添付のダウンロードだけが通る。**
+ *
+ * 借り物のクライアントはバイナリ応答の `body` を埋めないので、`sendBytes` は `bytes` を
+ * 読む（`src/domain/backlogGateway.ts`）。偽 Transport も同じ形にする。
+ */
+const BYTES_RESPONSES: Record<string, Uint8Array> = {
+  '/api/v2/issues/PROJ-1/attachments/8': new TextEncoder().encode('エラーログの中身'),
+};
+
 const makeTransport = (): Transport & { readonly urls: string[] } => {
   const urls: string[] = [];
   return {
@@ -105,6 +116,10 @@ const makeTransport = (): Transport & { readonly urls: string[] } => {
       urls.push(url);
       const path = new URL(url).pathname;
       const method = options?.method ?? 'GET';
+      const bytes = BYTES_RESPONSES[path];
+      if (bytes !== undefined) {
+        return Promise.resolve({ status: 200, headers: {}, body: null, text: '', bytes });
+      }
       const byMethod = BY_METHOD[path]?.[method];
       if (byMethod !== undefined) {
         return Promise.resolve({ status: 200, headers: {}, body: byMethod, text: '' });
@@ -123,6 +138,7 @@ interface Run {
   readonly written: string[];
   readonly urls: string[];
   readonly logDir: string;
+  readonly downloadsDir: string;
 }
 
 /** env を組み立て、行を流し込み、書き出された行と監査ログを返す。 */
@@ -143,6 +159,7 @@ const run = async (
   lines: readonly string[],
   policy: unknown = { projects: ['PROJ'] },
   attachments?: Readonly<Record<string, string>>,
+  downloads = false,
 ): Promise<Run> => {
   const root = mkdtempSync(join(tmpdir(), 'backlog-mcp-e2e-'));
   const policyPath = join(root, 'backlog-policy.json');
@@ -155,6 +172,12 @@ const run = async (
     for (const [name, body] of Object.entries(attachments)) {
       writeFileSync(join(attachmentsRoot, name), body);
     }
+  }
+
+  // ダウンロード先。読み取りルート・ログ・設定ファイルと重ならない位置に置く
+  const downloadsDir = join(root, 'downloads');
+  if (downloads) {
+    mkdirSync(downloadsDir, { recursive: true });
   }
 
   const transport = makeTransport();
@@ -172,11 +195,12 @@ const run = async (
 
       BACKLOG_POLICY: policyPath,
       ...(attachments === undefined ? {} : { BACKLOG_ATTACHMENTS_ROOT: attachmentsRoot }),
+      ...(downloads ? { BACKLOG_DOWNLOADS_DIR: downloadsDir } : {}),
     },
     { gateway: { transport, maxRetries: 0 }, config: { resolveApiKey: () => 'secret-key-value' } },
   );
 
-  return { written, urls: transport.urls, logDir: join(root, 'logs') };
+  return { written, urls: transport.urls, logDir: join(root, 'logs'), downloadsDir };
 };
 
 const auditLines = (logDir: string): Record<string, unknown>[] => {
@@ -663,7 +687,12 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
   });
 
   it('全ツールが tools/list に出せる（定義が壊れていない）', async () => {
-    const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
+    const { written } = await run(
+      [request(1, 'tools/list')],
+      WRITE_POLICY,
+      { 'review.md': 'ok' },
+      true,
+    );
     const tools = (
       JSON.parse(written[0] ?? '{}') as {
         result: { tools: { name: string; inputSchema: unknown }[] };
@@ -673,6 +702,135 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
     assert.equal(tools.length, 24);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
+    }
+  });
+});
+
+// ============================================================================
+// 添付は「明示しないと有効にならない」— env が絞る方向にしか効かないこと
+// ============================================================================
+
+interface ListedTool {
+  readonly name: string;
+  readonly inputSchema: { readonly properties?: Record<string, unknown> };
+}
+
+const listedTools = (line: string): ListedTool[] =>
+  (JSON.parse(line) as { result: { tools: ListedTool[] } }).result.tools;
+
+const resultText = (line: string): { readonly text: string; readonly isError?: boolean } => {
+  const result = (
+    JSON.parse(line) as { result: { content: { text: string }[]; isError?: boolean } }
+  ).result;
+  return { text: result.content[0]?.text ?? '', isError: result.isError };
+};
+
+/** `file` 引数を持つツール。添付が無いときはここからスキーマが痩せる。 */
+const ATTACHABLE_TOOLS = [
+  'add_issue_comment',
+  'create_issue',
+  'update_issue',
+  'create_pull_request',
+  'update_pull_request',
+  'add_pull_request_comment',
+] as const;
+
+const DOWNLOAD_TOOLS = ['list_issue_attachments', 'get_issue_attachment'] as const;
+
+describe('添付の可否は env が決める — ポリシーとは別の軸', () => {
+  it('BACKLOG_DOWNLOADS_DIR が無ければ添付のダウンロードは一覧に出ない', async () => {
+    const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
+    const names = listedTools(written[0] ?? '{}').map(tool => tool.name);
+
+    for (const toolName of DOWNLOAD_TOOLS) {
+      assert.equal(names.includes(toolName), false, toolName);
+    }
+  });
+
+  it('一覧に出さないことは防御ではない — 呼んでも拒否する', async () => {
+    const { written } = await run(
+      [
+        request(1, 'tools/call', {
+          name: 'get_issue_attachment',
+          arguments: { issueKey: 'PROJ-1', file: 'error.log' },
+        }),
+        request(2, 'tools/call', {
+          name: 'list_issue_attachments',
+          arguments: { issueKey: 'PROJ-1' },
+        }),
+      ],
+      WRITE_POLICY,
+    );
+
+    for (const line of written) {
+      const { text, isError } = resultText(line);
+      assert.equal(isError, true);
+      // 「ポリシーで許されていない」ではなく「設定が無い」と言い分ける（規約 §5.4）
+      assert.match(text, /BACKLOG_DOWNLOADS_DIR/);
+    }
+  });
+
+  it('設定すると2つとも出て、テキストの添付が囲まれて返る', async () => {
+    const { written, downloadsDir } = await run(
+      [
+        request(1, 'tools/list'),
+        request(2, 'tools/call', {
+          name: 'get_issue_attachment',
+          arguments: { issueKey: 'PROJ-1', file: 'error.log' },
+        }),
+      ],
+      WRITE_POLICY,
+      undefined,
+      true,
+    );
+    const names = listedTools(written[0] ?? '{}').map(tool => tool.name);
+
+    for (const toolName of DOWNLOAD_TOOLS) {
+      assert.ok(names.includes(toolName), toolName);
+    }
+
+    const { text, isError } = resultText(written[1] ?? '{}');
+    assert.equal(isError, undefined);
+    assert.match(text, /エラーログの中身/);
+    assert.match(text, /<untrusted source=/);
+    // テキストはディスクを触らない
+    assert.deepEqual(readdirSync(downloadsDir), []);
+  });
+
+  it('BACKLOG_ATTACHMENTS_ROOT が無ければ file 引数がスキーマに現れない', async () => {
+    const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
+    const tools = listedTools(written[0] ?? '{}');
+
+    for (const toolName of ATTACHABLE_TOOLS) {
+      const tool = tools.find(each => each.name === toolName);
+      assert.ok(tool, toolName);
+      assert.equal('file' in (tool.inputSchema.properties ?? {}), false, toolName);
+    }
+  });
+
+  it('設定すると file 引数が現れる（ツールごと消えるのではない）', async () => {
+    const { written } = await run([request(1, 'tools/list')], WRITE_POLICY, { 'review.md': 'ok' });
+    const tools = listedTools(written[0] ?? '{}');
+
+    for (const toolName of ATTACHABLE_TOOLS) {
+      const tool = tools.find(each => each.name === toolName);
+      assert.ok(tool, toolName);
+      assert.ok('file' in (tool.inputSchema.properties ?? {}), toolName);
+    }
+  });
+
+  it('env は絞る方向にしか効かない — 設定があってもポリシー外は出ない', async () => {
+    const { written } = await run(
+      [request(1, 'tools/list')],
+      // git だけの toolset。添付ダウンロードは issue なので出ないはず
+      { projects: [{ key: 'PROJ', can: 'write', toolsets: ['git'] }] },
+      { 'review.md': 'ok' },
+      true,
+    );
+    const names = listedTools(written[0] ?? '{}').map(tool => tool.name);
+
+    for (const toolName of DOWNLOAD_TOOLS) {
+      assert.equal(names.includes(toolName), false, toolName);
     }
   });
 });

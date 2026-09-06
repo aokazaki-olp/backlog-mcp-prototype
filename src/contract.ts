@@ -86,6 +86,17 @@ export interface ToolSpec {
   readonly description: string;
   /** MCP の ToolAnnotations に載せる。仕様上ヒントであり、防御には使わない。 */
   readonly readOnly: boolean;
+  /**
+   * このツールが有効になるために要る設定。**未設定なら `tools/list` に出さず、呼んでも拒否する。**
+   *
+   * ポリシー（`projects` × `toolsets` × `can`）とは別の軸。添付の危険は**機能に属していて
+   * プロジェクトに属していない**ので、`can` の階梯（`read < comment < write`）には乗らない。
+   * プロセス全体のスイッチとして env に置き、**絞る方向にしか効かない**形にしてある。
+   *
+   * ここに名前で書くのは、`src/tool/tools.ts` 側に列挙を持つと**ツールを足したときに
+   * 書き忘れる**ため。仕様の側に持たせれば、ツールの定義と同じ場所で目に入る。
+   */
+  readonly requiresConfig?: 'downloadsDir';
 }
 
 /**
@@ -218,6 +229,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キー（例: PROJ-123）を指定して、添付されているファイルの名前とサイズを取得する。',
     readOnly: true,
+    requiresConfig: 'downloadsDir',
   },
   get_issue_attachment: {
     toolset: 'issue',
@@ -227,6 +239,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キーとファイル名を指定して添付を取得する。テキストならそのまま返し、それ以外は設定されたディレクトリへ保存してパスを返す（数値 ID は受け付けない）。',
     readOnly: true,
+    requiresConfig: 'downloadsDir',
   },
   create_wiki_page: {
     toolset: 'wiki',
@@ -472,9 +485,11 @@ export interface ServerConfig {
    */
   readonly selfPaths: readonly string[];
   /**
-   * 添付を保存するディレクトリ（絶対パス）。**未設定ならバイナリを保存する口が開かない。**
+   * 添付を保存するディレクトリ（絶対パス）。**未設定なら添付のダウンロードそのものが無い。**
    *
-   * テキスト系の添付は囲んで返すだけなのでディスクを触らない。**設定が要るのは保存側だけ。**
+   * 「保存先」ではなく**ダウンロードの鍵**として扱う。テキスト系はディスクを触らずに返せるが、
+   * それでも**設定が無ければ閉じる** — 第三者が書いたファイルの中身が、何も設定していない
+   * 利用者のコンテキストへ入る状態を作らないため。`attachmentsRoot`（入口の鍵）と対称にしてある。
    *
    * 既定を置かない理由は `attachmentsRoot` と同じ。加えて「OS 既定のダウンロードフォルダ」を
    * 推測しない — Windows の既定は移動でき、Linux は XDG でロケール依存になりうる（未確認）。

@@ -23,6 +23,7 @@ import type {
   ResolvedPolicy,
   ResolvedRequest,
   ToolName,
+  ToolSpec,
 } from '../contract.ts';
 import type { ReceivedAttachment } from '../attach/localFile.ts';
 import type { BacklogGateway } from '../domain/gateway.ts';
@@ -53,6 +54,13 @@ export interface PlanContext {
   readonly limits: ToolLimits;
   /** 添付を許すディレクトリ。`null` なら添付の引数そのものを受け付けない。 */
   readonly attachmentsRoot?: string | null;
+  /**
+   * 添付を保存するディレクトリ。`null` なら**添付のダウンロードそのものを出さない**。
+   *
+   * 保存の有無ではなく**ダウンロードの可否**を決める（テキストも閉じる）。判定は
+   * `TOOL_SPECS[toolName].requiresConfig` を見るので、ここにツール名の列挙は持たない。
+   */
+  readonly downloadsDir?: string | null;
 }
 
 export interface ToolContext extends PlanContext {
@@ -2360,13 +2368,49 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
   },
 };
 
-const toDefinition = (toolName: ToolName): ToolDefinition => {
+/**
+ * `requiresConfig` の値 → それを設定する環境変数名。**エラーの文言に使う。**
+ *
+ * mapped type にしてあるので、`requiresConfig` に値を足してここに書き忘れると
+ * コンパイルエラーになる（`TOOL_SPECS` と同じ完全性チェック）。
+ */
+const CONFIG_ENV_NAMES: { readonly [K in NonNullable<ToolSpec['requiresConfig']>]: string } = {
+  downloadsDir: 'BACKLOG_DOWNLOADS_DIR',
+};
+
+/**
+ * その設定が要るツールを、設定が無ければ落とす。**絞る方向にしか効かない。**
+ *
+ * 要否は `TOOL_SPECS` が持つので、ここにツール名の列挙は無い。ツールを足したときに
+ * 印を付け忘れても**開く方向には壊れない**（印が要るのは閉じる側）。
+ */
+const configAllows = (context: PlanContext, toolName: ToolName): boolean =>
+  TOOL_SPECS[toolName].requiresConfig === 'downloadsDir' ? context.downloadsDir != null : true;
+
+/**
+ * 添付が設定されていないとき、`file` 引数をスキーマから落とす。
+ *
+ * 受け付けて実行時に送出する形だと、**使えない引数を LLM に見せている**ことになる。
+ * `tools/list` の段で消せば書きようがない（原則1 と同じ「到達不能」の形）。
+ * **ツールごと消さない** — コメント自体は添付が無くても使える。
+ */
+const withoutFileProperty = (schema: Record<string, unknown>): Record<string, unknown> => {
+  const properties = schema['properties'];
+  if (!isRecord(properties) || !('file' in properties)) {
+    return schema;
+  }
+  const { file: _file, ...rest } = properties;
+  return { ...schema, properties: rest };
+};
+
+const toDefinition = (toolName: ToolName, attachable: boolean): ToolDefinition => {
   const spec = TOOL_SPECS[toolName];
+  const schema = INPUT_SCHEMAS[toolName];
   return {
     name: toolName,
     title: spec.title,
     description: spec.description,
-    inputSchema: INPUT_SCHEMAS[toolName],
+    inputSchema: attachable ? schema : withoutFileProperty(schema),
     annotations: {
       readOnlyHint: spec.readOnly,
       // 削除系を作っていないので、どのツールも破壊的ではない。
@@ -2394,10 +2438,15 @@ const toDefinition = (toolName: ToolName): ToolDefinition => {
  */
 export const buildHandlers = (context: ToolContext): McpHandlers => {
   const listed = listedTools(context.policy);
+  const attachable = context.attachmentsRoot != null;
+  // env は**絞る方向にしか効かない**。ポリシーが許していても設定が無ければ出さない
+  const enabled = new Set([...listed].filter(toolName => configAllows(context, toolName)));
 
   return {
     listTools(): readonly ToolDefinition[] {
-      return TOOL_NAMES.filter(toolName => listed.has(toolName)).map(toDefinition);
+      return TOOL_NAMES.filter(toolName => enabled.has(toolName)).map(toolName =>
+        toDefinition(toolName, attachable),
+      );
     },
 
     async callTool(name: string, args: unknown): Promise<ToolResult> {
@@ -2406,11 +2455,18 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
         : undefined;
 
       // 一覧に出していないツール名でも呼べる。ここで必ず確認する。
-      if (toolName === undefined || !listed.has(toolName)) {
-        return {
-          content: [{ type: 'text', text: `利用できないツールです: ${name}` }],
-          isError: true,
-        };
+      if (toolName === undefined || !enabled.has(toolName)) {
+        // 設定で閉じているのか、ポリシーで閉じているのかを言い分ける（規約 §5.4）。
+        // どちらも「呼べない」だが、直し方が違う
+        const missing =
+          toolName === undefined || !listed.has(toolName)
+            ? undefined
+            : TOOL_SPECS[toolName].requiresConfig;
+        const reason =
+          missing === undefined
+            ? `利用できないツールです: ${name}`
+            : `このサーバでは有効になっていません（${CONFIG_ENV_NAMES[missing]} が未設定）: ${name}`;
+        return { content: [{ type: 'text', text: reason }], isError: true };
       }
 
       try {

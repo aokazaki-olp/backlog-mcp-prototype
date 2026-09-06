@@ -138,6 +138,8 @@ export const createHandlers = async (
         gateway,
         limits: DEFAULT_LIMITS,
         attachmentsRoot: config.attachmentsRoot,
+        // 添付のダウンロードは**これが無ければツールごと出さない**（テキストも含めて閉じる）
+        downloadsDir: config.downloadsDir,
         // ローカルファイルを読むのはここで組み立てる。tool 層は node:fs を知らない。
         // このサーバ自身の設定ファイルは送り出さない（主防御はルートの外に置くこと）
         readAttachment: (root, requested) =>
