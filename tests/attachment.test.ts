@@ -295,3 +295,65 @@ describe('readAttachment — サーバ自身の設定ファイル', () => {
     }
   });
 });
+
+// ============================================================================
+// サーバ自身が書き出したもの（監査ログ）は添付できない
+// ============================================================================
+
+describe('readAttachment — 監査ログの出力先', () => {
+  let logRoot: string;
+  let logDir: string;
+
+  before(() => {
+    logRoot = mkdtempSync(join(tmpdir(), 'backlog-mcp-logdir-'));
+    logDir = join(logRoot, 'logs');
+    mkdirSync(join(logDir, 'old'), { recursive: true });
+    writeFileSync(join(logDir, 'audit-2026-09-06.jsonl'), '{"event":"startup"}\n');
+    // 拡張子で絞っていないことを示すため、ログ以外の名前も置く
+    writeFileSync(join(logDir, 'memo.md'), '# ログの隣に置かれたメモ\n');
+    writeFileSync(join(logDir, 'old', 'archived.md'), '# 深い階層\n');
+    writeFileSync(join(logRoot, 'note.md'), '# ログの外\n');
+    // 接頭辞が同じだけの別ディレクトリ（prefix matching を使っていないことの確認）
+    mkdirSync(join(logRoot, 'logs-backup'), { recursive: true });
+    writeFileSync(join(logRoot, 'logs-backup', 'note.md'), '# 別ディレクトリ\n');
+  });
+
+  it('配下は拡張子を問わず拒否する', async () => {
+    for (const requested of ['logs/memo.md', 'logs/old/archived.md']) {
+      await assert.rejects(
+        () => readAttachment(logRoot, requested, { selfDirs: [logDir] }),
+        AttachmentError,
+        `拒否されるべき: ${requested}`,
+      );
+    }
+  });
+
+  it('ログの外は通る（拒否が広がっていない）', async () => {
+    const file = await readAttachment(logRoot, 'note.md', { selfDirs: [logDir] });
+
+    assert.equal(file.filename, 'note.md');
+  });
+
+  it('接頭辞が同じだけの別ディレクトリは通る（prefix matching ではない）', async () => {
+    const file = await readAttachment(logRoot, 'logs-backup/note.md', { selfDirs: [logDir] });
+
+    assert.equal(file.filename, 'note.md');
+  });
+
+  it('存在しないディレクトリを渡しても落ちない（網が狭くなるだけ）', async () => {
+    const file = await readAttachment(logRoot, 'note.md', {
+      selfDirs: [join(logRoot, 'nonexistent'), logDir],
+    });
+
+    assert.equal(file.filename, 'note.md');
+  });
+
+  it('symlink でログの外から指しても拒否する', async () => {
+    symlinkSync(join(logDir, 'memo.md'), join(logRoot, 'link-to-log.md'));
+
+    await assert.rejects(
+      () => readAttachment(logRoot, 'link-to-log.md', { selfDirs: [logDir] }),
+      AttachmentError,
+    );
+  });
+});

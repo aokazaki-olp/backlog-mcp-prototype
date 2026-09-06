@@ -150,7 +150,11 @@ export const createHandlers = async (
         // ローカルファイルを読むのはここで組み立てる。tool 層は node:fs を知らない。
         // このサーバ自身の設定ファイルは送り出さない（主防御はルートの外に置くこと）
         readAttachment: (root, requested) =>
-          readAttachment(root, requested, { selfPaths: config.selfPaths }),
+          readAttachment(root, requested, {
+            selfPaths: config.selfPaths,
+            // 監査ログの出力先。配下に置いてよい添付は無いので丸ごと拒む
+            selfDirs: [config.logDir],
+          }),
       }),
       sink,
     );

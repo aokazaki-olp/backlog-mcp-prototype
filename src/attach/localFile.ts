@@ -237,6 +237,17 @@ export interface AttachmentOptions {
    * 置くので、作業ディレクトリをルートにすると配下に入りやすい）。
    */
   readonly selfPaths?: readonly string[];
+  /**
+   * **このサーバ自身が書き出すディレクトリ**（監査ログの出力先）。配下は丸ごと添付できない。
+   *
+   * **拡張子で絞らない。** 今の出力は `audit-*.jsonl` だが、名前や拡張子を条件にすると
+   * 出力の形を変えたときにガードだけが静かに外れる。**この配下に置いてよい添付は無い**ので、
+   * 丸ごと拒む方が穴も無く、説明も短い。
+   *
+   * **glob で判定しない。** 出力先の名前に `[` が入るだけでパターンが黙ってマッチしなく
+   * なる（`logs[1]` で確認）。判定は `isInside` に寄せる — 同じ問いに同じ答えを使う。
+   */
+  readonly selfDirs?: readonly string[];
 }
 
 export const readAttachment = async (
@@ -261,6 +272,13 @@ export const readAttachment = async (
 
   if (!isInside(realRoot, realPath)) {
     throw new AttachmentError('添付できるのは設定したルートの中のファイルだけです');
+  }
+
+  for (const dir of options.selfDirs ?? []) {
+    const realDir = await realpath(dir).catch(() => null);
+    if (realDir !== null && isInside(realDir, realPath)) {
+      throw new AttachmentError('このサーバが書き出したファイルは添付できません');
+    }
   }
 
   const rule = contentRuleFor(realPath);
