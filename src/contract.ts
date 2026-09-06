@@ -374,5 +374,13 @@ export interface ServerConfig {
    * 設定で明示する以外に安全な決め方が無い。相対指定はポリシーファイルのディレクトリから解決する。
    */
   readonly attachmentsRoot: string | null;
+  /**
+   * **このサーバ自身の設定ファイル**（絶対パス）。添付として送り出せないようにするために持つ。
+   *
+   * `BACKLOG_ENV_FILE` / `BACKLOG_ENV_KEYS_FILE` / `BACKLOG_POLICY` が指すファイルそのもの。
+   * **名前で塞がない** — これらのパスは利用者が決めるので、拡張子の allowlist では漏れる
+   * （env を `secrets.json` と名付ければ `.json` として通ってしまう）。
+   */
+  readonly selfPaths: readonly string[];
   readonly readOnly: boolean;
 }

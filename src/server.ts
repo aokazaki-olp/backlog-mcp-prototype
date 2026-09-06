@@ -147,8 +147,10 @@ export const createHandlers = async (
         gateway,
         limits: DEFAULT_LIMITS,
         attachmentsRoot: config.attachmentsRoot,
-        // ローカルファイルを読むのはここで組み立てる。tool 層は node:fs を知らない
-        readAttachment,
+        // ローカルファイルを読むのはここで組み立てる。tool 層は node:fs を知らない。
+        // このサーバ自身の設定ファイルは送り出さない（主防御はルートの外に置くこと）
+        readAttachment: (root, requested) =>
+          readAttachment(root, requested, { selfPaths: config.selfPaths }),
       }),
       sink,
     );

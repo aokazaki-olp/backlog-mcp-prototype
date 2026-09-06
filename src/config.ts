@@ -55,6 +55,18 @@ const required = (env: NodeJS.ProcessEnv, name: string): string => {
   return value;
 };
 
+/**
+ * 鍵まわりの2つのパス。**復号にも、添付の拒否にも要る**ので1箇所で解決する。
+ *
+ * 添付側が要るのは「このサーバ自身の設定ファイルはどれか」であって、中身ではない。
+ */
+const envFilePaths = (
+  env: NodeJS.ProcessEnv,
+): { readonly envFile: string; readonly envKeysFile: string } => ({
+  envFile: resolve(required(env, 'BACKLOG_ENV_FILE')),
+  envKeysFile: resolve(required(env, 'BACKLOG_ENV_KEYS_FILE')),
+});
+
 /** dotenvx が復号できなかった値に残す接頭辞。 */
 const CIPHERTEXT_PREFIX = 'encrypted:';
 
@@ -89,8 +101,7 @@ const API_KEY_NAME = 'BACKLOG_API_KEY';
  * @throws {ConfigError} パスが無い場合、復号できない場合、値が空の場合
  */
 const decryptApiKey = (env: NodeJS.ProcessEnv): string => {
-  const envFile = required(env, 'BACKLOG_ENV_FILE');
-  const envKeysFile = required(env, 'BACKLOG_ENV_KEYS_FILE');
+  const { envFile, envKeysFile } = envFilePaths(env);
   const decrypted: Record<string, string> = {};
 
   try {
@@ -144,6 +155,26 @@ const resolveAttachmentsRoot = (value: string | undefined, policyPath: string): 
 };
 
 /**
+ * **このサーバ自身の設定ファイル**を並べる。添付として送り出せないようにするために持つ。
+ *
+ * `decryptApiKey` を差し替えているとき（テスト）は env のパスが無いので、**あるものだけ**を
+ * 並べる。本番経路では `decryptApiKey` が2つとも必須にしているので、必ず3つそろう。
+ *
+ * ここで `realpath` を使わない — **比較は開いたファイルの識別で行う**ので、パスは入口として
+ * 渡すだけでよい（`src/attach/localFile.ts`）。
+ */
+const selfPathsOf = (env: NodeJS.ProcessEnv, policyPath: string): readonly string[] => {
+  const paths = [policyPath];
+  for (const name of ['BACKLOG_ENV_FILE', 'BACKLOG_ENV_KEYS_FILE']) {
+    const value = env[name];
+    if (value !== undefined && value !== '') {
+      paths.push(resolve(value));
+    }
+  }
+  return Object.freeze(paths);
+};
+
+/**
  * 環境変数から設定を組み立てる。
  *
  * **URL を受け取らない。** スペースID とドメイン（閉じた3値）だけを受け、
@@ -194,6 +225,7 @@ export const loadConfig = (
     policyPath,
     logDir: resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath),
     attachmentsRoot: resolveAttachmentsRoot(env['BACKLOG_ATTACHMENTS_ROOT'], policyPath),
+    selfPaths: selfPathsOf(env, policyPath),
     readOnly: rawReadOnly === '1' || rawReadOnly === 'true',
   });
 };

@@ -4,7 +4,7 @@
  * @description 添付するローカルファイルを検証して読み込む。**唯一のファイル読み取り面**
  */
 
-import { open, realpath } from 'node:fs/promises';
+import { open, realpath, stat } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { AttachmentError } from '../contract.ts';
@@ -44,6 +44,55 @@ const BINARY_EXTENSIONS: Readonly<Record<string, string>> = {
   '.jpeg': 'jpg',
   '.gif': 'gif',
   '.pdf': 'pdf',
+};
+
+/**
+ * ファイルの識別。**パス文字列ではなくこれで比べる。**
+ *
+ * 主戦場が Windows なので、パス文字列の比較では取り逃がす。
+ *
+ * - Windows のパスは**大文字小文字を区別しない**（`C:\\x\\.env` と `C:\\X\\.ENV` は同じファイル）
+ * - **8.3 形式の短い名前**（`PROGRA~1`）でも同じファイルを別の文字列で指せる
+ *
+ * 識別で比べれば、**すでに開いたハンドルそのもの**を見ることになるので TOCTOU の隙も無い。
+ *
+ * > **未確認**: Windows の `ino` は NTFS のファイルインデックスが入るはずだが、この環境で
+ * > 確かめられない。ネットワーク共有などで `0` になる例が知られているので、
+ * > **`0` のときは大文字小文字を無視したパス比較へ落とす**（`isSameFile`）。
+ */
+interface FileIdentity {
+  readonly dev: number;
+  readonly ino: number;
+  readonly path: string;
+}
+
+/** `ino` が使えるなら識別で、使えないならパスで比べる。 */
+const isSameFile = (a: FileIdentity, b: FileIdentity): boolean => {
+  if (a.ino !== 0 && b.ino !== 0) {
+    return a.dev === b.dev && a.ino === b.ino;
+  }
+  // 識別が取れない環境向けの落としどころ。Windows を想定して大文字小文字を無視する
+  return a.path.toLowerCase() === b.path.toLowerCase();
+};
+
+/**
+ * **このサーバ自身の設定ファイル**の識別を集める。
+ *
+ * 読めないものは黙って飛ばす（存在しない設定ファイルは拒否の対象にならない）。**拒否の
+ * 網が狭くなるだけで、広くはならない**ので、ここで送出はしない。
+ */
+const identitiesOf = async (paths: readonly string[]): Promise<readonly FileIdentity[]> => {
+  const found: FileIdentity[] = [];
+  for (const path of paths) {
+    try {
+      const real = await realpath(path);
+      const info = await stat(real);
+      found.push({ dev: info.dev, ino: info.ino, path: real });
+    } catch {
+      // 解決できないパスは比較対象にならない
+    }
+  }
+  return found;
 };
 
 export interface AttachmentLimits {
@@ -138,11 +187,25 @@ const verifyContent = async (
  * @returns multipart に載せるファイルパート
  * @throws {AttachmentError} ルート外・未知の拡張子・中身の不一致・サイズ超過・読めない場合
  */
+export interface AttachmentOptions {
+  readonly limits?: AttachmentLimits;
+  /**
+   * **このサーバ自身の設定ファイル**（`BACKLOG_ENV_FILE` / `BACKLOG_ENV_KEYS_FILE` /
+   * `BACKLOG_POLICY` が指すもの）。ここに当たるファイルは添付として送り出さない。
+   *
+   * **主防御ではない。** 設定ファイルを添付ルートの外に置くのが主で、これは
+   * ルートを広く取ってしまった場合に効く2枚目（README の例はポリシーをリポジトリ直下に
+   * 置くので、作業ディレクトリをルートにすると配下に入りやすい）。
+   */
+  readonly selfPaths?: readonly string[];
+}
+
 export const readAttachment = async (
   root: string,
   requested: string,
-  limits: AttachmentLimits = DEFAULT_ATTACHMENT_LIMITS,
+  options: AttachmentOptions = {},
 ): Promise<AttachmentFile> => {
+  const limits = options.limits ?? DEFAULT_ATTACHMENT_LIMITS;
   if (requested === '') {
     throw new AttachmentError('添付するファイルのパスを指定してください');
   }
@@ -168,19 +231,29 @@ export const readAttachment = async (
   });
 
   // 以降はハンドル経由。パスを再解決しない（ここが TOCTOU の境目）
-  const stat = await handle.stat();
-  if (!stat.isFile()) {
+  const info = await handle.stat();
+  if (!info.isFile()) {
     throw new AttachmentError('添付できるのは通常のファイルだけです');
   }
-  if (stat.size > limits.maxBytes) {
+
+  // **開いたハンドルそのもの**と突き合わせる。名前や拡張子では塞がない
+  // （env のパスは利用者が決めるので、`secrets.json` と名付ければ allowlist を通ってしまう）
+  const self = { dev: info.dev, ino: info.ino, path: realPath };
+  for (const denied of await identitiesOf(options.selfPaths ?? [])) {
+    if (isSameFile(self, denied)) {
+      // どのファイルだったかは書かない（設定の在り処を教えることになる）
+      throw new AttachmentError('このサーバ自身の設定ファイルは添付できません');
+    }
+  }
+  if (info.size > limits.maxBytes) {
     throw new AttachmentError(
-      `ファイルが大きすぎます（上限 ${String(limits.maxBytes)} バイト、実際 ${String(stat.size)} バイト）`,
+      `ファイルが大きすぎます（上限 ${String(limits.maxBytes)} バイト、実際 ${String(info.size)} バイト）`,
     );
   }
 
-  const bytes = new Uint8Array(stat.size);
-  const { bytesRead } = await handle.read(bytes, 0, stat.size, 0);
-  if (bytesRead !== stat.size) {
+  const bytes = new Uint8Array(info.size);
+  const { bytesRead } = await handle.read(bytes, 0, info.size, 0);
+  if (bytesRead !== info.size) {
     // 途中で切り詰められたものを黙って送らない（規約 §5.4）
     throw new AttachmentError('添付するファイルを最後まで読めませんでした');
   }

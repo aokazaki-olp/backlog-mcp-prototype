@@ -126,11 +126,14 @@ describe('readAttachment — 拡張子と中身を突き合わせる', () => {
 
 describe('readAttachment — サイズ上限', () => {
   it('上限を超えたら読まずに拒否する', async () => {
-    await assert.rejects(() => readAttachment(root, 'note.md', { maxBytes: 3 }), AttachmentError);
+    await assert.rejects(
+      () => readAttachment(root, 'note.md', { limits: { maxBytes: 3 } }),
+      AttachmentError,
+    );
   });
 
   it('上限ちょうどは通る', async () => {
-    const file = await readAttachment(root, 'data.csv', { maxBytes: 1024 });
+    const file = await readAttachment(root, 'data.csv', { limits: { maxBytes: 1024 } });
 
     assert.ok(file.data.length > 0);
   });
@@ -145,6 +148,98 @@ describe('readAttachment — 失敗しても中身を漏らさない', () => {
       assert.ok(e instanceof AttachmentError);
       assert.doesNotMatch(e.message, /見えてはいけない/);
       assert.doesNotMatch(e.message, /secret/);
+    }
+  });
+});
+
+// ============================================================================
+// サーバ自身の設定ファイルは添付として送り出さない
+// ============================================================================
+
+/**
+ * **名前ではなく識別で拒否する。**
+ *
+ * `.env` が今たまたま塞がっているのは拡張子 allowlist に載っていないからで、設計ではない。
+ * `BACKLOG_ENV_FILE` は任意のパスを取るので、`my.env.txt` や `secrets.json` と名付ければ
+ * 拡張子では通ってしまう。**ポリシー（`.json`）はそもそも allowlist を素通りする。**
+ */
+describe('readAttachment — サーバ自身の設定ファイル', () => {
+  let selfRoot: string;
+  let policyPath: string;
+  let envPath: string;
+
+  before(() => {
+    selfRoot = mkdtempSync(join(tmpdir(), 'backlog-mcp-self-'));
+    policyPath = join(selfRoot, 'backlog-policy.json');
+    // env ファイルを .txt と名付ける。拡張子では塞げないことを示す
+    envPath = join(selfRoot, 'my.env.txt');
+    writeFileSync(policyPath, JSON.stringify({ projects: ['PROJ'] }));
+    writeFileSync(envPath, 'BACKLOG_API_KEY=encrypted:xxxx\n');
+    writeFileSync(join(selfRoot, 'note.md'), '# ふつうのファイル\n');
+    symlinkSync(policyPath, join(selfRoot, 'link-to-policy.json'));
+  });
+
+  it('拒否対象を渡さなければポリシーは添付できてしまう（穴の再現）', async () => {
+    const file = await readAttachment(selfRoot, 'backlog-policy.json');
+
+    assert.equal(file.contentType, 'application/json');
+  });
+
+  it('ポリシーファイルを拒否する', async () => {
+    await assert.rejects(
+      () => readAttachment(selfRoot, 'backlog-policy.json', { selfPaths: [policyPath] }),
+      AttachmentError,
+    );
+  });
+
+  it('拡張子を変えた env ファイルも拒否する（名前で塞いでいない証拠）', async () => {
+    await assert.rejects(
+      () => readAttachment(selfRoot, 'my.env.txt', { selfPaths: [envPath] }),
+      AttachmentError,
+    );
+  });
+
+  it('symlink で別名から指しても拒否する', async () => {
+    await assert.rejects(
+      () => readAttachment(selfRoot, 'link-to-policy.json', { selfPaths: [policyPath] }),
+      AttachmentError,
+    );
+  });
+
+  it('拒否対象を symlink 経由で渡しても実体で照合する', async () => {
+    await assert.rejects(
+      () =>
+        readAttachment(selfRoot, 'backlog-policy.json', {
+          selfPaths: [join(selfRoot, 'link-to-policy.json')],
+        }),
+      AttachmentError,
+    );
+  });
+
+  it('関係ないファイルは通る（拒否が広がっていない）', async () => {
+    const file = await readAttachment(selfRoot, 'note.md', {
+      selfPaths: [policyPath, envPath],
+    });
+
+    assert.equal(file.filename, 'note.md');
+  });
+
+  it('存在しない拒否対象があっても落ちない（網が狭くなるだけ）', async () => {
+    const file = await readAttachment(selfRoot, 'note.md', {
+      selfPaths: [join(selfRoot, 'nonexistent.json'), policyPath],
+    });
+
+    assert.equal(file.filename, 'note.md');
+  });
+
+  it('エラーはどのファイルだったかを書かない（設定の在り処を教えない）', async () => {
+    try {
+      await readAttachment(selfRoot, 'backlog-policy.json', { selfPaths: [policyPath] });
+      assert.fail('拒否されるべき');
+    } catch (e) {
+      assert.ok(e instanceof AttachmentError);
+      assert.doesNotMatch(e.message, /backlog-policy|\.env|my\.env/);
+      assert.match(e.message, /設定ファイル/);
     }
   });
 });
