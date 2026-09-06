@@ -61,7 +61,8 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/projects/103/statuses': [{ id: 1, name: '未対応' }],
   '/projects/103/categories': [],
   '/projects/103/versions': [],
-  '/projects/103/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
+  // ログイン名を持たないユーザー（実データで確認。`userId: null` は珍しくない）
+  '/projects/103/users': [{ id: 11, userId: null, name: '田中' }],
 };
 
 const makeGateway = (
@@ -1768,6 +1769,13 @@ describe('planToolCall — list_project_masters', () => {
       { name: '山田太郎', loginName: 'yamada' },
       { name: '鈴木', loginName: 'suzuki' },
     ]);
+  });
+
+  it('ログイン名を持たない参加者も候補に出る', () => {
+    // INFRA の参加者は userId を持たない想定にしてある
+    const result = mastersOf('INFRA');
+
+    assert.deepEqual(result['assignees'], [{ name: '田中' }]);
   });
 
   it('read だけのプロジェクトでも引ける', () => {

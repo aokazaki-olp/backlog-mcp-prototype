@@ -241,6 +241,30 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
     assert.equal(project.versionIds.get('いますぐ'), 3);
   });
 
+  it('ログイン名を持たないユーザーも1件として並べる', async () => {
+    // 実データで確認: userId が null のユーザーは珍しくない
+    const masters = await resolveMasters(
+      makeFetcher({
+        ...projectMasterResponses,
+        '/projects/151/users': [
+          { id: 2644217, userId: '*hKXgXDllj6', name: 'てすと' },
+          { id: 2644215, userId: null, name: '岡崎 有寛' },
+        ],
+      }),
+      ['PROJ'],
+    );
+    const project = projectMastersOf(masters, 'PROJ');
+
+    // 一覧から落とすと「指定できるのに候補に見えない」状態になる
+    assert.deepEqual(project.members, [
+      { name: 'てすと', loginName: '*hKXgXDllj6' },
+      { name: '岡崎 有寛' },
+    ]);
+    // 表示名では引ける（ログイン名が無いだけで担当者にはできる）
+    assert.equal(project.userIds.get('岡崎 有寛'), 2644215);
+    assert.equal(project.userIds.get('てすと'), 2644217);
+  });
+
   it('担当者は表示名でもログイン名でも引ける', async () => {
     const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ']);
     const project = projectMastersOf(masters, 'PROJ');

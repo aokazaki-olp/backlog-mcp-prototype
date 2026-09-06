@@ -71,8 +71,13 @@ export interface ProjectMasters {
 export interface ProjectMember {
   /** 表示名。**一意とは限らない**（同名は `ambiguousUserNames` に入る）。 */
   readonly name: string;
-  /** ログイン名（Backlog の `userId`）。一意。 */
-  readonly loginName: string;
+  /**
+   * ログイン名（Backlog の `userId`）。一意。
+   *
+   * **省略される**（`userId: null` のユーザーが実在する。実データで確認）。
+   * 「無いことはキーが無いことで表す」約束に揃えてある。
+   */
+  readonly loginName?: string;
 }
 
 // ============================================================================
@@ -147,11 +152,20 @@ const toUserIds = (
     }
     byName.set(item.name, item.id);
 
-    // ログイン名は一意。表示名が曖昧でも、こちらでは必ず指せる
-    if (isRecord(item) && typeof item['userId'] === 'string' && item['userId'] !== '') {
-      result.set(item['userId'], item.id);
-      members.push(Object.freeze({ name: item.name, loginName: item['userId'] }));
+    // ログイン名は一意。表示名が曖昧でも、こちらでは必ず指せる。
+    // **ただし全員が持つとは限らない**（実データで `userId: null` のユーザーを確認）
+    const loginName =
+      isRecord(item) && typeof item['userId'] === 'string' && item['userId'] !== ''
+        ? item['userId']
+        : undefined;
+    if (loginName !== undefined) {
+      result.set(loginName, item.id);
     }
+    // ログイン名の有無にかかわらず1件。持たない人を一覧から落とすと、
+    // **指定できるのに候補に見えない**（表示名では引ける）
+    members.push(
+      Object.freeze(loginName === undefined ? { name: item.name } : { name: item.name, loginName }),
+    );
   }
 
   for (const [name, id] of byName) {
