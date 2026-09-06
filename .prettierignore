@@ -4,7 +4,8 @@
 node_modules/
 dist/
 
-# 生成物 — Backlog API ドキュメントのミラー（tools/backlog-docs で再生成する）
+# 生成物 — 外部ドキュメントのミラー
+# Backlog API は tools/backlog-docs、MCP 仕様は tools/mcp-docs で再生成する。
 docs/reference/
 
 # 借り物 — 正本は aokazaki-olp/coding-rules

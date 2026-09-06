@@ -1,0 +1,137 @@
+/docs/2025-06-18/develop/build-client.md	Build an MCP client	Get started building your own client that can integrate with all MCP servers.
+/docs/2025-06-18/develop/build-server.md	Build an MCP server	Get started building your own server to use in Claude for Desktop and other clients.
+/docs/2025-06-18/develop/build-with-agent-skills.md	Build with Agent Skills	Use agent skills to guide AI coding assistants through MCP server design and implementation
+/docs/2025-06-18/develop/clients/client-best-practices.md	Client Best Practices	Patterns for scaling MCP host applications across many servers and tools.
+/docs/2025-06-18/develop/connect-local-servers.md	Connect to local MCP servers	Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations
+/docs/2025-06-18/develop/connect-remote-servers.md	Connect to remote MCP Servers	Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources
+/docs/2025-06-18/getting-started/intro.md	What is the Model Context Protocol (MCP)?	
+/docs/2025-06-18/learn/architecture.md	Architecture overview	
+/docs/2025-06-18/learn/client-concepts.md	Understanding MCP clients	
+/docs/2025-06-18/learn/server-concepts.md	Understanding MCP servers	
+/docs/2025-06-18/learn/versioning.md	Versioning	
+/docs/2025-06-18/sdk.md	SDKs	Official SDKs for building with Model Context Protocol
+/docs/2025-06-18/tools/debugging.md	Debugging	A comprehensive guide to debugging Model Context Protocol (MCP) integrations
+/docs/2025-06-18/tools/inspector.md	MCP Inspector	In-depth guide to using the MCP Inspector for testing and debugging Model Context Protocol servers
+/docs/2025-06-18/tutorials/security/authorization.md	Understanding Authorization in MCP	Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations
+/docs/2025-06-18/tutorials/security/security_best_practices.md	Security Best Practices	Security considerations, attack vectors, and best practices for MCP implementations
+/docs/2025-11-25/develop/build-client.md	Build an MCP client	Get started building your own client that can integrate with all MCP servers.
+/docs/2025-11-25/develop/build-server.md	Build an MCP server	Get started building your own server to use in Claude for Desktop and other clients.
+/docs/2025-11-25/develop/build-with-agent-skills.md	Build with Agent Skills	Use agent skills to guide AI coding assistants through MCP server design and implementation
+/docs/2025-11-25/develop/clients/client-best-practices.md	Client Best Practices	Patterns for scaling MCP host applications across many servers and tools.
+/docs/2025-11-25/develop/connect-local-servers.md	Connect to local MCP servers	Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations
+/docs/2025-11-25/develop/connect-remote-servers.md	Connect to remote MCP Servers	Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources
+/docs/2025-11-25/getting-started/intro.md	What is the Model Context Protocol (MCP)?	
+/docs/2025-11-25/learn/architecture.md	Architecture overview	
+/docs/2025-11-25/learn/client-concepts.md	Understanding MCP clients	
+/docs/2025-11-25/learn/server-concepts.md	Understanding MCP servers	
+/docs/2025-11-25/learn/versioning.md	Versioning	
+/docs/2025-11-25/sdk.md	SDKs	Official SDKs for building with Model Context Protocol
+/docs/2025-11-25/tools/debugging.md	Debugging	A comprehensive guide to debugging Model Context Protocol (MCP) integrations
+/docs/2025-11-25/tools/inspector.md	MCP Inspector	In-depth guide to using the MCP Inspector for testing and debugging Model Context Protocol servers
+/docs/2025-11-25/tutorials/security/authorization.md	Understanding Authorization in MCP	Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations
+/docs/2025-11-25/tutorials/security/security_best_practices.md	Security Best Practices	Security considerations, attack vectors, and best practices for MCP implementations
+/docs/2026-07-28/develop/build-client.md	Build an MCP client	Get started building your own client that can integrate with all MCP servers.
+/docs/2026-07-28/develop/build-server.md	Build an MCP server	Get started building your own server to use in Claude for Desktop and other clients.
+/docs/2026-07-28/develop/build-with-agent-skills.md	Build with Agent Skills	Use agent skills to guide AI coding assistants through MCP server design and implementation
+/docs/2026-07-28/develop/clients/client-best-practices.md	Client Best Practices	Patterns for scaling MCP host applications across many servers and tools.
+/docs/2026-07-28/develop/connect-local-servers.md	Connect to local MCP servers	Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations
+/docs/2026-07-28/develop/connect-remote-servers.md	Connect to remote MCP Servers	Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources
+/docs/2026-07-28/getting-started/intro.md	What is the Model Context Protocol (MCP)?	
+/docs/2026-07-28/learn/architecture.md	Architecture overview	
+/docs/2026-07-28/learn/client-concepts.md	Understanding MCP clients	
+/docs/2026-07-28/learn/server-concepts.md	Understanding MCP servers	
+/docs/2026-07-28/learn/versioning.md	Versioning	
+/docs/2026-07-28/sdk.md	SDKs	Official SDKs for building with Model Context Protocol
+/docs/2026-07-28/tools/debugging.md	Debugging	A comprehensive guide to debugging Model Context Protocol (MCP) integrations
+/docs/2026-07-28/tools/inspector.md	MCP Inspector	Interactive developer tooling for testing and debugging MCP servers, in the browser, on the command line, and in the terminal
+/docs/2026-07-28/tools/inspector/authorization.md	Authorization	How the MCP Inspector performs OAuth, re-authorizes mid-session, and shares tokens between its clients
+/docs/2026-07-28/tools/inspector/cli.md	CLI client	Scripting the MCP Inspector: methods, output formats, exit codes, and CI recipes
+/docs/2026-07-28/tools/inspector/configuration.md	Configuration and flags	Catalog vs. config files, which client owns which flag, and every environment variable
+/docs/2026-07-28/tools/inspector/protocol-eras.md	Protocol eras	How the Inspector negotiates legacy vs. modern MCP, and how every feature is handled between protocol eras
+/docs/2026-07-28/tools/inspector/recipes.md	Recipes	Practical guides for transports, importing configs, reviewing MCP Apps, Docker, and network hosting
+/docs/2026-07-28/tools/inspector/tui.md	TUI client	The terminal MCP Inspector: navigation, tabs, and keyboard reference
+/docs/2026-07-28/tools/inspector/web.md	Web client	A tab-by-tab walkthrough of the graphical MCP Inspector
+/docs/2026-07-28/tutorials/security/authorization.md	Understanding Authorization in MCP	Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations
+/docs/2026-07-28/tutorials/security/security_best_practices.md	Security Best Practices	Security considerations, attack vectors, and best practices for MCP implementations
+/extensions/apps/build.md	Build an MCP App	Getting started guide for building interactive UI applications with MCP Apps
+/extensions/apps/overview.md	MCP Apps	Interactive UI applications that render inside MCP hosts like Claude Desktop
+/extensions/auth/enterprise-managed-authorization.md	Enterprise-Managed Authorization	Centralized access control for MCP in enterprise environments via identity providers
+/extensions/auth/oauth-client-credentials.md	OAuth Client Credentials	Machine-to-machine authentication for MCP using the OAuth 2.0 client credentials flow
+/extensions/auth/overview.md	Authorization Extensions	Supplementary authorization mechanisms for the Model Context Protocol
+/extensions/client-matrix.md	Extension Support Matrix	Which MCP clients implement which official extensions
+/extensions/overview.md	Extensions Overview	Optional extensions to the Model Context Protocol
+/extensions/tasks/overview.md	Tasks	Asynchronous task execution for long-running MCP operations
+/specification/2025-06-18/architecture/index.md	Architecture	
+/specification/2025-06-18/basic/authorization.md	Authorization	
+/specification/2025-06-18/basic/index.md	Overview	
+/specification/2025-06-18/basic/lifecycle.md	Lifecycle	
+/specification/2025-06-18/basic/transports.md	Transports	
+/specification/2025-06-18/basic/utilities/cancellation.md	Cancellation	
+/specification/2025-06-18/basic/utilities/ping.md	Ping	
+/specification/2025-06-18/basic/utilities/progress.md	Progress	
+/specification/2025-06-18/changelog.md	Key Changes	
+/specification/2025-06-18/client/elicitation.md	Elicitation	
+/specification/2025-06-18/client/roots.md	Roots	
+/specification/2025-06-18/client/sampling.md	Sampling	
+/specification/2025-06-18/index.md	Specification	
+/specification/2025-06-18/schema.md	Schema Reference	
+/specification/2025-06-18/server/index.md	Overview	
+/specification/2025-06-18/server/prompts.md	Prompts	
+/specification/2025-06-18/server/resources.md	Resources	
+/specification/2025-06-18/server/tools.md	Tools	
+/specification/2025-06-18/server/utilities/completion.md	Completion	
+/specification/2025-06-18/server/utilities/logging.md	Logging	
+/specification/2025-06-18/server/utilities/pagination.md	Pagination	
+/specification/2025-11-25/architecture/index.md	Architecture	
+/specification/2025-11-25/basic/authorization.md	Authorization	
+/specification/2025-11-25/basic/index.md	Overview	
+/specification/2025-11-25/basic/lifecycle.md	Lifecycle	
+/specification/2025-11-25/basic/transports.md	Transports	
+/specification/2025-11-25/basic/utilities/cancellation.md	Cancellation	
+/specification/2025-11-25/basic/utilities/ping.md	Ping	
+/specification/2025-11-25/basic/utilities/progress.md	Progress	
+/specification/2025-11-25/basic/utilities/tasks.md	Tasks	
+/specification/2025-11-25/changelog.md	Key Changes	
+/specification/2025-11-25/client/elicitation.md	Elicitation	
+/specification/2025-11-25/client/roots.md	Roots	
+/specification/2025-11-25/client/sampling.md	Sampling	
+/specification/2025-11-25/index.md	Specification	
+/specification/2025-11-25/schema.md	Schema Reference	
+/specification/2025-11-25/server/index.md	Overview	
+/specification/2025-11-25/server/prompts.md	Prompts	
+/specification/2025-11-25/server/resources.md	Resources	
+/specification/2025-11-25/server/tools.md	Tools	
+/specification/2025-11-25/server/utilities/completion.md	Completion	
+/specification/2025-11-25/server/utilities/logging.md	Logging	
+/specification/2025-11-25/server/utilities/pagination.md	Pagination	
+/specification/2026-07-28/architecture/index.md	Architecture	
+/specification/2026-07-28/basic/authorization/authorization-server-discovery.md	Authorization Server Discovery	
+/specification/2026-07-28/basic/authorization/client-registration.md	Client Registration	
+/specification/2026-07-28/basic/authorization/index.md	Authorization	
+/specification/2026-07-28/basic/authorization/security-considerations.md	Authorization Security Considerations	
+/specification/2026-07-28/basic/index.md	Overview	
+/specification/2026-07-28/basic/patterns/cancellation.md	Cancellation	
+/specification/2026-07-28/basic/patterns/index.md	Overview	
+/specification/2026-07-28/basic/patterns/mrtr.md	Multi Round-Trip Requests	
+/specification/2026-07-28/basic/patterns/progress.md	Progress	
+/specification/2026-07-28/basic/patterns/subscriptions.md	Subscriptions	
+/specification/2026-07-28/basic/transports/index.md	Overview	
+/specification/2026-07-28/basic/transports/stdio.md	stdio	
+/specification/2026-07-28/basic/transports/streamable-http.md	Streamable HTTP	
+/specification/2026-07-28/basic/versioning.md	Versioning and Compatibility	
+/specification/2026-07-28/changelog.md	Key Changes	
+/specification/2026-07-28/client/elicitation.md	Elicitation	
+/specification/2026-07-28/client/roots.md	Roots	
+/specification/2026-07-28/client/sampling.md	Sampling	
+/specification/2026-07-28/deprecated.md	Deprecated Features	
+/specification/2026-07-28/index.md	Specification	
+/specification/2026-07-28/schema.md	Schema Reference	
+/specification/2026-07-28/server/discover.md	Discovery	
+/specification/2026-07-28/server/index.md	Overview	
+/specification/2026-07-28/server/prompts.md	Prompts	
+/specification/2026-07-28/server/resources.md	Resources	
+/specification/2026-07-28/server/tools.md	Tools	
+/specification/2026-07-28/server/utilities/caching.md	Caching	
+/specification/2026-07-28/server/utilities/completion.md	Completion	
+/specification/2026-07-28/server/utilities/logging.md	Logging	
+/specification/2026-07-28/server/utilities/pagination.md	Pagination	
