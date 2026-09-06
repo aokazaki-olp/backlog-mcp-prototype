@@ -18,6 +18,10 @@ CODING_RULES.md
 # 借り物 — ミラー生成スクリプト
 tools/
 
+# 借り物 — 正本は aokazaki-olp/backlog-mcp の _tmp/borrowed（ローカル編集禁止）
+# `_review/` 直下の自作ノートは対象のまま残す。
+_review/borrowed/
+
 # 借り物 — 正本は aokazaki-olp/libraries（ローカル編集禁止）
 src/libs/
 
