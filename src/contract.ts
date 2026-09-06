@@ -56,6 +56,7 @@ export const TOOL_NAMES = [
   'list_project_masters',
   'create_wiki_page',
   'update_wiki_page',
+  'list_related_issues',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -196,6 +197,15 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: '指定できる名前の一覧を取得する',
     description:
       'プロジェクトで使える状態・課題種別・カテゴリー・マイルストーン・担当者と、スペース共通の優先度・完了理由の名前を返す。課題の作成・更新・検索でこれらを名前で指定する前に引く。',
+    readOnly: true,
+  },
+  list_related_issues: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'key',
+    title: '関連課題の一覧を取得する',
+    description:
+      '課題キー（例: PROJ-123）を指定して、その課題に設定されている関連課題を取得する。子課題や依存関係を辿るのに使う。',
     readOnly: true,
   },
   create_wiki_page: {

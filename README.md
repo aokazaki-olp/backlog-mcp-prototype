@@ -192,6 +192,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `list_project_masters`      | issue     | read         |
 | `get_issue`                 | issue     | read         |
 | `get_issue_comments`        | issue     | read         |
+| `list_related_issues`       | issue     | read         |
 | `add_issue_comment`         | issue     | comment      |
 | `create_issue`              | issue     | write        |
 | `update_issue`              | issue     | write        |
@@ -211,6 +212,11 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `list_project_activities`   | activity  | read         |
 
 `tools/list` に載るのはポリシーが許可したものだけだが、**一覧に出さないことは防御ではない**（クライアントは任意の名前で `tools/call` できる）ので、ハンドラ側でも必ず確認する。
+
+**PR の差分・コミットは読めない。マージ・クローズもできない。** どちらも **Backlog API に
+エンドポイントが存在しない**（152本を確認）。`GET .../pullRequests/:number` で分かるのは
+`base` / `branch` / `summary` / `description` とコメントだけで、`PATCH` のパラメータにも
+`status` が無い。**サーバの欠落ではなく API 側の制約**なので、ここは埋められない。
 
 **行ごとのレビューコメントは作れない。** Backlog のプルリクエストコメント API のパラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけで、ファイル名も行番号も position も無い（ミラーで確認）。1レビュー = 1コメントとして、本文に `src/main.ts:42` の形で参照を書く。
 
@@ -238,6 +244,27 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 `childIssueSummary`（`{ total, closed }`）は **`GET /issues`（一覧）でしか返らず、`expand[]` で要求しないと応答に含まれない**（仕様で確認。実スペースでも、送らなければキー自体が無いことを確認した）。`get_issue`（単体）に `expand[]` は無い。
 
 数値2つなので `<untrusted>` で囲まない。**子のいない課題にも `{ total: 0, closed: 0 }` が付く**ので、`total` が 0 なら項目ごと出さない（件数と名前の配列と同じ約束）。`hasParent` と両方出るので、中間階層の課題（親でも子でもある）が一覧で見分けられる。
+
+### 打ち切ったら「あと何件か」も返す
+
+`search_issues` は**本体と件数を並列に2本投げる**。`GET /issues/count` は `GET /issues` と同じ
+絞り込みパラメータ一式を取るので、同じ `query` をそのまま渡せる（**並び順・件数・`offset`・
+`expand[]` は渡さない** — 渡すと「該当件数」ではなく「取得件数」になる）。
+
+`total` は打ち切っていなくても返す。`offset` を指定すると `items.length` と一致しないため。
+
+これを表現するために `PlannedCall` に `kind: 'both'` を足してある。`chain`（応答から次を決める）
+とは別の形で、**互いに依存しない2本**を並列に投げて合成する。
+
+### 子課題として作る・関連課題を辿る
+
+`POST /issues` の `parentIssueId` は数値だが、**`parentIssueKey: "PROJ-123"` を受けてサーバ内で
+解決する**（`create_pull_request` の `relatedIssueKey` と同じ形）。**親課題の側もポリシーで確認する**
+ので、許可されていないプロジェクトの課題を親にはできない。
+
+`list_related_issues` は `GET /issues/:issueIdOrKey/relatedIssues` で、**課題キーで叩ける**
+（数値 ID が要らない）。応答は課題オブジェクトの配列なので課題と同じ形に整形する。`type` は
+現在つねに `RELATES` なので落とす。
 
 ### 書き込みも名前で受ける
 
@@ -353,11 +380,7 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 
 **ユーザーオブジェクトは `name` しか出さない。** Backlog のユーザーは `id` / `userId` / `name` / `roleType` / `lang` / `nulabAccount` / `mailAddress` / `lastLoginTime` を持ち、`assignee` / `createdUser` / `updatedUser` / `stars[].presenter` / `notifications[].user` すべてが同じ形。**出力へ載せる経路を1つ（`pickName`）に限る**ことで担保していて、テストで固定してある。
 
-### `customFields` は「値が入っている件数」だけ返す
-
-**素の件数では意味を成さない。** `customFields` は**プロジェクトで定義されている属性を、値の有無に
-かかわらず全部並べる**ので、配列の長さは定義数であり、どの課題でも同じ値になる。未設定は
-`value: null`、リスト型の未選択は `[]`。**値が入っているものだけ数える**（0 なら項目ごと出さない）。
+### `customFields` は名前 → 値で返す
 
 要素の形は**仕様書から決められなかった唯一の項目**だった（応答例8箇所すべてが `[]`）。実データで
 確認済み（2026-09-06）。
@@ -371,9 +394,26 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 }
 ```
 
-**中身を返すかは別の判断として残している。** 属性名は要素の `name` に直接入っており、リスト型の値も
-ID ではなく `{ id, name }` だった（仕様書の「リスト=値のID」は**送信側**の話で、応答には当てはまらない）。
-**定義の起動時解決は要らない。** 返す段になったら、要素の `id` とリスト項目の `id` の両方を落とすこと。
+**属性名は要素の `name` に直接入っており、リスト型の値も ID ではなく `{ id, name }`**（仕様書の
+「リスト=値のID」は**送信側**の話で、応答には当てはまらない）。したがって**定義の起動時解決は
+要らない**。要素の `id` とリスト項目の `id` は両方落とす。
+
+値の読み方は**形で決める**。囲むかどうかだけ `fieldTypeId` を見る。
+
+| 実データの形                      | 返すもの                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| 文字列（文字列型・文章型）        | **囲む**。利用者の自由記述なので `description` と同じ扱い                      |
+| 文字列（日付型 `fieldTypeId: 4`） | そのまま。形が決まっている                                                     |
+| 数値                              | そのまま                                                                       |
+| `{ id, name }` / その配列         | `name` だけ。**選択肢は管理者が定義したもの**なので囲まない（`status` と同型） |
+
+**未知の `fieldTypeId` で文字列が来たら囲む側へ倒す。** 第三者が書けるか分からないものを素通しする
+より、余分に囲むほうが安全側。
+
+**`customFieldCount` も残している。** これは**値が入っている件数**で、`customFields` に並ぶのは
+**読めたものだけ**。数が合わなければ取りこぼしがあったと分かる（黙って消さない）。素の配列長を
+使わないのは、`customFields` が**定義されている属性を値の有無にかかわらず全部並べる**ため —
+長さは定義数であり、どの課題でも同じ値になる。未設定は `value: null`、リスト型の未選択は `[]`。
 
 ## プロンプトインジェクションについて
 

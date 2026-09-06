@@ -92,6 +92,15 @@ export type PlannedCall =
       readonly kind: 'chain';
       readonly request: ResolvedRequest;
       readonly next: (raw: unknown) => PlannedCall;
+    }
+  | {
+      /**
+       * **独立した2本を並列に投げて合成する。** `chain` は「応答から次を決める」形なので、
+       * 「本体と件数を同時に引く」ような**互いに依存しない2本**を表現できない。
+       */
+      readonly kind: 'both';
+      readonly requests: readonly [ResolvedRequest, ResolvedRequest];
+      readonly shape: (first: unknown, second: unknown) => unknown;
     };
 
 /**
@@ -485,6 +494,86 @@ const hasCustomFieldValue = (value: unknown): boolean =>
   value != null && !(Array.isArray(value) && value.length === 0);
 
 /**
+ * カスタム属性の**日付型**（`fieldTypeId`）。文字列で来るが自由記述ではないので囲まない。
+ *
+ * 対応表は `add-custom-field.md` にある（1 文字列 / 2 文章 / 3 数値 / 4 日付 /
+ * 5 単一リスト / 6 複数リスト / 7 チェックボックス / 8 ラジオ）。**使うのはこの1つだけ** —
+ * 他は値の形で読めるうえ、**未知の型番号が来たときに「囲む側」へ倒したい**ため。
+ */
+const CUSTOM_FIELD_DATE = 4;
+
+/**
+ * カスタム属性の値を1つ読む。**読めない形は返さない**（推測で埋めない。規約 §4.6）。
+ *
+ * | 実データの形 | 返すもの |
+ * | --- | --- |
+ * | 文字列（文字列型・文章型） | **囲む**。利用者の自由記述なので `description` と同じ扱い |
+ * | 文字列（日付型） | そのまま。形が決まっている |
+ * | 数値 | そのまま |
+ * | `{ id, name }` | `name` だけ。**選択肢は管理者が定義したもの**なので囲まない（`status` と同型） |
+ * | `{ id, name }` の配列 | `name` の配列 |
+ *
+ * **`id` は要素にもリスト項目にも入っているが、どちらも落とす**（原則4）。
+ *
+ * 未知の `fieldTypeId` で文字列が来たら**囲む側へ倒す** — 第三者が書けるかどうか分からない
+ * ものを素通しするより、余分に囲むほうが安全側。
+ */
+const pickCustomFieldValue = (
+  item: Record<string, unknown>,
+  wrap: (text: string, name: string) => string,
+): unknown => {
+  const value = item['value'];
+  const name = pickString(item['name']) ?? '(名前なし)';
+
+  if (typeof value === 'string') {
+    return pickNumber(item['fieldTypeId']) === CUSTOM_FIELD_DATE ? value : wrap(value, name);
+  }
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (isRecord(value)) {
+    return pickString(value['name']);
+  }
+  if (Array.isArray(value)) {
+    // pickNames は空配列を undefined にする。読めないのと同じ扱いでよい
+    return pickNames(value);
+  }
+  return undefined;
+};
+
+/**
+ * カスタム属性を**名前 → 値**の形で返す。値が入っていないものは並べない。
+ *
+ * 要素の形は**仕様書からは決まらなかった唯一の項目**で、実データで確定した（応答例8箇所が
+ * すべて `[]` だった）。**属性名は要素の `name` に直接入っており、リスト型の値も ID ではなく
+ * `{ id, name }`** — 仕様書の「リスト=値のID」は送信側の話で、応答には当てはまらない。
+ * したがって**定義の起動時解決は要らない**。
+ *
+ * 読めなかったものは黙って消えるが、`customFieldCount`（値が入っている件数）と件数が
+ * 合わなくなるので**取りこぼしが見える**（規約 §5.4）。
+ */
+const pickCustomFields = (
+  value: unknown,
+  wrap: (text: string, name: string) => string,
+): Record<string, unknown> | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const result: Record<string, unknown> = {};
+  for (const item of value) {
+    if (!isRecord(item) || !hasCustomFieldValue(item['value'])) {
+      continue;
+    }
+    const name = pickString(item['name']);
+    const shaped = pickCustomFieldValue(item, wrap);
+    if (name !== undefined && shaped !== undefined) {
+      result[name] = shaped;
+    }
+  }
+  return Object.keys(result).length === 0 ? undefined : result;
+};
+
+/**
  * **値が入っている**カスタム属性の件数。空なら `undefined`（キーごと出さない）。
  *
  * `countOf` を使えないのは、`customFields` が**定義されている属性を値の有無に
@@ -571,8 +660,14 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     // 連番 ID は落とすが、「子課題である」事実は残す
     hasParent: pickNumber(raw['parentIssueId']) !== undefined,
     attachmentCount: countOf(raw['attachments']),
-    // 中身は出さない。値が入っている数だけ伝える（定義数ではない）
+    // 件数は中身と両方返す。読めなかった要素があると数が合わなくなり、取りこぼしが見える
     customFieldCount: filledCustomFieldCount(raw['customFields']),
+    customFields: pickCustomFields(raw['customFields'], (text, name) =>
+      wrapUntrusted(text, {
+        source: { subject: `backlog:issue:${issueKey}`, name, field: 'customField' },
+        maxLength: limits.maxTextLength,
+      }),
+    ),
     createdUser: pickName(raw['createdUser']),
     created: pickString(raw['created']),
     updatedUser: pickName(raw['updatedUser']),
@@ -877,22 +972,38 @@ const findWikiId = (raw: unknown, name: string): number => {
   throw new Error(`Wiki ページ「${name}」が見つかりません`);
 };
 
-/** 打ち切った事実を必ず出力に載せる（規約 §5.4）。 */
+/**
+ * 打ち切った事実を必ず出力に載せる（規約 §5.4）。
+ *
+ * `total`（絞り込みに該当する全件数）を渡せると、**「あと何件か」が分かる**。
+ * `offset` を指定したときは打ち切っていなくても `items.length` と一致しないので、
+ * 分かるなら常に載せる。
+ */
 const listPayload = (
   items: readonly unknown[],
   truncated: boolean,
   maxCount: number,
-): Record<string, unknown> =>
-  truncated
-    ? { items, truncated: true, note: `上限 ${String(maxCount)} 件で打ち切りました` }
-    : { items };
+  total?: number,
+): Record<string, unknown> => ({
+  items,
+  total,
+  truncated: truncated ? true : undefined,
+  note: truncated
+    ? `上限 ${String(maxCount)} 件で打ち切りました${total === undefined ? '' : `（該当 ${String(total)} 件）`}`
+    : undefined,
+});
+
+/** `GET /issues/count` の応答から件数を取る。読めなければ載せない（推測で埋めない）。 */
+const pickTotal = (raw: unknown): number | undefined =>
+  isRecord(raw) ? pickNumber(raw['count']) : undefined;
 
 // ============================================================================
 // 各ツール
 // ============================================================================
 
 /**
- * `relatedIssueKey` が指定されていれば、**課題キーを ID に直してから**本体を送る。
+ * `relatedIssueKey` / `parentIssueKey` が指定されていれば、**課題キーを ID に直してから**
+ * 本体を送る。どちらも Backlog 側は数値 ID を要求するが、LLM には触らせない（原則4）。
  *
  * `issueId` は数値なので、そのまま受けると原則4（数値 ID を LLM に触らせない）に反する。
  * 課題キーで受けて `GET /issues/:issueKey` の応答から `id` を採る（Wiki の名前 → ID と同じ形）。
@@ -901,17 +1012,23 @@ const listPayload = (
  * プロジェクトでも同じツールが許可されていなければ拒否**される。Backlog 自体はもっと緩いが、
  * **ポリシーが覆っていないプロジェクトへ読みに行かない**方を採る。
  */
-const withRelatedIssue = (
+const ISSUE_KEY_ARGS = {
+  relatedIssueKey: '関連課題',
+  parentIssueKey: '親課題',
+} as const;
+
+const withResolvedIssueId = (
   context: PlanContext,
   toolName: ToolName,
   args: Record<string, unknown>,
+  argName: keyof typeof ISSUE_KEY_ARGS,
   send: (issueId?: number) => PlannedCall,
 ): PlannedCall => {
-  const relatedIssueKey = optionalString(args, 'relatedIssueKey');
-  if (relatedIssueKey === undefined) {
+  const given = optionalString(args, argName);
+  if (given === undefined) {
     return send();
   }
-  const { issueKey } = resolveIssueKey(context, toolName, relatedIssueKey);
+  const { issueKey } = resolveIssueKey(context, toolName, given);
   return {
     kind: 'chain',
     request: { endpoint: `/issues/${issueKey}`, method: 'GET' },
@@ -919,7 +1036,7 @@ const withRelatedIssue = (
       const id = isRecord(raw) ? pickNumber(raw['id']) : undefined;
       if (id === undefined) {
         // 関連づけたつもりで付いていない、を作らない（規約 §5.4）
-        throw new Error(`関連課題 ${issueKey} の ID を受け取れませんでした`);
+        throw new Error(`${ISSUE_KEY_ARGS[argName]} ${issueKey} の ID を受け取れませんでした`);
       }
       return send(id);
     },
@@ -999,22 +1116,15 @@ export const planToolCall = (
         args['projectKey'] === undefined || args['projectKey'] === null
           ? undefined
           : resolveProjectKey(context, toolName, args);
+      // 絞り込みだけを持つ。件数の取得（GET /issues/count）へも同じものを渡すため、
+      // 並び順・件数・offset・expand とは分けて組み立てる
       const query: Record<string, unknown> = {
         'projectId[]': narrowed === undefined ? scoped : [narrowed.projectId],
-        // 要求しないと応答に入らない。一覧にしか無い項目（仕様で確認）
-        'expand[]': ['childIssueSummary'],
-        count: probeCount(count),
-        sort: optionalEnum(args, 'sort', SORT_KEYS) ?? 'updated',
-        order: optionalEnum(args, 'order', ORDER_KEYS) ?? 'desc',
       };
 
       const keyword = optionalString(args, 'keyword');
       if (keyword !== undefined) {
         query['keyword'] = keyword;
-      }
-      const offset = optionalOffset(args, 'offset');
-      if (offset !== undefined) {
-        query['offset'] = offset;
       }
       for (const name of ['dueDateSince', 'dueDateUntil'] as const) {
         const value = optionalDate(args, name);
@@ -1063,15 +1173,34 @@ export const planToolCall = (
         );
       }
 
+      const offset = optionalOffset(args, 'offset');
       return {
-        kind: 'send',
-        request: { endpoint: '/issues', method: 'GET', query },
-        shape: raw => {
+        // 件数は同じ絞り込みで別途引く。「あと何件あるか」を言えるようにするため（§5.4）
+        kind: 'both',
+        requests: [
+          {
+            endpoint: '/issues',
+            method: 'GET',
+            query: {
+              ...query,
+              // 要求しないと応答に入らない。一覧にしか無い項目（仕様で確認）
+              'expand[]': ['childIssueSummary'],
+              count: probeCount(count),
+              sort: optionalEnum(args, 'sort', SORT_KEYS) ?? 'updated',
+              order: optionalEnum(args, 'order', ORDER_KEYS) ?? 'desc',
+              ...(offset === undefined ? {} : { offset }),
+            },
+          },
+          // count / offset / sort は渡さない。渡すと「該当件数」ではなく「取得件数」になる
+          { endpoint: '/issues/count', method: 'GET', query },
+        ],
+        shape: (raw, counted) => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues'), count);
           return listPayload(
             items.map(item => shapeIssue(item, limits)),
             truncated,
             count,
+            pickTotal(counted),
           );
         },
       };
@@ -1100,6 +1229,28 @@ export const planToolCall = (
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/comments'), count);
           return listPayload(
             items.map(item => shapeComment(item, `backlog:issue:${issueKey}`, limits)),
+            truncated,
+            count,
+          );
+        },
+      };
+    }
+
+    case 'list_related_issues': {
+      const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
+      const count = boundedCount(args, limits);
+      // 件数の絞り込みパラメータが無いエンドポイントなので、打ち切りはこちらで行う
+      return {
+        kind: 'send',
+        request: { endpoint: `/issues/${issueKey}/relatedIssues`, method: 'GET' },
+        shape: raw => {
+          const { items, truncated } = limitCount(
+            asArray(raw, 'GET /issues/*/relatedIssues'),
+            count,
+          );
+          // 応答は課題オブジェクトの配列。`type` は現在つねに RELATES なので落とす
+          return listPayload(
+            items.map(item => shapeIssue(item, limits)),
             truncated,
             count,
           );
@@ -1459,17 +1610,26 @@ export const planToolCall = (
       );
       putSchedule(form, args);
 
-      const post = (attachmentId?: number): PlannedCall => ({
+      const post = (attachmentId?: number, parentIssueId?: number): PlannedCall => ({
         kind: 'send',
         // notifiedUserId は載せない。LLM に通知先を決めさせない
         request: {
           endpoint: '/issues',
           method: 'POST',
-          form: attachmentId === undefined ? form : { ...form, 'attachmentId[]': attachmentId },
+          form: {
+            ...form,
+            ...(attachmentId === undefined ? {} : { 'attachmentId[]': attachmentId }),
+            ...(parentIssueId === undefined ? {} : { parentIssueId }),
+          },
         },
         shape: raw => shapeIssue(raw, limits),
       });
-      return withOptionalAttachment(context, args, post);
+      // 添付（2手）→ 親課題の解決（1手）→ 本体、で最長4手。MAX_HOPS の内側
+      return withOptionalAttachment(context, args, attachmentId =>
+        withResolvedIssueId(context, toolName, args, 'parentIssueKey', parentIssueId =>
+          post(attachmentId, parentIssueId),
+        ),
+      );
     }
 
     case 'update_issue': {
@@ -1545,7 +1705,7 @@ export const planToolCall = (
 
       const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests`;
       const post = (attachmentId?: number): PlannedCall =>
-        withRelatedIssue(context, toolName, args, issueId => ({
+        withResolvedIssueId(context, toolName, args, 'relatedIssueKey', issueId => ({
           kind: 'send',
           // notifiedUserId は載せない。LLM に通知先を決めさせない
           request: {
@@ -1591,7 +1751,7 @@ export const planToolCall = (
       const source = `backlog:pr:${projectKey}/${repository}#${String(number)}`;
       const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}`;
       const post = (attachmentId?: number): PlannedCall =>
-        withRelatedIssue(context, toolName, args, issueId => ({
+        withResolvedIssueId(context, toolName, args, 'relatedIssueKey', issueId => ({
           kind: 'send',
           request: {
             endpoint,
@@ -1693,6 +1853,14 @@ const runTool = async (
       }
       planned = planned.next(await read(root, planned.localPath));
       continue;
+    }
+    if (planned.kind === 'both') {
+      // 互いに独立なので並列に投げる（規約 §5.3）
+      const [first, second] = await Promise.all([
+        sendRequest(context, planned.requests[0]),
+        sendRequest(context, planned.requests[1]),
+      ]);
+      return planned.shape(first, second);
     }
     const raw = await sendRequest(context, planned.request);
     if (planned.kind === 'send') {
@@ -1805,6 +1973,15 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
     additionalProperties: false,
   },
   get_issue_comments: {
+    type: 'object',
+    properties: {
+      issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
+      count: COUNT_PROPERTY,
+    },
+    required: ['issueKey'],
+    additionalProperties: false,
+  },
+  list_related_issues: {
     type: 'object',
     properties: {
       issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
@@ -1946,6 +2123,11 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       assignee: NAMED_PROPERTIES.assignee,
       category: NAMED_PROPERTIES.category,
       milestone: NAMED_PROPERTIES.milestone,
+      parentIssueKey: {
+        type: 'string',
+        description:
+          '親課題の課題キー（例: PROJ-123）。指定すると子課題として作成する。数値 ID は不可',
+      },
       ...SCHEDULE_PROPERTIES,
       file: FILE_PROPERTY,
     },

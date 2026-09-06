@@ -50,6 +50,8 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/api/v2/projects/102/categories': [],
   '/api/v2/projects/102/versions': [],
   '/api/v2/projects/102/users': [{ id: 9, userId: 'sato', name: '佐藤' }],
+  '/api/v2/issues/count': { count: 42 },
+  '/api/v2/issues/PROJ-1/relatedIssues': [{ issueKey: 'PROJ-2', summary: '関連する課題' }],
   '/api/v2/documents': [
     {
       id: 'abc',
@@ -84,13 +86,29 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   },
 };
 
+/**
+ * 同じパスでもメソッドで応答の形が違うもの。
+ *
+ * `/issues` は GET なら課題の配列、POST なら作成した1件を返す。
+ */
+const BY_METHOD: Record<string, Record<string, unknown>> = {
+  '/api/v2/issues': {
+    GET: [{ id: 777, issueKey: 'PROJ-1', summary: '一覧の課題' }],
+  },
+};
+
 const makeTransport = (): Transport & { readonly urls: string[] } => {
   const urls: string[] = [];
   return {
     urls,
-    fetch(url): Promise<RawResponse> {
+    fetch(url, options): Promise<RawResponse> {
       urls.push(url);
       const path = new URL(url).pathname;
+      const method = options?.method ?? 'GET';
+      const byMethod = BY_METHOD[path]?.[method];
+      if (byMethod !== undefined) {
+        return Promise.resolve({ status: 200, headers: {}, body: byMethod, text: '' });
+      }
       if (!(path in MASTER_RESPONSES)) {
         return Promise.reject(
           new HttpError('HTTPエラー 404', 404, { message: 'not found' }, {}, ''),
@@ -594,6 +612,35 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
     assert.deepEqual(toolPaths(urls), ['/api/v2/wikis', '/api/v2/wikis', '/api/v2/wikis/112']);
   });
 
+  it('search_issues は本体と件数の2本を投げ、total を返す', async () => {
+    const { written, urls } = await run([
+      request(1, 'tools/call', { name: 'search_issues', arguments: {} }),
+    ]);
+
+    assert.deepEqual(toolPaths(urls).toSorted(), ['/api/v2/issues', '/api/v2/issues/count']);
+    const text =
+      (JSON.parse(written[0] ?? '{}') as { result: { content: { text: string }[] } }).result
+        .content[0]?.text ?? '';
+    assert.match(text, /"total": 42/);
+  });
+
+  it('list_related_issues が配線されている', async () => {
+    const { written } = await run([
+      request(1, 'tools/call', {
+        name: 'list_related_issues',
+        arguments: { issueKey: 'PROJ-1' },
+      }),
+    ]);
+
+    const result = (
+      JSON.parse(written[0] ?? '{}') as {
+        result: { isError?: boolean; content: { text: string }[] };
+      }
+    ).result;
+    assert.equal(result.isError, undefined);
+    assert.match(result.content[0]?.text ?? '', /PROJ-2/);
+  });
+
   it('list_project_masters は API に行かず、名前だけを返す', async () => {
     const { written, urls } = await run([
       request(1, 'tools/call', {
@@ -623,7 +670,7 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
       }
     ).result.tools;
 
-    assert.equal(tools.length, 21);
+    assert.equal(tools.length, 22);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
     }

@@ -97,7 +97,24 @@ const requestOf = (planned: PlannedCall): ResolvedRequest => {
   if (planned.kind === 'attach' || planned.kind === 'none') {
     assert.fail('このツールは1本のリクエストを組み立てるはず');
   }
-  return planned.request;
+  // 2本投げるツールは1本目（本体）を見る
+  return planned.kind === 'both' ? planned.requests[0] : planned.request;
+};
+
+/** 2本投げるツールの両方を見るとき用。 */
+const bothOf = (
+  context: PlanContext,
+  toolName: ToolName,
+  args: Record<string, unknown>,
+): {
+  readonly requests: readonly [ResolvedRequest, ResolvedRequest];
+  readonly shape: (first: unknown, second: unknown) => unknown;
+} => {
+  const planned = planToolCall(context, toolName, args);
+  if (planned.kind !== 'both') {
+    assert.fail(`${toolName} は2本投げるはず`);
+  }
+  return planned;
 };
 
 /** 組み立てたリクエストだけを見るとき用。 */
@@ -114,6 +131,10 @@ const shapeOf = (
   args: Record<string, unknown>,
 ): ((raw: unknown) => unknown) => {
   const planned = planToolCall(context, toolName, args);
+  if (planned.kind === 'both') {
+    // 件数は別のテストで見る。ここでは本体の shape だけを使う
+    return raw => planned.shape(raw, undefined);
+  }
   if (planned.kind !== 'send') {
     assert.fail(`${toolName} は1往復で終わるはず`);
   }
@@ -757,20 +778,26 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     assert.equal(shaped['hasParent'], false);
   });
 
-  it('customFields は中身を出さず、件数だけ返す', () => {
+  it('customFields は名前 → 値で返し、件数も添える', () => {
     const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
     const shaped = shape({
       ...MIRROR_ISSUE,
       customFields: [
-        { id: 1, name: '対応環境', value: 'Windows 8' },
-        { id: 2, name: '重要度', value: 7 },
+        { id: 1, fieldTypeId: 1, name: '対応環境', value: 'Windows 8' },
+        { id: 2, fieldTypeId: 3, name: '重要度', value: 7 },
       ],
     }) as Record<string, unknown>;
+    const fields = shaped['customFields'] as Record<string, unknown>;
 
     assert.equal(shaped['customFieldCount'], 2);
-    assert.equal(Object.keys(shaped).includes('customFields'), false);
-    // 中身は読んでいないので、値も名前も出ない
-    assert.doesNotMatch(JSON.stringify(shaped), /対応環境|Windows 8|重要度/);
+    assert.deepEqual(Object.keys(fields), ['対応環境', '重要度']);
+    // 数値はそのまま。文字列は自由記述なので囲む
+    assert.equal(fields['重要度'], 7);
+    assert.match(
+      String(fields['対応環境']),
+      /<untrusted source="backlog:issue:PROJ-1:対応環境:customField"/,
+    );
+    assert.match(String(fields['対応環境']), /Windows 8/);
   });
 
   it('カスタム属性が無ければ件数ごと出さない（0 を全課題に載せない）', () => {
@@ -843,11 +870,50 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     );
   });
 
-  it('値が入っていても中身は出さない', () => {
+  it('型ごとに値の読み方を変え、id は1つも出さない', () => {
     const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
     const shaped = shape({ ...MIRROR_ISSUE, customFields: CUSTOM_FIELDS_FILLED });
+    const fields = (shaped as Record<string, unknown>)['customFields'] as Record<string, unknown>;
 
-    assert.doesNotMatch(JSON.stringify(shaped), /選択リスト|692819|displayOrder|2026-09-25/);
+    // リスト型は name だけ。選択肢は管理者が定義したものなので囲まない
+    assert.deepEqual(fields['選択リスト'], ['b']);
+    assert.equal(fields['数値'], 2);
+    // 日付型は文字列だが自由記述ではないので囲まない
+    assert.equal(fields['日付'], '2026-09-25T00:00:00Z');
+    // 文字列型・文章型は囲む
+    assert.match(String(fields['文字列']), /<untrusted source=/);
+    assert.match(String(fields['文章']), /bb\ncc/);
+
+    // 要素の id もリスト項目の id も displayOrder も出さない（原則4）
+    const json = JSON.stringify(shaped);
+    assert.doesNotMatch(json, /692819|692816|displayOrder|fieldTypeId/);
+  });
+
+  it('読めない形は返さない（推測で埋めない）', () => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    const shaped = shape({
+      ...MIRROR_ISSUE,
+      customFields: [
+        { id: 1, fieldTypeId: 1, name: '読める', value: 'x' },
+        { id: 2, fieldTypeId: 99, name: '読めない', value: { foo: 'bar' } },
+      ],
+    }) as Record<string, unknown>;
+    const fields = shaped['customFields'] as Record<string, unknown>;
+
+    assert.deepEqual(Object.keys(fields), ['読める']);
+    // 件数は 2 のままなので、取りこぼしが見える（規約 §5.4）
+    assert.equal(shaped['customFieldCount'], 2);
+  });
+
+  it('未知の型番号の文字列は囲む側へ倒す', () => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    const shaped = shape({
+      ...MIRROR_ISSUE,
+      customFields: [{ id: 1, fieldTypeId: 99, name: '未知', value: '第三者が書いたかもしれない' }],
+    }) as Record<string, unknown>;
+    const fields = shaped['customFields'] as Record<string, unknown>;
+
+    assert.match(String(fields['未知']), /<untrusted source=/);
   });
 
   it('id 系・sharedFiles・stars を落とす', () => {
@@ -1516,6 +1582,152 @@ describe('planToolCall — create_document', () => {
     const record = shaped as Record<string, unknown>;
     assert.match(String(record['title']), /<untrusted source="backlog:document:/);
     assert.doesNotMatch(JSON.stringify(shaped), /019b4e27b88b7cc4ae16d72c3de62299/);
+  });
+});
+
+describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
+  it('本体と件数の2本を組み立て、絞り込みは同じで並び順は本体だけ', () => {
+    const { requests } = bothOf(contextOf(), 'search_issues', {
+      keyword: 'バグ',
+      sort: 'dueDate',
+      offset: 20,
+    });
+    const [list, counted] = requests;
+
+    assert.equal(list.endpoint, '/issues');
+    assert.equal(counted.endpoint, '/issues/count');
+    // 絞り込みは両方に載る
+    assert.equal(list.query?.['keyword'], 'バグ');
+    assert.equal(counted.query?.['keyword'], 'バグ');
+    assert.deepEqual(counted.query['projectId[]'], list.query['projectId[]']);
+    // 並び順・件数・offset・expand は本体だけ（渡すと「該当件数」でなくなる）
+    for (const name of ['sort', 'order', 'count', 'offset', 'expand[]']) {
+      assert.equal(name in counted.query, false, `${name} が件数側に載っている`);
+    }
+  });
+
+  it('打ち切ったときに「あと何件か」が分かる', () => {
+    const { shape } = bothOf(contextOf(), 'search_issues', { count: 2 });
+    const payload = shape([MIRROR_ISSUE, MIRROR_ISSUE, MIRROR_ISSUE], { count: 57 }) as Record<
+      string,
+      unknown
+    >;
+
+    assert.equal(payload['truncated'], true);
+    assert.equal(payload['total'], 57);
+    assert.match(String(payload['note']), /該当 57 件/);
+  });
+
+  it('打ち切っていなくても total は載せる（offset を使うと件数と一致しない）', () => {
+    const { shape } = bothOf(contextOf(), 'search_issues', { offset: 12 });
+    const payload = shape([MIRROR_ISSUE], { count: 16 }) as Record<string, unknown>;
+
+    assert.equal(payload['total'], 16);
+    assert.equal(payload['truncated'], undefined);
+    assert.equal(payload['note'], undefined);
+  });
+
+  it('件数の応答が読めなければ total を載せない（推測で埋めない）', () => {
+    const { shape } = bothOf(contextOf(), 'search_issues', {});
+
+    for (const bad of [undefined, {}, { count: 'いっぱい' }, []]) {
+      const payload = shape([MIRROR_ISSUE], bad) as Record<string, unknown>;
+      assert.equal(payload['total'], undefined);
+    }
+  });
+});
+
+describe('planToolCall — list_related_issues', () => {
+  it('課題キーでパスを組み立てる', () => {
+    const request = planRequest(contextOf(), 'list_related_issues', { issueKey: 'PROJ-1' });
+
+    assert.equal(request.endpoint, '/issues/PROJ-1/relatedIssues');
+    assert.equal(request.method, 'GET');
+  });
+
+  it('許可外のプロジェクトは API 到達前に拒否する', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'list_related_issues', { issueKey: 'OTHER-1' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('応答は課題として整形する（数値 ID は出ない）', () => {
+    const shape = shapeOf(contextOf(), 'list_related_issues', { issueKey: 'PROJ-1' });
+    const payload = shape([{ ...MIRROR_ISSUE, type: 'RELATES' }]) as {
+      items: Record<string, unknown>[];
+    };
+
+    assert.equal(payload.items[0]?.['issueKey'], 'PROJ-1');
+    // 関連の種類は現在つねに RELATES なので落とす
+    assert.doesNotMatch(JSON.stringify(payload), /RELATES/);
+  });
+});
+
+describe('planToolCall — 子課題として作成する', () => {
+  it('parentIssueKey は課題キーで受けて ID に直す', () => {
+    const planned = planToolCall(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '子課題',
+      issueType: 'バグ',
+      priority: '高',
+      parentIssueKey: 'PROJ-1',
+      // 引数に parentIssueId を混ぜても組み立てに使う口が無い
+      parentIssueId: 999,
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('親課題の解決で1手増えるはず');
+    }
+
+    assert.equal(planned.request.endpoint, '/issues/PROJ-1');
+    const second = requestOf(planned.next({ id: 4321 }));
+    assert.equal(second.form?.['parentIssueId'], 4321);
+    assert.doesNotMatch(JSON.stringify(second), /999/);
+  });
+
+  it('親課題のプロジェクトもポリシーで確認する', () => {
+    for (const parentIssueKey of ['OTHER-1', 'SALES-1']) {
+      assert.throws(
+        () =>
+          planToolCall(contextOf(), 'create_issue', {
+            projectKey: 'PROJ',
+            summary: '子課題',
+            issueType: 'バグ',
+            priority: '高',
+            parentIssueKey,
+          }),
+        ScopeDeniedError,
+        `${parentIssueKey} が通ってしまう`,
+      );
+    }
+  });
+
+  it('親課題の応答に id が無ければ送出する（付いていないのに成功にしない）', () => {
+    const planned = planToolCall(contextOf(), 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '子課題',
+      issueType: 'バグ',
+      priority: '高',
+      parentIssueKey: 'PROJ-1',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.throws(() => planned.next({}), /親課題 PROJ-1/);
+  });
+
+  it('添付と親課題を両方指定しても上限に達しない', () => {
+    const planned = planToolCall({ ...contextOf(), attachmentsRoot: '/allowed' }, 'create_issue', {
+      projectKey: 'PROJ',
+      summary: '子課題',
+      issueType: 'バグ',
+      priority: '高',
+      parentIssueKey: 'PROJ-1',
+      file: 'note.md',
+    });
+
+    assert.equal(planned.kind, 'attach');
   });
 });
 
