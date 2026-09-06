@@ -411,8 +411,11 @@ export class ScopeDeniedError extends Error {
 /**
  * Backlog API の呼び出しが失敗した。
  *
- * **メッセージは第三者（Backlog サーバ）が書いた文字列を含む**ので、組み立てる側が
- * `<untrusted>` で囲んでからこの型に載せる。元の例外は `cause` に残す。
+ * **メッセージは第三者（Backlog サーバ）が書いた文字列を含む**ので、`<untrusted>` で囲んでから
+ * この型に載せる。元の例外は `cause` に残す。
+ *
+ * **囲むのは gateway を包む1箇所だけ**（`tool/` 側。`runTool` は包んでいない口を持たない）。
+ * 以前は「組み立てる側が囲む」という約束にしていたが、口が増えたときに貼り忘れた。
  */
 export class ApiFailureError extends Error {
   override readonly name = 'ApiFailureError';

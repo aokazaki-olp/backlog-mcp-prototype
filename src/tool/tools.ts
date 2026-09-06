@@ -1675,13 +1675,13 @@ export const planToolCall = (
           assignees: project.members,
           priorities: [...masters.priorityIds.keys()],
           resolutions: [...masters.resolutionIds.keys()],
-          // 同名が複数いて表示名では指せないもの。黙って落とさない（規約 §5.4）
+          // 複数の人が名乗っていて指せない名前。黙って落とさない（規約 §5.4）
           ambiguousUserNames:
             project.ambiguousUserNames.size === 0 ? undefined : [...project.ambiguousUserNames],
           note:
             project.ambiguousUserNames.size === 0
               ? undefined
-              : 'ambiguousUserNames の表示名は同名が複数いるため使えません。assignees の loginName で指定してください',
+              : 'ambiguousUserNames の名前は複数の人が名乗っているため使えません。assignees の loginName で指定してください（loginName も載っている場合は、その人を名前で指す手段がありません）',
         },
       };
     }

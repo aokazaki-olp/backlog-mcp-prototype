@@ -54,11 +54,12 @@ export interface ProjectMasters {
   /**
    * 担当者の表示名・ログイン名 → id。
    *
-   * **表示名は一意ではない。** 同名が複数いるキーはここに入れず、`ambiguousUserNames` へ回す。
+   * **ここから引ける名前は必ず1人を指す。** 複数の人が名乗る名前は入れず、
+   * `ambiguousUserNames` へ回す（表示名どうしに限らない。`toUserIds` の表を見ること）。
    * 黙ってどちらかを選ばない（規約 §5.4）。
    */
   readonly userIds: ReadonlyMap<string, number>;
-  /** 表示名が重複していて引けないもの。案内のために持つ。 */
+  /** 複数の人が名乗っていて引けない名前。案内のために持つ。 */
   readonly ambiguousUserNames: ReadonlySet<string>;
   /**
    * **1人につき1件**の参加者。`userIds` は表示名とログイン名の両方をキーに持つので、
@@ -69,7 +70,7 @@ export interface ProjectMasters {
 
 /** プロジェクトの参加者1人。**数値 ID は持たない。** */
 export interface ProjectMember {
-  /** 表示名。**一意とは限らない**（同名は `ambiguousUserNames` に入る）。 */
+  /** 表示名。**一意とは限らない**（複数の人が名乗る名前は `ambiguousUserNames` に入る）。 */
   readonly name: string;
   /**
    * ログイン名（Backlog の `userId`）。一意。
@@ -121,9 +122,25 @@ const toNameToIdAllowingEmpty = (value: unknown, where: string): ReadonlyMap<str
 /**
  * プロジェクトの参加者を名前とログイン名の両方から引けるようにする。
  *
- * **表示名（`name`）は一意ではない。** 同名が2人いるとどちらを指すか決まらないので、
- * そのキーは引けなくして `ambiguousUserNames` に入れる。ログイン名（`userId`）は一意なので
- * そのまま入れる。**黙って先勝ちにしない**（規約 §5.4 — 別人に割り当てるのは静かな失敗）。
+ * **不変条件: この索引から引ける名前は、必ず1人を指す。**
+ *
+ * 表示名とログイン名を**同じ索引に入れる**ので、衝突は3通りある。
+ *
+ * | 衝突 | 例 |
+ * | --- | --- |
+ * | 表示名 × 表示名 | 同姓同名が2人 |
+ * | **ログイン名 × 表示名** | A のログイン名が B の表示名と同じ |
+ * | **ログイン名 × ログイン名** | Backlog 側で一意である可能性は高いが、**ミラーに一意性の記述が無い**（未確認） |
+ *
+ * **どれか1つを検査する形にしない。** 以前は表示名どうしだけを別の Map で数えており、
+ * 残る2つが素通りしていた（`assignee` が別人に解決される）。**名前を1つずつ「誰が名乗るか」で
+ * 数えれば、3通りとも同じ規則で落ちる。**
+ *
+ * 引けなくした名前は `ambiguousUserNames` へ回して案内する。**黙って先勝ち・後勝ちにしない**
+ * （規約 §5.4 — 別人に割り当てるのは静かな失敗）。
+ *
+ * **同じ人が同じ名前を2度名乗るのは衝突ではない**（ログイン名と表示名が同じ人）。
+ * ここを衝突扱いにすると「指せるのに候補から消える」— 実データで一度踏んだ形になる。
  */
 const toUserIds = (
   value: unknown,
@@ -137,29 +154,34 @@ const toUserIds = (
     throw new MasterDataError(`${where} の応答が配列ではありません`);
   }
 
-  const byName = new Map<string, number>();
+  /** 名前 → それを名乗る唯一の id。2人目が名乗った時点で `ambiguous` へ移す。 */
+  const claims = new Map<string, number>();
   const ambiguous = new Set<string>();
-  const result = new Map<string, number>();
   const members: ProjectMember[] = [];
+
+  /** 表示名にもログイン名にも同じ規則を当てる。**同じ人が2度名乗るのは衝突ではない。** */
+  const claim = (name: string, id: number): void => {
+    const claimed = claims.get(name);
+    if (claimed !== undefined && claimed !== id) {
+      ambiguous.add(name);
+      return;
+    }
+    claims.set(name, id);
+  };
 
   for (const item of value) {
     if (!isNamedId(item)) {
       throw new MasterDataError(`${where} の応答に { id, name } でない要素が含まれています`);
     }
-    const existing = byName.get(item.name);
-    if (existing !== undefined && existing !== item.id) {
-      ambiguous.add(item.name);
-    }
-    byName.set(item.name, item.id);
-
-    // ログイン名は一意。表示名が曖昧でも、こちらでは必ず指せる。
-    // **ただし全員が持つとは限らない**（実データで `userId: null` のユーザーを確認）
+    // ログイン名は**全員が持つとは限らない**（実データで `userId: null` のユーザーを確認）
     const loginName =
       isRecord(item) && typeof item['userId'] === 'string' && item['userId'] !== ''
         ? item['userId']
         : undefined;
+
+    claim(item.name, item.id);
     if (loginName !== undefined) {
-      result.set(loginName, item.id);
+      claim(loginName, item.id);
     }
     // ログイン名の有無にかかわらず1件。持たない人を一覧から落とすと、
     // **指定できるのに候補に見えない**（表示名では引ける）
@@ -168,7 +190,8 @@ const toUserIds = (
     );
   }
 
-  for (const [name, id] of byName) {
+  const result = new Map<string, number>();
+  for (const [name, id] of claims) {
     if (!ambiguous.has(name)) {
       result.set(name, id);
     }

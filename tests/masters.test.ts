@@ -10,6 +10,7 @@ import {
 } from '../src/domain/masters.ts';
 import type { ResolvedRequest } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
+import type { ProjectMasters } from '../src/domain/masters.ts';
 
 /**
  * プロジェクト単位のマスタは**許可プロジェクト全部**について引かれるので、個別に定義して
@@ -295,6 +296,78 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
     // ログイン名は一意なので引ける
     assert.equal(project.userIds.get('yamada'), 7);
     assert.equal(project.userIds.get('yamada2'), 8);
+  });
+
+  // --------------------------------------------------------------------------
+  // L1-4 — 引ける名前は必ず1人を指す
+  //
+  // `userIds` は表示名とログイン名を**同じ索引**に入れる。したがって衝突は3通りある
+  // （表示名×表示名／ログイン名×表示名／ログイン名×ログイン名）。守られていたのは1つ目だけ。
+  // --------------------------------------------------------------------------
+
+  const usersOf = async (users: readonly Record<string, unknown>[]): Promise<ProjectMasters> => {
+    const masters = await resolveMasters(
+      makeFetcher({ ...projectMasterResponses, '/projects/151/users': users }),
+      ['PROJ'],
+    );
+    return projectMastersOf(masters, 'PROJ');
+  };
+
+  it('表示名が他人のログイン名と衝突したら、その名前では引けない', async () => {
+    const project = await usersOf([
+      { id: 7, userId: 'sato', name: '佐藤 一郎' },
+      // 別人の表示名が、上のログイン名と同じ
+      { id: 8, userId: 'suzuki', name: 'sato' },
+    ]);
+
+    // 黙って後勝ちにすると 8（別人）に割り当てる
+    assert.equal(project.userIds.get('sato'), undefined);
+    assert.equal(project.ambiguousUserNames.has('sato'), true);
+    // 衝突していない名前はそのまま引ける
+    assert.equal(project.userIds.get('佐藤 一郎'), 7);
+    assert.equal(project.userIds.get('suzuki'), 8);
+  });
+
+  it('ログイン名が他人の表示名と衝突しても、その名前では引けない（向きを問わない）', async () => {
+    const project = await usersOf([
+      // 先に表示名として現れ、後からログイン名として現れる
+      { id: 7, userId: 'ichiro', name: 'tanaka' },
+      { id: 8, userId: 'tanaka', name: '田中 二郎' },
+    ]);
+
+    assert.equal(project.userIds.get('tanaka'), undefined);
+    assert.equal(project.ambiguousUserNames.has('tanaka'), true);
+    assert.equal(project.userIds.get('ichiro'), 7);
+    assert.equal(project.userIds.get('田中 二郎'), 8);
+  });
+
+  it('ログイン名同士が衝突しても引けない（一意性を前提にしない）', async () => {
+    // Backlog 側で一意である可能性は高いが、**ミラーに一意性の記述は無い**（未確認）。
+    // 前提が外れたときに別人へ割り当てるより、引けなくする側へ倒す
+    const project = await usersOf([
+      { id: 7, userId: 'dup', name: '一人目' },
+      { id: 8, userId: 'dup', name: '二人目' },
+    ]);
+
+    assert.equal(project.userIds.get('dup'), undefined);
+    assert.equal(project.ambiguousUserNames.has('dup'), true);
+    assert.equal(project.userIds.get('一人目'), 7);
+    assert.equal(project.userIds.get('二人目'), 8);
+  });
+
+  it('同じ人のログイン名と表示名が同じなら、衝突扱いにしない（境界）', async () => {
+    // 「指せるのに指せなくなる」を作らない。DESIGN.md §9 の2回目の事故と同型
+    const project = await usersOf([
+      { id: 7, userId: 'sato', name: 'sato' },
+      { id: 8, userId: 'suzuki', name: '鈴木' },
+    ]);
+
+    assert.equal(project.userIds.get('sato'), 7);
+    assert.equal(project.ambiguousUserNames.size, 0);
+    assert.deepEqual(project.members, [
+      { name: 'sato', loginName: 'sato' },
+      { name: '鈴木', loginName: 'suzuki' },
+    ]);
   });
 
   it('カテゴリーとバージョンは空でも起動する（定義していないプロジェクトがある）', async () => {
