@@ -73,6 +73,11 @@ export interface ToolContext extends PlanContext {
  */
 export type PlannedCall =
   | {
+      /** **API へ行かない。** 起動時に解決済みのものを返すだけのツール。 */
+      readonly kind: 'none';
+      readonly result: unknown;
+    }
+  | {
       readonly kind: 'attach';
       /** 利用者が指定したパス。**ルートの中に収まっているかは読み取り側が検証する。** */
       readonly localPath: string;
@@ -125,6 +130,22 @@ const optionalString = (args: Record<string, unknown>, name: string): string | u
 };
 
 /**
+ * 課題キーの形が合わないときの案内。**理由ごとに言い分ける。**
+ *
+ * 「数値 ID は受け付けない」と一律に返すと、小文字を書いただけの利用者が原因を
+ * 取り違える。Backlog のプロジェクトキーは大文字なので、そこを名指しする。
+ */
+const issueKeyHint = (issueKey: string): string => {
+  if (/^\d+$/.test(issueKey)) {
+    return 'issueKey には課題キー（例: PROJ-123）を指定してください。数値の課題 ID は受け付けません';
+  }
+  if (issueKey !== issueKey.toUpperCase()) {
+    return `issueKey のプロジェクトキーは大文字です（例: ${issueKey.toUpperCase()}）`;
+  }
+  return 'issueKey には「プロジェクトキー-番号」の形（例: PROJ-123）を指定してください';
+};
+
+/**
  * 課題キーからプロジェクトキーを取り出し、ポリシーに照らす。
  *
  * **API へ到達する前に弾く**（種別 A のエンドポイント）。数値の課題 ID は受け付けない —
@@ -137,9 +158,9 @@ const resolveIssueKey = (
 ): { readonly issueKey: string; readonly projectKey: string } => {
   const matched = ISSUE_KEY_PATTERN.exec(issueKey);
   if (matched === null) {
-    throw new TypeError(
-      `issueKey には課題キー（例: PROJ-123）を指定してください。数値の課題 ID は受け付けません`,
-    );
+    // 失敗理由を1本に畳まない。小文字を「数値 ID」と言われると、原因を取り違えて
+    // 数値 ID を疑い始める経路ができる（実データで踏んだ）
+    throw new TypeError(issueKeyHint(issueKey));
   }
   // 直前の exec が成功しているのでキャプチャは必ずある。
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- 上の null 検査で確定
@@ -222,6 +243,73 @@ const resolveProjectKey = (
   return { projectKey, projectId: toProjectId(context.masters, projectKey) };
 };
 
+/** 並び順に使える属性。**閉じた列挙**にして、`customField_${id}` を表現できなくする。 */
+const SORT_KEYS = [
+  'issueType',
+  'category',
+  'version',
+  'milestone',
+  'summary',
+  'status',
+  'priority',
+  'attachment',
+  'sharedFile',
+  'created',
+  'createdUser',
+  'updated',
+  'updatedUser',
+  'assignee',
+  'startDate',
+  'dueDate',
+  'estimatedHours',
+  'actualHours',
+  'childIssue',
+] as const;
+
+const ORDER_KEYS = ['asc', 'desc'] as const;
+
+/**
+ * 閉じた列挙から1つ受ける。**既定に落とさず送出する**（`can` / `toolset` と同じ扱い）。
+ */
+const optionalEnum = (
+  args: Record<string, unknown>,
+  name: string,
+  allowed: readonly string[],
+): string | undefined => {
+  const value = optionalString(args, name);
+  if (value === undefined) {
+    return undefined;
+  }
+  if (!allowed.includes(value)) {
+    throw new TypeError(`${name} に使えるのは ${allowed.join(' / ')} です`);
+  }
+  return value;
+};
+
+/** 0 以上の整数。取得開始位置に使う（件数の `1 以上` とは下限が違う）。 */
+const optionalOffset = (args: Record<string, unknown>, name: string): number | undefined => {
+  const value = args[name];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    throw new TypeError(`${name} には 0 以上の整数を指定してください`);
+  }
+  return value;
+};
+
+/** 真偽値を受ける。**未指定と `false` を区別する**（`false` にも意味がある引数のため）。 */
+const optionalBoolean = (args: Record<string, unknown>, name: string): boolean | undefined => {
+  const value = args[name];
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value !== 'boolean') {
+    throw new TypeError(`${name} には true または false を指定してください`);
+  }
+  return value;
+};
+
 /** `yyyy-MM-dd` だけを受ける。Backlog が受け付ける形をこちらで固定する。 */
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -265,12 +353,14 @@ const putSchedule = (form: Record<string, FormValue>, args: Record<string, unkno
 };
 
 /**
- * 名前で受けた項目を ID に直してフォームへ載せる。**指定が無ければ載せない。**
+ * 名前で受けた項目を ID に直してフォームやクエリへ載せる。**指定が無ければ載せない。**
  *
  * `update_issue` は「指定した項目だけ変える」ので、`undefined` を送らないことが要件になる。
+ * 検索の絞り込み（クエリ）でも同じ扱いをするので、載せ先は `Record<string, unknown>` で受ける。
+ * 書き込むのは `resolve` が返す `number` だけなので、`FormValue` の制約は緩まない。
  */
 const putResolved = (
-  form: Record<string, FormValue>,
+  target: Record<string, unknown>,
   key: string,
   name: string | undefined,
   resolve: (name: string) => number,
@@ -278,7 +368,7 @@ const putResolved = (
   if (name === undefined) {
     return;
   }
-  form[key] = resolve(name);
+  target[key] = resolve(name);
 };
 
 /**
@@ -362,6 +452,31 @@ const countOf = (value: unknown): number | undefined =>
   Array.isArray(value) && value.length > 0 ? value.length : undefined;
 
 /**
+ * 直下の子課題の件数。**`GET /issues` に `expand[]=childIssueSummary` を送ったときだけ**
+ * 応答に入る（仕様で確認。実スペースでも、送らなければキー自体が存在しないことを確認した）。
+ *
+ * `{ total, closed }` の**数値2つ**なので `<untrusted>` で囲まない。片方でも欠けたら
+ * 返さない — 想定と違う形を推測で埋めない（規約 §4.6）。
+ *
+ * **`total: 0` は返さない。** 子のいない課題にも `{ closed: 0, total: 0 }` が付いてくるので
+ * （実データで確認）、そのまま出すと大半の課題に無意味な 0 が並ぶ。`countOf` /
+ * `filledCustomFieldCount` と同じ「無いことはキーが無いことで表す」約束に揃える。
+ */
+const pickChildIssueSummary = (
+  value: unknown,
+): { readonly total: number; readonly closed: number } | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const total = pickNumber(value['total']);
+  const closed = pickNumber(value['closed']);
+  if (total === undefined || closed === undefined || total === 0) {
+    return undefined;
+  }
+  return { total, closed };
+};
+
+/**
  * カスタム属性に値が入っているか。
  *
  * 未設定は `value: null`、リスト型の未選択は `[]`（実データで確認）。
@@ -391,8 +506,15 @@ const filledCustomFieldCount = (value: unknown): number | undefined => {
  * 推測できる。返した値が別の操作への入口にならないようにする（Electron が
  * `IpcRendererEvent` を渡すなと言うのと同型）。
  *
- * **項目はミラーの応答例から決めている**（`docs/reference/api/v2/get-issue.md`。
- * 一覧は `childIssueSummary` が1つ増えるだけで同じ形）。実データではなく仕様で決まる。
+ * **項目はミラーの応答例から決めている**（`docs/reference/api/v2/get-issue.md`）。
+ * 実データではなく仕様で決まる。
+ *
+ * **`childIssueSummary` は一覧でしか返らない。** `expand[]` は `GET /issues` にしか無く
+ * （`get-issue.md` に記述が無い）、しかも要求しないと応答に含まれない。単体取得では
+ * 項目が来ないので `undefined` になって出力から落ちる — 分岐は要らない。
+ *
+ * `hasParent` と `childIssues` の両方が出るので、中間階層の課題（親でも子でもある）が
+ * 一覧で見分けられる。実スペースで3階層を作って確認した。
  *
  * | 扱い | 項目 |
  * | --- | --- |
@@ -428,7 +550,7 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     });
   const summary = pickString(raw['summary']);
   const description = pickString(raw['description']);
-  const childIssueSummary = pickString(raw['childIssueSummary']);
+  const childIssues = pickChildIssueSummary(raw['childIssueSummary']);
 
   return {
     issueKey,
@@ -456,8 +578,8 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     updatedUser: pickName(raw['updatedUser']),
     updated: pickString(raw['updated']),
     description: description === undefined ? undefined : wrap(description, 'description'),
-    childIssueSummary:
-      childIssueSummary === undefined ? undefined : wrap(childIssueSummary, 'childIssueSummary'),
+    // 数値2つなので囲まない（第三者が書けるテキストではない）
+    childIssues,
   };
 };
 
@@ -871,17 +993,76 @@ export const planToolCall = (
   switch (toolName) {
     case 'search_issues': {
       const count = boundedCount(args, limits);
-      // projectId はポリシー由来。引数から受け取る口を作っていない。
+      // projectId はポリシー由来。引数で広げる口は無く、projectKey は「絞る」方向にしか効かない
+      const scoped = scopedProjectIds(context, toolName);
+      const narrowed =
+        args['projectKey'] === undefined || args['projectKey'] === null
+          ? undefined
+          : resolveProjectKey(context, toolName, args);
       const query: Record<string, unknown> = {
-        'projectId[]': scopedProjectIds(context, toolName),
+        'projectId[]': narrowed === undefined ? scoped : [narrowed.projectId],
+        // 要求しないと応答に入らない。一覧にしか無い項目（仕様で確認）
+        'expand[]': ['childIssueSummary'],
         count: probeCount(count),
-        sort: 'updated',
-        order: 'desc',
+        sort: optionalEnum(args, 'sort', SORT_KEYS) ?? 'updated',
+        order: optionalEnum(args, 'order', ORDER_KEYS) ?? 'desc',
       };
+
       const keyword = optionalString(args, 'keyword');
       if (keyword !== undefined) {
         query['keyword'] = keyword;
       }
+      const offset = optionalOffset(args, 'offset');
+      if (offset !== undefined) {
+        query['offset'] = offset;
+      }
+      for (const name of ['dueDateSince', 'dueDateUntil'] as const) {
+        const value = optionalDate(args, name);
+        if (value !== undefined) {
+          query[name] = value;
+        }
+      }
+      // 仕様上 hasDueDate=true はエラーになる。`true` を送る形を表現できなくしてある
+      if (optionalBoolean(args, 'noDueDate') === true) {
+        query['hasDueDate'] = false;
+      }
+      // 優先度はスペース共通のマスタなので projectKey が要らない
+      putResolved(query, 'priorityId[]', optionalString(args, 'priority'), name =>
+        lookupName(masters.priorityIds, name, '優先度'),
+      );
+      if (optionalBoolean(args, 'assignedToMe') === true) {
+        query['assigneeId[]'] = masters.myUserId;
+      }
+
+      // 状態・種別・カテゴリー・マイルストーン・担当者は**プロジェクトごとに ID が違う**。
+      // 跨いで名前を引くと曖昧になるので、projectKey を要求する（絞る方向なので原則1は保たれる）
+      const byName = ['status', 'issueType', 'category', 'milestone', 'assignee'] as const;
+      const named = byName.filter(name => optionalString(args, name) !== undefined);
+      if (named.length > 0) {
+        if (narrowed === undefined) {
+          throw new TypeError(
+            `${named.join(' / ')} で絞るときは projectKey も指定してください` +
+              '（状態や種別の名前はプロジェクトごとに違うため）',
+          );
+        }
+        const project = projectMastersOf(masters, narrowed.projectKey);
+        putResolved(query, 'statusId[]', optionalString(args, 'status'), name =>
+          lookupName(project.statusIds, name, '状態'),
+        );
+        putResolved(query, 'issueTypeId[]', optionalString(args, 'issueType'), name =>
+          lookupName(project.issueTypeIds, name, '課題種別'),
+        );
+        putResolved(query, 'categoryId[]', optionalString(args, 'category'), name =>
+          lookupName(project.categoryIds, name, 'カテゴリー'),
+        );
+        putResolved(query, 'milestoneId[]', optionalString(args, 'milestone'), name =>
+          lookupName(project.versionIds, name, 'マイルストーン'),
+        );
+        putResolved(query, 'assigneeId[]', optionalString(args, 'assignee'), name =>
+          resolveAssignee(project, name),
+        );
+      }
+
       return {
         kind: 'send',
         request: { endpoint: '/issues', method: 'GET', query },
@@ -1137,6 +1318,31 @@ export const planToolCall = (
         kind: 'send',
         request: { endpoint: '/documents', method: 'POST', form },
         shape: raw => shapeDocument(raw, limits),
+      };
+    }
+
+    case 'list_project_masters': {
+      const { projectKey } = resolveProjectKey(context, toolName, args);
+      const project = projectMastersOf(masters, projectKey);
+      // 起動時に解決済み。API へは行かない
+      return {
+        kind: 'none',
+        result: {
+          statuses: [...project.statusIds.keys()],
+          issueTypes: [...project.issueTypeIds.keys()],
+          categories: [...project.categoryIds.keys()],
+          milestones: [...project.versionIds.keys()],
+          assignees: [...project.userIds.keys()],
+          priorities: [...masters.priorityIds.keys()],
+          resolutions: [...masters.resolutionIds.keys()],
+          // 同名が複数いて表示名では指せないもの。黙って落とさない（規約 §5.4）
+          ambiguousUserNames:
+            project.ambiguousUserNames.size === 0 ? undefined : [...project.ambiguousUserNames],
+          note:
+            project.ambiguousUserNames.size === 0
+              ? undefined
+              : 'ambiguousUserNames の表示名は同名が複数いるため使えません。assignees に並ぶログイン名で指定してください',
+        },
       };
     }
 
@@ -1417,6 +1623,9 @@ const runTool = async (
   let planned = planToolCall(context, toolName, args);
 
   for (let hop = 0; hop < MAX_HOPS; hop++) {
+    if (planned.kind === 'none') {
+      return planned.result;
+    }
     if (planned.kind === 'attach') {
       const root = context.attachmentsRoot;
       if (root == null) {
@@ -1501,6 +1710,32 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
     type: 'object',
     properties: {
       keyword: { type: 'string', description: '検索キーワード' },
+      projectKey: {
+        type: 'string',
+        description:
+          '1つのプロジェクトに絞る。省略すると許可された全プロジェクトが対象。' +
+          'status / issueType / category / milestone / assignee で絞るときは必須',
+      },
+      status: NAMED_PROPERTIES.status,
+      issueType: NAMED_PROPERTIES.issueType,
+      category: NAMED_PROPERTIES.category,
+      milestone: NAMED_PROPERTIES.milestone,
+      assignee: NAMED_PROPERTIES.assignee,
+      assignedToMe: {
+        type: 'boolean',
+        description: 'true で自分が担当の課題だけに絞る。projectKey は不要',
+      },
+      priority: NAMED_PROPERTIES.priority,
+      dueDateSince: { type: 'string', description: '期限日の範囲の開始（yyyy-MM-dd）' },
+      dueDateUntil: { type: 'string', description: '期限日の範囲の終了（yyyy-MM-dd）' },
+      noDueDate: { type: 'boolean', description: 'true で期限日が設定されていない課題だけに絞る' },
+      sort: {
+        type: 'string',
+        enum: [...SORT_KEYS],
+        description: '並び順に使う属性。既定は updated',
+      },
+      order: { type: 'string', enum: [...ORDER_KEYS], description: '並び順。既定は desc' },
+      offset: { type: 'integer', minimum: 0, description: '取得開始位置。既定は 0' },
       count: COUNT_PROPERTY,
     },
     additionalProperties: false,
@@ -1575,6 +1810,12 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       content: { type: 'string', description: 'ドキュメントの本文（Markdown）' },
     },
     required: ['projectKey', 'title', 'content'],
+    additionalProperties: false,
+  },
+  list_project_masters: {
+    type: 'object',
+    properties: { projectKey: PROJECT_KEY_PROPERTY },
+    required: ['projectKey'],
     additionalProperties: false,
   },
   list_project_activities: {

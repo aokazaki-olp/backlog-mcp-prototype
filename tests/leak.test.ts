@@ -36,6 +36,12 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/api/v2/priorities': [{ id: 2, name: '高' }],
   '/api/v2/resolutions': [{ id: 0, name: '対応済み' }],
   '/api/v2/users/myself': { id: 42 },
+  // プロジェクト単位のマスタは許可プロジェクト全部について引かれる
+  '/api/v2/projects/101/issueTypes': [{ id: 1, name: 'バグ' }],
+  '/api/v2/projects/101/statuses': [{ id: 1, name: '未対応' }],
+  '/api/v2/projects/101/categories': [],
+  '/api/v2/projects/101/versions': [],
+  '/api/v2/projects/101/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
 };
 
 /** マスタ解決だけ成功させ、ツールの呼び出しでは `fail` を投げる Transport。 */

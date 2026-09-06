@@ -83,12 +83,17 @@ describe('GET /projects に all=true を送らない', () => {
 
   it('起動時のマスタ解決を通しても付かない', async () => {
     const transport = makeTransport();
-    // マスタ解決は4本叩くので、エンドポイントごとに応答を出し分ける
+    // マスタ解決はスペース直下4本 + プロジェクト単位5本を叩くので、応答を出し分ける
     const responses: Record<string, unknown> = {
       '/api/v2/projects': [{ id: 101, projectKey: 'PROJ' }],
       '/api/v2/priorities': [{ id: 2, name: '高' }],
       '/api/v2/resolutions': [{ id: 0, name: '対応済み' }],
       '/api/v2/users/myself': { id: 42 },
+      '/api/v2/projects/101/issueTypes': [{ id: 1, name: 'バグ' }],
+      '/api/v2/projects/101/statuses': [{ id: 1, name: '未対応' }],
+      '/api/v2/projects/101/categories': [],
+      '/api/v2/projects/101/versions': [],
+      '/api/v2/projects/101/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
     };
     const routing: Transport & { readonly calls: Call[] } = {
       calls: transport.calls,

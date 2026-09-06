@@ -44,6 +44,12 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/api/v2/projects/101/categories': [],
   '/api/v2/projects/101/versions': [],
   '/api/v2/projects/101/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
+  // SALES も許可プロジェクトなので、プロジェクト単位のマスタが引かれる
+  '/api/v2/projects/102/issueTypes': [{ id: 21, name: '問い合わせ' }],
+  '/api/v2/projects/102/statuses': [{ id: 1, name: '未対応' }],
+  '/api/v2/projects/102/categories': [],
+  '/api/v2/projects/102/versions': [],
+  '/api/v2/projects/102/users': [{ id: 9, userId: 'sato', name: '佐藤' }],
   '/api/v2/documents': [
     {
       id: 'abc',
@@ -102,6 +108,19 @@ interface Run {
 }
 
 /** env を組み立て、行を流し込み、書き出された行と監査ログを返す。 */
+/**
+ * 起動時のマスタ解決で叩くパス。スペース直下4本 + プロジェクトごと5本。
+ *
+ * ツール由来の呼び出しだけを見たいテストのために、ここを除く（件数で数えると
+ * 許可プロジェクトを増やしたときに全部ずれる）。
+ */
+const STARTUP_PATH =
+  /^\/api\/v2\/(projects|priorities|resolutions|users\/myself|projects\/\d+\/(issueTypes|statuses|categories|versions|users))$/;
+
+/** ツール由来の呼び出しのパスだけを取り出す。 */
+const toolPaths = (urls: readonly string[]): string[] =>
+  urls.map(url => new URL(url).pathname).filter(path => !STARTUP_PATH.test(path));
+
 const run = async (
   lines: readonly string[],
   policy: unknown = { projects: ['PROJ'] },
@@ -213,11 +232,8 @@ describe('サーバ1本の通し — 初期化からツール呼び出しまで'
       }),
     ]);
 
-    // 起動時のマスタ解決4本のあとに、一覧 → 本文の順で2本
-    assert.deepEqual(
-      urls.slice(4).map(url => new URL(url).pathname),
-      ['/api/v2/wikis', '/api/v2/wikis/112'],
-    );
+    // 一覧 → 本文の順で2本（起動時のマスタ解決は除く）
+    assert.deepEqual(toolPaths(urls), ['/api/v2/wikis', '/api/v2/wikis/112']);
 
     const text =
       (JSON.parse(written[0] ?? '{}') as { result: { content: { text: string }[] } }).result
@@ -246,8 +262,8 @@ describe('サーバ1本の通し — 初期化からツール呼び出しまで'
 
     const result = (JSON.parse(written[0] ?? '{}') as { result: { isError?: boolean } }).result;
     assert.equal(result.isError, true);
-    // 起動時のマスタ解決4本だけ。ツール由来の呼び出しは1件も出ていない
-    assert.equal(urls.length, 4);
+    // 起動時のマスタ解決だけ。ツール由来の呼び出しは1件も出ていない
+    assert.deepEqual(toolPaths(urls), []);
     assert.equal(
       urls.some(url => url.includes('OTHER')),
       false,
@@ -424,7 +440,7 @@ describe('サーバ1本の通し — 書き込み系', () => {
     assert.equal(call['issueKey'], 'PROJ-1');
   });
 
-  it('書き込みを許したプロジェクトのマスタだけを起動時に引く', async () => {
+  it('許可プロジェクト全部のマスタを起動時に引く（read だけでも引く）', async () => {
     const writable = await run([request(1, 'ping')], WRITE_POLICY);
     const readOnly = await run([request(1, 'ping')], { projects: ['PROJ'] });
 
@@ -433,8 +449,9 @@ describe('サーバ1本の通し — 書き込み系', () => {
         .map(url => new URL(url).pathname)
         .filter(path => path.startsWith('/api/v2/projects/101/'));
 
+    // 名前で絞る検索もマスタ一覧も read の操作なので、書き込みの有無で切り分けない
     assert.equal(perProject(writable.urls).length, 5);
-    assert.equal(perProject(readOnly.urls).length, 0);
+    assert.equal(perProject(readOnly.urls).length, 5);
   });
 });
 
@@ -554,6 +571,27 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
     assert.equal(call['projectKey'], 'PROJ');
   });
 
+  it('list_project_masters は API に行かず、名前だけを返す', async () => {
+    const { written, urls } = await run([
+      request(1, 'tools/call', {
+        name: 'list_project_masters',
+        arguments: { projectKey: 'PROJ' },
+      }),
+    ]);
+
+    // 起動時に解決済みのものを返すだけ。ツール由来の呼び出しは1件も出ない
+    assert.deepEqual(toolPaths(urls), []);
+
+    const text =
+      (JSON.parse(written[0] ?? '{}') as { result: { content: { text: string }[] } }).result
+        .content[0]?.text ?? '';
+    assert.match(text, /バグ/);
+    assert.match(text, /未対応/);
+    assert.match(text, /山田太郎/);
+    // 数値 ID は1つも出さない
+    assert.doesNotMatch(text, /"id"|101|"1"/);
+  });
+
   it('全ツールが tools/list に出せる（定義が壊れていない）', async () => {
     const { written } = await run([request(1, 'tools/list')], WRITE_POLICY);
     const tools = (
@@ -562,7 +600,7 @@ describe('サーバ1本の通し — 残りのツールセット', () => {
       }
     ).result.tools;
 
-    assert.equal(tools.length, 18);
+    assert.equal(tools.length, 19);
     for (const tool of tools) {
       assert.ok(tool.inputSchema, `${tool.name} の inputSchema が無い`);
     }

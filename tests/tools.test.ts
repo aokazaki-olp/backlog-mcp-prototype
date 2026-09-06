@@ -33,7 +33,7 @@ const MASTER_RESPONSES: Record<string, unknown> = {
   '/priorities': [{ id: 2, name: '高' }],
   '/resolutions': [{ id: 0, name: '対応済み' }],
   '/users/myself': { id: 42 },
-  // PROJ だけ can: write なので、プロジェクト単位のマスタもここだけ引かれる
+  // プロジェクト単位のマスタは許可プロジェクト全部について引かれる
   '/projects/101/issueTypes': [
     { id: 1, name: 'バグ' },
     { id: 2, name: 'タスク' },
@@ -48,6 +48,20 @@ const MASTER_RESPONSES: Record<string, unknown> = {
     { id: 7, userId: 'yamada', name: '山田太郎' },
     { id: 8, userId: 'suzuki', name: '鈴木' },
   ],
+  // SALES（read のみ）と INFRA（comment のみ）も引く。状態や担当者で絞るのは read の操作
+  '/projects/102/issueTypes': [{ id: 21, name: '問い合わせ' }],
+  '/projects/102/statuses': [
+    { id: 1, name: '未対応' },
+    { id: 4, name: '完了' },
+  ],
+  '/projects/102/categories': [],
+  '/projects/102/versions': [],
+  '/projects/102/users': [{ id: 9, userId: 'sato', name: '佐藤' }],
+  '/projects/103/issueTypes': [{ id: 31, name: '障害' }],
+  '/projects/103/statuses': [{ id: 1, name: '未対応' }],
+  '/projects/103/categories': [],
+  '/projects/103/versions': [],
+  '/projects/103/users': [{ id: 7, userId: 'yamada', name: '山田太郎' }],
 };
 
 const makeGateway = (
@@ -66,11 +80,7 @@ const makeGateway = (
 let masters: Masters;
 
 before(async () => {
-  masters = await resolveMasters(
-    makeGateway(MASTER_RESPONSES),
-    ['PROJ', 'SALES', 'INFRA'],
-    ['PROJ'],
-  );
+  masters = await resolveMasters(makeGateway(MASTER_RESPONSES), ['PROJ', 'SALES', 'INFRA']);
 });
 
 const contextOf = (source: unknown = POLICY_SOURCE, readOnly = false): PlanContext => ({
@@ -84,8 +94,8 @@ const contextOf = (source: unknown = POLICY_SOURCE, readOnly = false): PlanConte
  * 添付を伴わないツールを見るテストのために narrow する。
  */
 const requestOf = (planned: PlannedCall): ResolvedRequest => {
-  if (planned.kind === 'attach') {
-    assert.fail('このツールは添付を伴わないはず');
+  if (planned.kind === 'attach' || planned.kind === 'none') {
+    assert.fail('このツールは1本のリクエストを組み立てるはず');
   }
   return planned.request;
 };
@@ -126,12 +136,124 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
     const request = planRequest(contextOf(), 'search_issues', {
       projectId: 999,
       'projectId[]': [999],
-      projectKey: 'OTHER',
     });
 
     // 許可外の 999 は組み立てたリクエストのどこにも現れない
     assert.deepEqual(request.query?.['projectId[]'], [103, 101, 102]);
-    assert.doesNotMatch(JSON.stringify(request), /999|OTHER/);
+    assert.doesNotMatch(JSON.stringify(request), /999/);
+  });
+
+  it('projectKey は絞る方向にしか効かない（許可外は拒否）', () => {
+    // 許可されているキーなら1つに絞れる
+    const narrowed = planRequest(contextOf(), 'search_issues', { projectKey: 'SALES' });
+    assert.deepEqual(narrowed.query?.['projectId[]'], [102]);
+
+    // 許可外は API 到達前に拒否する
+    assert.throws(
+      () => planToolCall(contextOf(), 'search_issues', { projectKey: 'OTHER' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('名前で絞ると ID に直してクエリへ載る', () => {
+    const request = planRequest(contextOf(), 'search_issues', {
+      projectKey: 'PROJ',
+      status: '処理中',
+      issueType: 'バグ',
+      category: '開発',
+      milestone: 'v1.0',
+      assignee: '山田太郎',
+      priority: '高',
+    });
+
+    assert.equal(request.query?.['statusId[]'], 3);
+    assert.equal(request.query['issueTypeId[]'], 1);
+    assert.equal(request.query['categoryId[]'], 12);
+    assert.equal(request.query['milestoneId[]'], 3);
+    assert.equal(request.query['assigneeId[]'], 7);
+    assert.equal(request.query['priorityId[]'], 2);
+    // 名前は1つもクエリに残らない
+    assert.doesNotMatch(JSON.stringify(request.query), /処理中|バグ|開発|山田太郎/);
+  });
+
+  it('名前で絞るのに projectKey が無ければ API 到達前に送出する', () => {
+    // 状態や種別の ID はプロジェクトごとに違うので、跨いだ名前解決を許さない。
+    // クラスだけ見ると null 参照の TypeError と区別が付かないので、文言で固定する
+    assert.throws(() => planToolCall(contextOf(), 'search_issues', { status: '処理中' }), {
+      name: 'TypeError',
+      message: /status.*projectKey も指定/s,
+    });
+    assert.throws(() => planToolCall(contextOf(), 'search_issues', { assignee: '山田太郎' }), {
+      name: 'TypeError',
+      message: /assignee.*projectKey も指定/s,
+    });
+    // 複数指定したときは全部並べる
+    assert.throws(
+      () => planToolCall(contextOf(), 'search_issues', { status: '処理中', issueType: 'バグ' }),
+      { name: 'TypeError', message: /status \/ issueType/ },
+    );
+  });
+
+  it('優先度と assignedToMe は projectKey が無くても効く', () => {
+    const request = planRequest(contextOf(), 'search_issues', {
+      priority: '高',
+      assignedToMe: true,
+    });
+
+    assert.equal(request.query?.['priorityId[]'], 2);
+    // 起動時に解決した自分のユーザー ID
+    assert.equal(request.query['assigneeId[]'], 42);
+  });
+
+  it('assignedToMe が false なら assigneeId[] を送らない', () => {
+    const request = planRequest(contextOf(), 'search_issues', { assignedToMe: false });
+
+    assert.equal('assigneeId[]' in (request.query ?? {}), false);
+  });
+
+  it('noDueDate は false のときだけ hasDueDate を送る（true は API がエラーにする）', () => {
+    const on = planRequest(contextOf(), 'search_issues', { noDueDate: true });
+    const off = planRequest(contextOf(), 'search_issues', { noDueDate: false });
+
+    assert.equal(on.query?.['hasDueDate'], false);
+    // true を送る形が表現できない
+    assert.equal('hasDueDate' in (off.query ?? {}), false);
+    assert.doesNotMatch(JSON.stringify(on.query), /"hasDueDate":true/);
+  });
+
+  it('期限日は yyyy-MM-dd だけを受ける', () => {
+    const request = planRequest(contextOf(), 'search_issues', {
+      dueDateSince: '2026-09-01',
+      dueDateUntil: '2026-09-30',
+    });
+
+    assert.equal(request.query?.['dueDateSince'], '2026-09-01');
+    assert.equal(request.query['dueDateUntil'], '2026-09-30');
+    assert.throws(
+      () => planToolCall(contextOf(), 'search_issues', { dueDateSince: '2026/09/01' }),
+      TypeError,
+    );
+  });
+
+  it('sort は閉じた列挙。カスタム属性のキーは表現できない', () => {
+    const request = planRequest(contextOf(), 'search_issues', { sort: 'dueDate', order: 'asc' });
+
+    assert.equal(request.query?.['sort'], 'dueDate');
+    assert.equal(request.query['order'], 'asc');
+    assert.throws(
+      () => planToolCall(contextOf(), 'search_issues', { sort: 'customField_1' }),
+      TypeError,
+    );
+    assert.throws(() => planToolCall(contextOf(), 'search_issues', { order: 'up' }), TypeError);
+  });
+
+  it('offset は 0 以上（21件目以降へ到達できる）', () => {
+    const request = planRequest(contextOf(), 'search_issues', { offset: 20 });
+
+    assert.equal(request.query?.['offset'], 20);
+    // 未指定なら送らない
+    assert.equal('offset' in (planRequest(contextOf(), 'search_issues', {}).query ?? {}), false);
+    assert.throws(() => planToolCall(contextOf(), 'search_issues', { offset: -1 }), TypeError);
   });
 
   it('list_wiki_pages は projectKey を解決済みの projectId にして送る', () => {
@@ -641,11 +763,59 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     }
   });
 
-  it('一覧の childIssueSummary は第三者の文字列なので囲む', () => {
+  it('childIssueSummary は数値2つとして読み、囲まない', () => {
     const shape = shapeOf(contextOf(), 'search_issues', {});
-    const shaped = shape([{ ...MIRROR_ISSUE, childIssueSummary: '子課題のまとめ' }]);
+    const shaped = (
+      shape([{ ...MIRROR_ISSUE, childIssueSummary: { total: 3, closed: 1 } }]) as {
+        items: Record<string, unknown>[];
+      }
+    ).items[0];
 
-    assert.match(JSON.stringify(shaped), /backlog:issue:PROJ-1:childIssueSummary/);
+    assert.deepEqual(shaped?.['childIssues'], { total: 3, closed: 1 });
+    // 第三者が書けるテキストではないので囲まない
+    assert.doesNotMatch(JSON.stringify(shaped['childIssues']), /untrusted/);
+  });
+
+  it('childIssueSummary の形が違えば返さない（推測で埋めない）', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', {});
+    const of = (childIssueSummary: unknown): unknown =>
+      (shape([{ ...MIRROR_ISSUE, childIssueSummary }]) as { items: Record<string, unknown>[] })
+        .items[0]?.['childIssues'];
+
+    assert.equal(of({ total: 3 }), undefined);
+    assert.equal(of('子課題のまとめ'), undefined);
+    assert.equal(of(undefined), undefined);
+  });
+
+  it('子がいなければ返さない（全課題に 0 が並ばないようにする）', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', {});
+    const shaped = (
+      shape([{ ...MIRROR_ISSUE, childIssueSummary: { total: 0, closed: 0 } }]) as {
+        items: Record<string, unknown>[];
+      }
+    ).items[0];
+
+    // undefined は JSON にしたときに消える（他の任意項目と同じ扱い）
+    assert.equal(shaped?.['childIssues'], undefined);
+    assert.doesNotMatch(JSON.stringify(shaped), /childIssues/);
+  });
+
+  it('中間階層は hasParent と childIssues の両方が出る', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', {});
+    const shaped = (
+      shape([
+        { ...MIRROR_ISSUE, parentIssueId: 777, childIssueSummary: { total: 1, closed: 0 } },
+      ]) as { items: Record<string, unknown>[] }
+    ).items[0];
+
+    assert.equal(shaped?.['hasParent'], true);
+    assert.deepEqual(shaped['childIssues'], { total: 1, closed: 0 });
+  });
+
+  it('search_issues は expand[] で childIssueSummary を要求する', () => {
+    const request = planRequest(contextOf(), 'search_issues', {});
+
+    assert.deepEqual(request.query?.['expand[]'], ['childIssueSummary']);
   });
 });
 
@@ -1251,6 +1421,82 @@ describe('planToolCall — create_document', () => {
     const record = shaped as Record<string, unknown>;
     assert.match(String(record['title']), /<untrusted source="backlog:document:/);
     assert.doesNotMatch(JSON.stringify(shaped), /019b4e27b88b7cc4ae16d72c3de62299/);
+  });
+});
+
+describe('planToolCall — list_project_masters', () => {
+  /** `kind: 'none'` の結果を取り出す。API へ行かないツール用。 */
+  const mastersOf = (projectKey: string): Record<string, unknown> => {
+    const planned = planToolCall(contextOf(), 'list_project_masters', { projectKey });
+    if (planned.kind !== 'none') {
+      assert.fail('list_project_masters は API に行かないはず');
+    }
+    return planned.result as Record<string, unknown>;
+  };
+
+  it('起動時に持っている名前を返す（API へ行かない）', () => {
+    const result = mastersOf('PROJ');
+
+    assert.deepEqual(result['issueTypes'], ['バグ', 'タスク']);
+    assert.deepEqual(result['statuses'], ['未対応', '処理中']);
+    assert.deepEqual(result['categories'], ['開発']);
+    assert.deepEqual(result['milestones'], ['v1.0']);
+    assert.deepEqual(result['priorities'], ['高']);
+    assert.deepEqual(result['resolutions'], ['対応済み']);
+  });
+
+  it('数値 ID を1つも返さない（原則4）', () => {
+    const result = mastersOf('PROJ');
+
+    // 値はすべて文字列。マイルストーン名の "v1.0" のように数字を含む名前はあるので、
+    // 文字列に現れる数字ではなく「JSON の数値が出ないこと」で見る
+    for (const value of Object.values(result)) {
+      for (const name of Array.isArray(value) ? value : []) {
+        assert.equal(typeof name, 'string');
+      }
+    }
+    assert.doesNotMatch(JSON.stringify(result), /:\s*-?\d/);
+  });
+
+  it('read だけのプロジェクトでも引ける', () => {
+    const result = mastersOf('SALES');
+
+    assert.deepEqual(result['issueTypes'], ['問い合わせ']);
+    // 表示名とログイン名の両方が並ぶ
+    assert.deepEqual((result['assignees'] as string[]).toSorted(), ['sato', '佐藤']);
+  });
+
+  it('許可外のプロジェクトは拒否する', () => {
+    assert.throws(
+      () => planToolCall(contextOf(), 'list_project_masters', { projectKey: 'OTHER' }),
+      ScopeDeniedError,
+    );
+  });
+
+  it('同名で指せない表示名は理由を添えて別に返す（黙って落とさない）', () => {
+    const result = mastersOf('PROJ');
+
+    // このマスタには重複がないので出さない
+    assert.equal(result['ambiguousUserNames'], undefined);
+    assert.equal(result['note'], undefined);
+  });
+});
+
+describe('resolveIssueKey — 拒否の理由を言い分ける', () => {
+  it('小文字と数値で違う文言になる', () => {
+    const messageOf = (issueKey: string): string => {
+      try {
+        planToolCall(contextOf(), 'get_issue', { issueKey });
+      } catch (e) {
+        return Error.isError(e) ? e.message : String(e);
+      }
+      return assert.fail('送出するはず');
+    };
+
+    assert.match(messageOf('sales-1'), /大文字/);
+    assert.doesNotMatch(messageOf('sales-1'), /数値/);
+    assert.match(messageOf('12345'), /数値の課題 ID/);
+    assert.match(messageOf('PROJ_1'), /プロジェクトキー-番号/);
   });
 });
 

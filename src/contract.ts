@@ -53,6 +53,7 @@ export const TOOL_NAMES = [
   'update_pull_request',
   'add_pull_request_comment',
   'create_document',
+  'list_project_masters',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -185,6 +186,15 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキー・タイトル・本文を指定してドキュメントを作成する。本文は Markdown。Backlog に更新の API が無いので、作成したドキュメントを後から書き換えることはできない。',
     readOnly: false,
+  },
+  list_project_masters: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'filter',
+    title: '指定できる名前の一覧を取得する',
+    description:
+      'プロジェクトで使える状態・課題種別・カテゴリー・マイルストーン・担当者と、スペース共通の優先度・完了理由の名前を返す。課題の作成・更新・検索でこれらを名前で指定する前に引く。',
+    readOnly: true,
   },
   list_project_activities: {
     toolset: 'activity',

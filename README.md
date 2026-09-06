@@ -189,6 +189,7 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | ツール                      | `toolset` | 必要な `can` |
 | --------------------------- | --------- | ------------ |
 | `search_issues`             | issue     | read         |
+| `list_project_masters`      | issue     | read         |
 | `get_issue`                 | issue     | read         |
 | `get_issue_comments`        | issue     | read         |
 | `add_issue_comment`         | issue     | comment      |
@@ -211,6 +212,31 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 **行ごとのレビューコメントは作れない。** Backlog のプルリクエストコメント API のパラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけで、ファイル名も行番号も position も無い（ミラーで確認）。1レビュー = 1コメントとして、本文に `src/main.ts:42` の形で参照を書く。
 
+### 検索も名前で絞る
+
+`search_issues` はプロジェクトの絞り込みを**ポリシー由来で組み立てる**（引数で広げる口が無い）。そのうえで次を受ける。
+
+| 引数                                                           | 備考                                                  |
+| -------------------------------------------------------------- | ----------------------------------------------------- |
+| `projectKey`                                                   | 1つに絞る。**絞る方向にしか効かない**（許可外は拒否） |
+| `status` / `issueType` / `category` / `milestone` / `assignee` | 名前で受ける。**`projectKey` が必須**                 |
+| `assignedToMe`                                                 | 自分が担当のものだけ。`projectKey` は不要             |
+| `priority`                                                     | スペース共通のマスタなので `projectKey` は不要        |
+| `dueDateSince` / `dueDateUntil` / `noDueDate`                  | 期限日                                                |
+| `sort` / `order` / `offset` / `count` / `keyword`              | 並び順とページング                                    |
+
+**名前で絞るときに `projectKey` を必須にしているのは、状態や種別の ID がプロジェクトごとに違うため。** 跨いで名前を引くと曖昧になるので、単一プロジェクトへ絞らせる。`projectKey` はポリシーとの交差でしか効かないので、原則1（絞り込みはポリシー由来）は崩れない。
+
+**`noDueDate` は `true` のときだけ `hasDueDate=false` を送る。** Backlog は `hasDueDate=true` をエラーにするので（仕様に明記）、**`true` を送る形をそもそも表現できなくしてある**。
+
+**`sort` は閉じた列挙**にしてある。仕様は `customField_${id}` も受けるが、それを書けるようにすると数値 ID が引数に現れる。
+
+### 子課題の件数は `expand[]` で要求する
+
+`childIssueSummary`（`{ total, closed }`）は **`GET /issues`（一覧）でしか返らず、`expand[]` で要求しないと応答に含まれない**（仕様で確認。実スペースでも、送らなければキー自体が無いことを確認した）。`get_issue`（単体）に `expand[]` は無い。
+
+数値2つなので `<untrusted>` で囲まない。**子のいない課題にも `{ total: 0, closed: 0 }` が付く**ので、`total` が 0 なら項目ごと出さない（件数と名前の配列と同じ約束）。`hasParent` と両方出るので、中間階層の課題（親でも子でもある）が一覧で見分けられる。
+
 ### 書き込みも名前で受ける
 
 `POST /issues` の必須は `projectId` / `summary` / `issueTypeId` / `priorityId` で**すべて数値 ID**、`PATCH /issues/:issueIdOrKey` も同様。素直に作ると「数値 ID を LLM に触らせない」設計に反するので、**起動時にマスタを解決して名前で受ける**。
@@ -224,7 +250,9 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 **担当者の表示名は一意ではない。** ユーザーは `{ id, userId, name }` を持ち、`name` は表示名。**同名が2人いたら表示名では引けなくして、ログイン名（`userId`）で指すよう返す**。黙って先勝ちにすると別人に割り当てることになる。
 
-**プロジェクト単位のマスタは、`can: "write"` を許したプロジェクトだけ引く。** 種別・状態・カテゴリー・バージョン・参加者の5本を、書き込み可能なプロジェクトごとに起動時に引く（read や comment しか無いプロジェクトでは1本も引かない）。
+**プロジェクト単位のマスタは、許可プロジェクト全部について引く。** 種別・状態・カテゴリー・バージョン・参加者の5本を、プロジェクトごとに起動時に引く（並列なので、増えるのは同時実行数であって直列の待ち時間ではない）。以前は書き込みを許したプロジェクトだけに絞っていたが、**「状態で絞る」「担当者で絞る」は read の操作**なので、書き込みの有無で切り分けられない。
+
+**選べる名前は `list_project_masters` で引ける。** 名前で受ける設計は「何を書けるか分からない」という穴とセットなので、起動時に持っているものをそのまま返すツールを1本置いてある（API へは行かない）。名前だけを返し、数値 ID は返さない。同名が複数いて表示名では指せないユーザーは、理由を添えて別に返す。
 
 **載せていないもの**: `parentIssueId`（数値 ID しか受けない。親を指定するなら1往復増える）／`notifiedUserId[]`（LLM に通知先を決めさせない）。`categoryId[]` と `milestoneId[]` は**単数で受ける**（借り物がスカラーの配列を弾くため。引数が単数なので黙って減らされることはない）。
 
@@ -304,8 +332,9 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **名前で返す**   | `issueType` / `status` / `priority` / `resolution` / `assignee` / `category` / `milestone` / `versions` / `createdUser` / `updatedUser` |
 | **そのまま返す** | `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）                |
-| **囲んで返す**   | `summary` / `description` / `childIssueSummary` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）             |
+| **囲んで返す**   | `summary` / `description` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）                                   |
 | **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount` / `customFields` → `customFieldCount`（後述）                         |
+| **数値で返す**   | `childIssueSummary` → `childIssues: { total, closed }`（数値2つなので囲まない。後述）                                                   |
 | **落とす**       | `id` / `projectId` / `keyId`（連番）、`sharedFiles` / `stars`（`stars[].presenter` はユーザーオブジェクトごと入る）                     |
 
 件数と名前の配列は、**空なら項目ごと出さない**（`0` や `[]` を全課題に載せるとノイズになる）。無いことは「項目が無い」で表す。

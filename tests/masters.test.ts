@@ -11,6 +11,27 @@ import {
 import type { ResolvedRequest } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
 
+/**
+ * プロジェクト単位のマスタは**許可プロジェクト全部**について引かれるので、個別に定義して
+ * いないプロジェクトにも当たり障りのない応答を返す。ここを検証したいテストは
+ * `responses` 側で上書きする。
+ */
+const PROJECT_MASTER_FALLBACK =
+  /^\/projects\/\d+\/(issueTypes|statuses|categories|versions|users)$/;
+
+const fallbackFor = (endpoint: string): unknown => {
+  if (endpoint.endsWith('/issueTypes')) {
+    return [{ id: 1, name: 'タスク' }];
+  }
+  if (endpoint.endsWith('/statuses')) {
+    return [{ id: 1, name: '未対応' }];
+  }
+  if (endpoint.endsWith('/users')) {
+    return [{ id: 1, userId: 'admin', name: '管理者' }];
+  }
+  return [];
+};
+
 /** 呼び出しを記録するだけの gateway。Transport より上の層で差し替える。 */
 const makeFetcher = (
   responses: Record<string, unknown>,
@@ -21,6 +42,9 @@ const makeFetcher = (
     send(request) {
       calls.push(request);
       if (!(request.endpoint in responses)) {
+        if (PROJECT_MASTER_FALLBACK.test(request.endpoint)) {
+          return Promise.resolve(fallbackFor(request.endpoint));
+        }
         return Promise.reject(new Error(`未定義のエンドポイント: ${request.endpoint}`));
       }
       return Promise.resolve(responses[request.endpoint]);
@@ -194,33 +218,21 @@ const projectMasterResponses = {
 };
 
 describe('resolveMasters — プロジェクト単位のマスタ', () => {
-  it('書き込みを許したプロジェクトだけ引く', async () => {
+  it('許可されたプロジェクト全部を引く（read だけのものも含む）', async () => {
     const fetcher = makeFetcher(projectMasterResponses);
 
-    const masters = await resolveMasters(fetcher, ['PROJ', 'SALES'], ['PROJ']);
+    const masters = await resolveMasters(fetcher, ['PROJ', 'SALES']);
 
-    assert.deepEqual([...masters.perProject.keys()], ['PROJ']);
-    // SALES（152）のマスタは1本も引いていない
+    assert.deepEqual([...masters.perProject.keys()].toSorted(), ['PROJ', 'SALES']);
+    // SALES（152）も引いている。名前で絞る検索は read の操作なので書き込みで切り分けない
     assert.equal(
       fetcher.calls.some(call => call.endpoint.startsWith('/projects/152/')),
-      false,
-    );
-  });
-
-  it('指定しなければ1本も引かない（read だけの構成で起動が重くならない）', async () => {
-    const fetcher = makeFetcher(projectMasterResponses);
-
-    const masters = await resolveMasters(fetcher, ['PROJ']);
-
-    assert.equal(masters.perProject.size, 0);
-    assert.equal(
-      fetcher.calls.some(call => call.endpoint.includes('/issueTypes')),
-      false,
+      true,
     );
   });
 
   it('名前 → ID が引ける', async () => {
-    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ']);
     const project = projectMastersOf(masters, 'PROJ');
 
     assert.equal(project.issueTypeIds.get('バグ'), 1);
@@ -230,7 +242,7 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
   });
 
   it('担当者は表示名でもログイン名でも引ける', async () => {
-    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ']);
     const project = projectMastersOf(masters, 'PROJ');
 
     assert.equal(project.userIds.get('山田太郎'), 7);
@@ -247,7 +259,6 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
           { id: 8, userId: 'yamada2', name: '山田太郎' },
         ],
       }),
-      ['PROJ'],
       ['PROJ'],
     );
     const project = projectMastersOf(masters, 'PROJ');
@@ -267,7 +278,6 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
         '/projects/151/versions': [],
       }),
       ['PROJ'],
-      ['PROJ'],
     );
     const project = projectMastersOf(masters, 'PROJ');
 
@@ -278,17 +288,15 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
   it('種別が空なら起動しない（応答の形を疑う）', async () => {
     await assert.rejects(
       () =>
-        resolveMasters(
-          makeFetcher({ ...projectMasterResponses, '/projects/151/issueTypes': [] }),
-          ['PROJ'],
-          ['PROJ'],
-        ),
+        resolveMasters(makeFetcher({ ...projectMasterResponses, '/projects/151/issueTypes': [] }), [
+          'PROJ',
+        ]),
       MasterDataError,
     );
   });
 
   it('引いていないプロジェクトのマスタを求めたら送出する', async () => {
-    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ'], ['PROJ']);
+    const masters = await resolveMasters(makeFetcher(projectMasterResponses), ['PROJ']);
 
     assert.throws(() => projectMastersOf(masters, 'SALES'), MasterDataError);
   });

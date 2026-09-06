@@ -283,29 +283,6 @@ export const writableProjectKeys = (policy: ResolvedPolicy): readonly string[] =
 };
 
 /**
- * **`can: "write"` のツール**が1つでも許可されているプロジェクトキーを返す。
- *
- * `writableProjectKeys` より狭い（あちらは comment も含む、stderr 表示用）。こちらは
- * **プロジェクト単位のマスタを起動時に引く対象**を決めるためのもので、read や comment
- * しか無いプロジェクトのぶんまで引かないようにする。
- *
- * @param policy - 展開済みポリシー
- * @returns プロジェクトキーの配列（決定的な順序）
- */
-export const writeScopedProjectKeys = (policy: ResolvedPolicy): readonly string[] => {
-  const result: string[] = [];
-  for (const [projectKey, tools] of policy.scopes) {
-    for (const toolName of tools) {
-      if (TOOL_SPECS[toolName].requires === 'write') {
-        result.push(projectKey);
-        break;
-      }
-    }
-  }
-  return result.sort();
-};
-
-/**
  * 展開結果を人が読める形にする。stderr と監査ログへ出す。
  *
  * 正規形は**読めるが書けない**。ポリシーに書けるのは `projects` / `can` / `toolsets` だけ。

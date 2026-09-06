@@ -32,17 +32,14 @@ export interface Masters {
   readonly resolutionIds: ReadonlyMap<string, number>;
   /** API キーの持ち主。「自分の担当課題」を引くのに要る。 */
   readonly myUserId: number;
-  /**
-   * projectKey → プロジェクト単位のマスタ。**書き込みを許したプロジェクトだけ**入る。
-   *
-   * read しか無いプロジェクトのぶんまで引くと、起動時の呼び出しが使わない分だけ増える。
-   */
+  /** projectKey → プロジェクト単位のマスタ。**許可されたプロジェクト全部**が入る。 */
   readonly perProject: ReadonlyMap<string, ProjectMasters>;
 }
 
 /**
- * プロジェクトごとに定義されるマスタ。**書き込みでしか要らない。**
+ * プロジェクトごとに定義されるマスタ。
  *
+ * 課題の作成・更新（名前 → ID）と、検索の絞り込み（同じく名前 → ID）の両方で要る。
  * どれも `{ id, name, projectId, … }` を返す（ミラーで確認）。
  */
 export interface ProjectMasters {
@@ -253,19 +250,21 @@ const resolveProjectMasters = async (
 /**
  * 起動時のマスタを一度だけ解決する。
  *
- * スペース直下の4本は互いに独立なので並列に投げる（規約 §5.3）。そのあと、**書き込みを
- * 許したプロジェクトについてだけ**プロジェクト単位のマスタを引く（1プロジェクトあたり5本）。
+ * スペース直下の4本は互いに独立なので並列に投げる（規約 §5.3）。そのあと、**許可された
+ * プロジェクト全部**についてプロジェクト単位のマスタを引く（1プロジェクトあたり5本）。
+ *
+ * 以前は書き込みを許したプロジェクトだけに絞っていたが、**「状態で絞る」「担当者で絞る」は
+ * read の操作**なので前提が変わった。ここも並列なので、増えるのは同時実行数であって直列の
+ * 待ち時間ではない。上限はポリシーが列挙した数（ワイルドカードが無いので人が書いた数）。
  *
  * @param gateway - Backlog API を叩くもの
  * @param projectKeys - 解決したいプロジェクトキー（ポリシーが許可したもの）
- * @param writableProjectKeys - プロジェクト単位のマスタも引くキー（書き込みを許したもの）
  * @returns 凍結済みのマスタ
  * @throws {MasterDataError} 応答の形が想定と違う場合、要求されたキーを解決できない場合
  */
 export const resolveMasters = async (
   gateway: BacklogGateway,
   projectKeys: readonly string[],
-  writableProjectKeys: readonly string[] = [],
 ): Promise<Masters> => {
   if (projectKeys.length === 0) {
     throw new MasterDataError('解決するプロジェクトキーが1つもありません');
@@ -279,13 +278,8 @@ export const resolveMasters = async (
   ]);
 
   const perProject = new Map<string, ProjectMasters>();
-  const targets = writableProjectKeys.filter(projectKey => projectIds.has(projectKey));
   const resolved = await Promise.all(
-    targets.map(async projectKey => {
-      const projectId = projectIds.get(projectKey);
-      if (projectId === undefined) {
-        throw new MasterDataError(`未解決のプロジェクトキーです: ${projectKey}`);
-      }
+    [...projectIds].map(async ([projectKey, projectId]) => {
       return [projectKey, await resolveProjectMasters(gateway, projectKey, projectId)] as const;
     }),
   );
@@ -305,8 +299,8 @@ export const resolveMasters = async (
 /**
  * プロジェクト単位のマスタを取り出す。
  *
- * 無いのは**書き込みを許していないプロジェクト**を指したときで、ポリシーの判定が先に
- * 通っているはずなので通常は起きない。起きたら組み立ての誤りなので送出する。
+ * 許可された全プロジェクトを引いているので、ポリシーの判定を先に通っていれば必ずある。
+ * 無いのは組み立ての誤りなので送出する。
  *
  * @param masters - 解決済みマスタ
  * @param projectKey - プロジェクトキー
