@@ -280,7 +280,7 @@ L.append('同じ意味の型が大文字小文字・語彙違いで混在して�
          '`endpoints.json` の `parameters[].type` には原文の値をそのまま入れている。\n')
 L.append('| 型 | 件数 |')
 L.append('| --- | --- |')
-for t, n in types.most_common():
+for t, n in sorted(types.items(), key=lambda kv: (-kv[1], kv[0])):
     L.append(f'| {"`" + t + "`" if t else "（記載なし）"} | {n} |')
 no_type = sorted({e['slug'] for e in endpoints
                   for v in e['parameters'].values() for p in v if not p['type']})
@@ -325,7 +325,8 @@ if varied:
     L.append('| 表記 | ページ数 |')
     L.append('| --- | --- |')
     for k in sorted(varied):
-        for h, n in sorted(varied[k], key=lambda x: -x[1]):
+        # 同数の行が挿入順（set の反復順＝hash 乱数化依存）で並ばないよう表記でも揃える
+        for h, n in sorted(varied[k], key=lambda x: (-x[1], x[0])):
             L.append(f'| {h} | {n} |')
     L.append('')
 

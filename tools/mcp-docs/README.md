@@ -47,9 +47,22 @@ python3 build.py ../../docs/reference/mcp
 | `fetch.sh` | 本文を `raw/` へ並列ダウンロード（3 回リトライ）。あわせてスキーマの実体と、対象外リンクの転送先を取得する |
 | `list-unmapped.py` | `raw/` から「対象一覧に無いサイト内リンク先」を列挙する（`fetch.sh` が転送先調査に使う） |
 | `convert.py` | 前置きの除去・リンクの書き換え・`schema` ページの HTML 変換 |
-| `build.py` | 変換結果から `specification/` `guides/` `extensions/` `schema/` `pages.json` `README.md` を生成。生成後、出力内の相対リンクがすべて解決できるか検査し、1 件でも壊れていれば失敗する |
+| `build.py` | 変換結果から `specification/` `guides/` `extensions/` `schema/` `pages.json` `README.md` を生成。生成後にリンクを 2 つの観点で検査し、1 件でも引っかかれば失敗する（下記） |
 
 `raw/` は生成物なのでコミットしない。
+
+## 生成後の検査
+
+`rewrite_target` は `page_map` に無いパスを**必ず絶対 URL に落とす**。そのため書き換えの
+取りこぼしは「壊れた相対リンク」としては現れない。相対リンクだけを見る検査は構造上発火
+しないので、2 つの観点で見る。
+
+| 観点 | 何を捕まえるか |
+| --- | --- |
+| 相対リンクが解決できるか | 出力の配置と書き換えのずれ |
+| ミラー内へ張れるはずのパスが絶対 URL のまま残っていないか | 書き換えの取りこぼし（素の URL など、`rewrite_links` が扱わない書き方） |
+
+front matter の `source` は原文の所在なので、絶対 URL のままが正しい。検査の対象外にしている。
 
 ## サイトの `.md` 版をそのまま使わない理由
 

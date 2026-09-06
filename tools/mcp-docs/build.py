@@ -229,6 +229,7 @@ L.append('| `<div id="enable-section-numbers" />` | 落とす（Mintlify の描�
 L.append('| サイト絶対パスのリンク | 対象内はミラー内の相対パスへ、対象外は絶対 URL へ書き換える |')
 L.append(f'| `schema` ページの typedoc HTML | 型ごとの見出し・シグネチャ・説明に組み直す。'
          f'見出しは原文の `` ### `型名` `` を保つので `schema#型名` のアンカーは解決する。'
+         f'非推奨メンバーは原文が取り消し線で示すので `(deprecated)` と付記する。'
          f'メンバー個別のアンカー（`#tool-description` 等）は失われるので、'
          f'厳密に追うときは [schema.ts](schema/{LATEST}/schema.ts) を見る |')
 L.append('')
@@ -237,7 +238,9 @@ if mdx:
              '（Markdown ビューアでは描画されない）。内訳は次のとおり。\n')
     L.append('| コンポーネント | ページ数 |')
     L.append('| --- | --- |')
-    for tag, n in mdx.most_common():
+    # 件数が同じ行の順序を確定させる。most_common() は同数を挿入順で並べ、その挿入順は
+    # set の反復順（hash 乱数化に依存）から来るので、揃えないと実行ごとに出力が変わる。
+    for tag, n in sorted(mdx.items(), key=lambda kv: (-kv[1], kv[0])):
         L.append(f'| `<{tag}>` | {n} |')
     L.append('')
 
@@ -283,10 +286,11 @@ if alias:
 
 open(f'{OUT}/README.md', 'w', encoding='utf-8').write('\n'.join(L))
 
-# ---- 出力内の相対リンクが解決できることを確かめる ----
-# 書き換えを取りこぼすとミラー内で辿れないリンクになるが、生成そのものは
-# 成功してしまうので明示的に検査する。
-broken = []
+# ---- 出力のリンクを検査する ----
+# 検査は 2 つある。`rewrite_target` は page_map に無いパスを必ず絶対 URL に落とすので、
+# 書き換えの取りこぼしは「壊れた相対リンク」ではなく「ミラー内へ張れるはずなのに絶対 URL
+# のまま」という形で現れる。前者だけを見ても発火しない。
+broken, escaped = [], []
 for root, _, names in os.walk(OUT):
     for name in names:
         if not name.endswith('.md'):
@@ -304,7 +308,15 @@ for root, _, names in os.walk(OUT):
                 continue  # 出力の外を指すリンクは生成側の責任範囲外
             if not os.path.exists(target):
                 broken.append(f'{os.path.relpath(src, OUT)}: [{label}]({href})')
+        # front matter の `source` は原文の所在なので、絶対 URL のままが正しい
+        body = re.sub(r'\A---\n.*?\n---\n', '', text, flags=re.S)
+        for ref in re.findall(re.escape(SITE) + r'(/[^)\s"\']*)', body):
+            path = C.normalize_path(ref.split('#')[0])
+            if C.normalize_path(redirects.get(path, path)) in page_map:
+                escaped.append(f'{os.path.relpath(src, OUT)}: {SITE}{ref}')
 if broken:
     raise SystemExit('解決できない相対リンク:\n  ' + '\n  '.join(broken))
+if escaped:
+    raise SystemExit('ミラー内へ張れるはずが絶対 URL のまま:\n  ' + '\n  '.join(escaped))
 
 print(f'pages={len(pages)} schema={len(schema_files)} redirects={len(redirects)} dead={len(dead)}')

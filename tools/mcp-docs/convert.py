@@ -127,10 +127,14 @@ def convert_schema(md):
         if sig:
             out += ['```ts', detag(sig.group(1), keep_links=False), '```', '']
         for sec in MEMBER.findall(block):
-            head = re.search(r'<div class="tsd-anchor-link"[^>]*>\s*<span>(.*?)</span>', sec, re.S)
+            head = re.search(r'<div class="tsd-anchor-link"[^>]*>\s*<span([^>]*)>(.*?)</span>',
+                             sec, re.S)
             if not head:
                 continue
-            out += [f'#### `{detag(head.group(1), keep_links=False)}`', '']
+            # typedoc は非推奨メンバーを `<span class="deprecated">` で示す。属性を許さないと
+            # メンバーごと落ちるので、印を残したうえで見出しにする。
+            mark = ' (deprecated)' if 'deprecated' in head.group(1) else ''
+            out += [f'#### `{detag(head.group(2), keep_links=False)}`{mark}', '']
             body = re.search(r'<div class="tsd-comment[^"]*">(.*?)</div>', sec, re.S)
             if body:
                 out += [detag(body.group(1)), '']

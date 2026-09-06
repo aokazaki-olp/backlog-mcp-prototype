@@ -208,7 +208,7 @@
 | 全ページ冒頭のブロック引用（「llms.txt を取得せよ」） | 落とす。本文ではなく取得側への指示であり、ミラーに残すと読み手への指示として働く |
 | `<div id="enable-section-numbers" />` | 落とす（Mintlify の描画指示で中身が無い） |
 | サイト絶対パスのリンク | 対象内はミラー内の相対パスへ、対象外は絶対 URL へ書き換える |
-| `schema` ページの typedoc HTML | 型ごとの見出し・シグネチャ・説明に組み直す。見出しは原文の `` ### `型名` `` を保つので `schema#型名` のアンカーは解決する。メンバー個別のアンカー（`#tool-description` 等）は失われるので、厳密に追うときは [schema.ts](schema/2026-07-28/schema.ts) を見る |
+| `schema` ページの typedoc HTML | 型ごとの見出し・シグネチャ・説明に組み直す。見出しは原文の `` ### `型名` `` を保つので `schema#型名` のアンカーは解決する。非推奨メンバーは原文が取り消し線で示すので `(deprecated)` と付記する。メンバー個別のアンカー（`#tool-description` 等）は失われるので、厳密に追うときは [schema.ts](schema/2026-07-28/schema.ts) を見る |
 
 MDX コンポーネントは原文のまま残している（Markdown ビューアでは描画されない）。内訳は次のとおり。
 
@@ -219,20 +219,20 @@ MDX コンポーネントは原文のまま残している（Markdown ビュー�
 | `<CardGroup>` | 37 |
 | `<Warning>` | 37 |
 | `<Frame>` | 28 |
-| `<Steps>` | 17 |
 | `<Step>` | 17 |
+| `<Steps>` | 17 |
 | `<CodeGroup>` | 16 |
-| `<Tabs>` | 15 |
 | `<Tab>` | 15 |
+| `<Tabs>` | 15 |
 | `<Info>` | 10 |
 | `<Accordion>` | 9 |
 | `<Tip>` | 9 |
 | `<AccordionGroup>` | 6 |
 | `<Icon>` | 4 |
-| `<Tooltip>` | 3 |
 | `<Badge>` | 3 |
-| `<Tree>` | 1 |
+| `<Tooltip>` | 3 |
 | `<CHECK>` | 1 |
+| `<Tree>` | 1 |
 
 ## 原文側の癖
 
