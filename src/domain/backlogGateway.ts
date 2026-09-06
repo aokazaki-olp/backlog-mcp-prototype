@@ -44,7 +44,25 @@ export const createBacklogGateway = (
 ): BacklogGateway => {
   const client = BacklogApiClient.create(config.baseUrl, { apiKey: config.apiKey }, overrides);
 
+  // バイナリの応答は `body` が null になり、生バイトは `bytes` にしか入らない。
+  // Transport のデコレータで移し替えて、焼き込まれた responseHandler に拾わせる
+  const bytesClient = client.extend(transport => ({
+    async fetch(url, options) {
+      const response = await transport.fetch(url, options);
+      return { ...response, body: response.bytes };
+    },
+  }));
+
   return {
+    async sendBytes(request: ResolvedRequest): Promise<Uint8Array> {
+      const raw: unknown = await bytesClient.get(request.endpoint, request.query);
+      if (!(raw instanceof Uint8Array)) {
+        // 生バイトが取れないのは想定外。黙って空を返さない（規約 §5.4）
+        throw new Error(`${request.endpoint} からバイト列を受け取れませんでした`);
+      }
+      return raw;
+    },
+
     async send(request: ResolvedRequest): Promise<unknown> {
       switch (request.method) {
         case 'GET': {

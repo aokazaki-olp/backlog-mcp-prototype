@@ -3,15 +3,21 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { AttachmentError } from '../src/contract.ts';
-import { isInside, readAttachment } from '../src/attach/localFile.ts';
+import {
+  isInside,
+  readAttachment,
+  receiveAttachment,
+  saveAttachment,
+} from '../src/attach/localFile.ts';
 
 /**
  * **実ファイルで確かめる。** 守りたい性質が `realpath` と symlink の挙動に乗っており、
@@ -353,6 +359,101 @@ describe('readAttachment — 監査ログの出力先', () => {
 
     await assert.rejects(
       () => readAttachment(logRoot, 'link-to-log.md', { selfDirs: [logDir] }),
+      AttachmentError,
+    );
+  });
+});
+
+// ============================================================================
+// 保存側 — Backlog から降ってきたバイト列をディスクへ置く
+// ============================================================================
+
+describe('saveAttachment — 第三者が決めるファイル名を安全に置く', () => {
+  const newDir = (): string => mkdtempSync(join(tmpdir(), 'backlog-mcp-dl-'));
+
+  it('置ける名前はそのまま使う（直さない）', async () => {
+    const dir = newDir();
+    const path = await saveAttachment(dir, 'screen shot.png', PNG);
+
+    assert.equal(basename(path), 'screen shot.png');
+    assert.deepEqual(readdirSync(dir), ['screen shot.png']);
+  });
+
+  it('ルートの外へ出る名前は弾く', async () => {
+    const dir = newDir();
+    for (const name of ['../evil.png', '..\\evil.png', '/etc/evil.png', '..']) {
+      await assert.rejects(() => saveAttachment(dir, name, PNG), AttachmentError, name);
+    }
+
+    assert.deepEqual(readdirSync(dir), []);
+  });
+
+  it('Windows で意味が変わる名前も弾く', async () => {
+    const dir = newDir();
+    // 代替データストリーム / 予約名 / 末尾のドットと空白（Windows が黙って落とす）
+    for (const name of ['a:b.png', 'CON.png', 'nul.png', 'a.png.', 'a.png ']) {
+      await assert.rejects(() => saveAttachment(dir, name, PNG), AttachmentError, name);
+    }
+  });
+
+  it('保存を許さない拡張子は置かない（人が開く場所なので厳しくする）', async () => {
+    const dir = newDir();
+    for (const name of ['setup.exe', 'link.lnk', 'run.bat', 'note.txt']) {
+      await assert.rejects(() => saveAttachment(dir, name, PNG), AttachmentError, name);
+    }
+  });
+
+  it('中身が拡張子と合わなければ置かない', async () => {
+    const dir = newDir();
+    await assert.rejects(
+      () => saveAttachment(dir, 'fake.png', new TextEncoder().encode('これは PNG ではない')),
+      AttachmentError,
+    );
+  });
+
+  it('同名があっても上書きしない', async () => {
+    const dir = newDir();
+    const first = await saveAttachment(dir, 'a.png', PNG);
+    const second = await saveAttachment(dir, 'a.png', PNG);
+
+    assert.equal(basename(first), 'a.png');
+    assert.equal(basename(second), 'a-2.png');
+    assert.equal(readdirSync(dir).length, 2);
+  });
+});
+
+describe('receiveAttachment — テキストと、それ以外の割り振り', () => {
+  it('テキストはディスクを触らずに返す（保存先が未設定でも動く）', async () => {
+    const received = await receiveAttachment(
+      new TextEncoder().encode('エラーログ\n2行目'),
+      'error.log',
+      null,
+    );
+
+    if (received.kind !== 'text') {
+      assert.fail('テキストとして返るはず');
+    }
+    assert.equal(received.text, 'エラーログ\n2行目');
+  });
+
+  it('バイナリは保存先が無ければ送出する（fail-closed）', async () => {
+    await assert.rejects(() => receiveAttachment(PNG, 'a.png', null), AttachmentError);
+  });
+
+  it('バイナリは保存先があればそこへ置く', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'backlog-mcp-dl-'));
+    const received = await receiveAttachment(PNG, 'a.png', dir);
+
+    assert.equal(received.kind, 'saved');
+    assert.deepEqual(readdirSync(dir), ['a.png']);
+  });
+
+  it('UTF-8 として読めなければテキストとして扱わない', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'backlog-mcp-dl-'));
+    // file-type は判定不能（undefined）だが、UTF-8 としては壊れている。
+    // 拡張子も保存できないものなので、テキストにもバイナリにも落ちずに送出する
+    await assert.rejects(
+      () => receiveAttachment(new Uint8Array([0xff, 0xfe, 0xfd]), 'broken.log', dir),
       AttachmentError,
     );
   });

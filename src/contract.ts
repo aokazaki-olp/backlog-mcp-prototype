@@ -57,6 +57,8 @@ export const TOOL_NAMES = [
   'create_wiki_page',
   'update_wiki_page',
   'list_related_issues',
+  'list_issue_attachments',
+  'get_issue_attachment',
 ] as const;
 
 export type ToolName = (typeof TOOL_NAMES)[number];
@@ -205,7 +207,25 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'key',
     title: '関連課題の一覧を取得する',
     description:
-      '課題キー（例: PROJ-123）を指定して、その課題に設定されている関連課題を取得する。子課題や依存関係を辿るのに使う。',
+      '課題キー（例: PROJ-123）を指定して、その課題に「関連課題」として設定されている課題を取得する。親子課題とは別の関係なので、子課題は返らない（子課題は search_issues の parentIssueKey で引く）。',
+    readOnly: true,
+  },
+  list_issue_attachments: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'key',
+    title: '課題の添付ファイル一覧を取得する',
+    description:
+      '課題キー（例: PROJ-123）を指定して、添付されているファイルの名前とサイズを取得する。',
+    readOnly: true,
+  },
+  get_issue_attachment: {
+    toolset: 'issue',
+    requires: 'read',
+    scopeKind: 'key',
+    title: '課題の添付ファイルを取得する',
+    description:
+      '課題キーとファイル名を指定して添付を取得する。テキストならそのまま返し、それ以外は設定されたディレクトリへ保存してパスを返す（数値 ID は受け付けない）。',
     readOnly: true,
   },
   create_wiki_page: {
@@ -451,5 +471,18 @@ export interface ServerConfig {
    * （env を `secrets.json` と名付ければ `.json` として通ってしまう）。
    */
   readonly selfPaths: readonly string[];
+  /**
+   * 添付を保存するディレクトリ（絶対パス）。**未設定ならバイナリを保存する口が開かない。**
+   *
+   * テキスト系の添付は囲んで返すだけなのでディスクを触らない。**設定が要るのは保存側だけ。**
+   *
+   * 既定を置かない理由は `attachmentsRoot` と同じ。加えて「OS 既定のダウンロードフォルダ」を
+   * 推測しない — Windows の既定は移動でき、Linux は XDG でロケール依存になりうる（未確認）。
+   * **確かめていない値を既定にしない。**
+   *
+   * 読み取りルート・監査ログの出力先・設定ファイルと**重なっていたら起動しない**
+   * （ブラウザが落とした任意のファイルを Backlog へ上げられる経路になるため）。
+   */
+  readonly downloadsDir: string | null;
   readonly readOnly: boolean;
 }

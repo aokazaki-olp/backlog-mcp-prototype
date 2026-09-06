@@ -24,6 +24,7 @@ import type {
   ResolvedRequest,
   ToolName,
 } from '../contract.ts';
+import type { ReceivedAttachment } from '../attach/localFile.ts';
 import type { BacklogGateway } from '../domain/gateway.ts';
 import type { Masters, ProjectMasters } from '../domain/masters.ts';
 import type { McpHandlers, ToolDefinition, ToolResult } from '../mcp/protocol.ts';
@@ -58,6 +59,13 @@ export interface ToolContext extends PlanContext {
   readonly gateway: BacklogGateway;
   /** ローカルファイルの読み取り。**差し替えられる**（規約 §7）。 */
   readonly readAttachment?: (root: string, requested: string) => Promise<AttachmentFile>;
+  /**
+   * ダウンロードした添付の受け取り。**差し替えられる**（規約 §7）。
+   *
+   * テキストならそのまま、それ以外はディスクへ置いてパスを返す。**I/O はここに閉じる**
+   * ので、`shape` は純関数のままでいられる（`readAttachment` と同じ形）。
+   */
+  readonly receiveAttachment?: (bytes: Uint8Array, name: string) => Promise<ReceivedAttachment>;
 }
 
 /**
@@ -92,6 +100,19 @@ export type PlannedCall =
       readonly kind: 'chain';
       readonly request: ResolvedRequest;
       readonly next: (raw: unknown) => PlannedCall;
+    }
+  | {
+      /**
+       * **バイト列で受け取る。** 添付のダウンロードだけが使う。
+       *
+       * 中身をテキストとして返すかディスクへ置くかの判断と、その I/O は
+       * `context.receiveAttachment` に閉じる（`attach` と同じ形）。`shape` は純関数のまま。
+       */
+      readonly kind: 'download';
+      readonly request: ResolvedRequest;
+      /** 一覧の応答から採ったファイル名。**第三者が決める**ので保存側で検査する。 */
+      readonly fileName: string;
+      readonly shape: (received: ReceivedAttachment) => unknown;
     }
   | {
       /**
@@ -973,6 +994,45 @@ const findWikiId = (raw: unknown, name: string): number => {
 };
 
 /**
+ * 添付の一覧から、名前が一致するものの `id` を採る。
+ *
+ * `findWikiId` と同じ形。**引数で `attachmentId` を渡す口が無い**ので、到達できるのは
+ * 定義上「許可された課題に付いている添付」だけになる（原則2）。
+ *
+ * 見つからなければ**候補を挙げて送出する**（黙って空を返さない。規約 §5.4）。
+ */
+const findAttachment = (raw: unknown, name: string): { readonly id: number } => {
+  const items = asArray(raw, 'GET /issues/*/attachments');
+  for (const item of items) {
+    if (isRecord(item) && item['name'] === name && typeof item['id'] === 'number') {
+      return { id: item['id'] };
+    }
+  }
+  const available = items
+    .map(item => (isRecord(item) ? pickString(item['name']) : undefined))
+    .filter(each => each !== undefined)
+    .slice(0, 20);
+  throw new Error(
+    `添付「${name}」が見つかりません（この課題にあるのは ${available.length === 0 ? '(なし)' : available.join(' / ')}）`,
+  );
+};
+
+/** 添付の1件。**`id` は返さない**（返しても使い道が無いようにしてある）。 */
+const shapeAttachment = (raw: unknown): Record<string, unknown> => {
+  if (!isRecord(raw)) {
+    return { error: '添付の形が想定と違います' };
+  }
+  return {
+    // ファイル名は次の呼び出しに渡す識別子。囲むと識別子として使えない
+    // （`list_wiki_pages` のページ名と同じ扱い）
+    name: pickString(raw['name']),
+    size: pickNumber(raw['size']),
+    createdUser: pickName(raw['createdUser']),
+    created: pickString(raw['created']),
+  };
+};
+
+/**
  * 打ち切った事実を必ず出力に載せる（規約 §5.4）。
  *
  * `total`（絞り込みに該当する全件数）を渡せると、**「あと何件か」が分かる**。
@@ -1174,7 +1234,9 @@ export const planToolCall = (
       }
 
       const offset = optionalOffset(args, 'offset');
-      return {
+      // 子課題を引く唯一の手段。relatedIssues は「関連課題」で親子とは別の関係なので、
+      // 子課題は返らない（実データで確認）。親は数値 ID を要るので課題キーから解決する
+      return withResolvedIssueId(context, toolName, args, 'parentIssueKey', parentIssueId => ({
         // 件数は同じ絞り込みで別途引く。「あと何件あるか」を言えるようにするため（§5.4）
         kind: 'both',
         requests: [
@@ -1183,6 +1245,7 @@ export const planToolCall = (
             method: 'GET',
             query: {
               ...query,
+              ...(parentIssueId === undefined ? {} : { 'parentIssueId[]': parentIssueId }),
               // 要求しないと応答に入らない。一覧にしか無い項目（仕様で確認）
               'expand[]': ['childIssueSummary'],
               count: probeCount(count),
@@ -1192,7 +1255,14 @@ export const planToolCall = (
             },
           },
           // count / offset / sort は渡さない。渡すと「該当件数」ではなく「取得件数」になる
-          { endpoint: '/issues/count', method: 'GET', query },
+          {
+            endpoint: '/issues/count',
+            method: 'GET',
+            query: {
+              ...query,
+              ...(parentIssueId === undefined ? {} : { 'parentIssueId[]': parentIssueId }),
+            },
+          },
         ],
         shape: (raw, counted) => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues'), count);
@@ -1203,7 +1273,7 @@ export const planToolCall = (
             pickTotal(counted),
           );
         },
-      };
+      }));
     }
 
     case 'get_issue': {
@@ -1236,6 +1306,58 @@ export const planToolCall = (
       };
     }
 
+    case 'list_issue_attachments': {
+      const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
+      const count = boundedCount(args, limits);
+      return {
+        kind: 'send',
+        request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
+        shape: raw => {
+          const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/attachments'), count);
+          return listPayload(items.map(shapeAttachment), truncated, count);
+        },
+      };
+    }
+
+    case 'get_issue_attachment': {
+      const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
+      const file = requiredString(args, 'file');
+      return {
+        kind: 'chain',
+        // 1本目は一覧。attachmentId は**この応答からしか採らない**（引数で渡す口が無い）
+        request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
+        next: raw => {
+          const { id } = findAttachment(raw, file);
+          return {
+            kind: 'download',
+            request: {
+              endpoint: `/issues/${issueKey}/attachments/${String(id)}`,
+              method: 'GET',
+            },
+            fileName: file,
+            shape: received =>
+              received.kind === 'text'
+                ? {
+                    file,
+                    content: wrapUntrusted(received.text, {
+                      source: {
+                        subject: `backlog:issue:${issueKey}`,
+                        name: file,
+                        field: 'attachment',
+                      },
+                      maxLength: limits.maxTextLength,
+                    }),
+                  }
+                : {
+                    file,
+                    savedTo: received.path,
+                    note: 'テキストではないのでディスクへ保存しました。中身を読ませたい場合はこのファイルを開いてください',
+                  },
+          };
+        },
+      };
+    }
+
     case 'list_related_issues': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       const count = boundedCount(args, limits);
@@ -1248,7 +1370,10 @@ export const planToolCall = (
             asArray(raw, 'GET /issues/*/relatedIssues'),
             count,
           );
-          // 応答は課題オブジェクトの配列。`type` は現在つねに RELATES なので落とす
+          // 応答は課題オブジェクトの配列。`type` は現在つねに RELATES なので落とす。
+          // **これは Backlog の「関連課題」で、親子課題とは別の関係**（実データで確認:
+          // 親子を作った課題でも relatedIssues は 0 件）。子課題は search_issues の
+          // parentIssueKey で引く
           return listPayload(
             items.map(item => shapeIssue(item, limits)),
             truncated,
@@ -1854,6 +1979,14 @@ const runTool = async (
       planned = planned.next(await read(root, planned.localPath));
       continue;
     }
+    if (planned.kind === 'download') {
+      const receive = context.receiveAttachment;
+      if (receive === undefined) {
+        throw new AttachmentError('添付の受け取りが組み立てられていません');
+      }
+      const bytes = await context.gateway.sendBytes(planned.request);
+      return planned.shape(await receive(bytes, planned.fileName));
+    }
     if (planned.kind === 'both') {
       // 互いに独立なので並列に投げる（規約 §5.3）
       const [first, second] = await Promise.all([
@@ -1960,6 +2093,11 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       },
       order: { type: 'string', enum: [...ORDER_KEYS], description: '並び順。既定は desc' },
       offset: { type: 'integer', minimum: 0, description: '取得開始位置。既定は 0' },
+      parentIssueKey: {
+        type: 'string',
+        description:
+          '親課題の課題キー（例: PROJ-123）。指定するとその直下の子課題だけを返す。数値 ID は不可',
+      },
       count: COUNT_PROPERTY,
     },
     additionalProperties: false,
@@ -1988,6 +2126,28 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       count: COUNT_PROPERTY,
     },
     required: ['issueKey'],
+    additionalProperties: false,
+  },
+  list_issue_attachments: {
+    type: 'object',
+    properties: {
+      issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
+      count: COUNT_PROPERTY,
+    },
+    required: ['issueKey'],
+    additionalProperties: false,
+  },
+  get_issue_attachment: {
+    type: 'object',
+    properties: {
+      issueKey: { type: 'string', description: '課題キー（例: PROJ-123）。数値 ID は不可' },
+      file: {
+        type: 'string',
+        description:
+          'ファイル名。list_issue_attachments が返す name をそのまま渡す。数値 ID は不可',
+      },
+    },
+    required: ['issueKey', 'file'],
     additionalProperties: false,
   },
   list_wiki_pages: {

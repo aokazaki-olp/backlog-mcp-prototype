@@ -167,3 +167,71 @@ describe('API キーが露出しない', () => {
     }
   });
 });
+
+describe('loadConfig — ダウンロード先は重ねられない', () => {
+  const withDirs = (extra: Record<string, string>): NodeJS.ProcessEnv => ({
+    ...base,
+    BACKLOG_POLICY: '/work/backlog-policy.json',
+    ...extra,
+  });
+
+  it('未設定なら null（バイナリの口だけが閉じる）', () => {
+    assert.equal(loadConfig(withDirs({})).downloadsDir, null);
+    // 既定を置かない。OS 既定のダウンロードフォルダを推測しない
+    assert.equal(loadConfig(withDirs({ BACKLOG_DOWNLOADS_DIR: '' })).downloadsDir, null);
+  });
+
+  it('相対指定はポリシーのディレクトリから解決する', () => {
+    const config = loadConfig(withDirs({ BACKLOG_DOWNLOADS_DIR: 'downloads' }));
+
+    assert.equal(config.downloadsDir, '/work/downloads');
+  });
+
+  it('添付の読み取りルートと重なったら起動しない', () => {
+    // ブラウザが落とした任意のファイルを Backlog へ上げられる経路になる
+    const overlaps: readonly (readonly [string, string])[] = [
+      ['/work/files', '/work/files'],
+      ['/work/files', '/work/files/sub'],
+      ['/work/files/sub', '/work/files'],
+    ];
+    for (const [attachments, downloads] of overlaps) {
+      assert.throws(
+        () =>
+          loadConfig(
+            withDirs({
+              BACKLOG_ATTACHMENTS_ROOT: attachments,
+              BACKLOG_DOWNLOADS_DIR: downloads,
+            }),
+          ),
+        ConfigError,
+        `${attachments} と ${downloads}`,
+      );
+    }
+  });
+
+  it('監査ログの出力先と重なったら起動しない', () => {
+    assert.throws(
+      () =>
+        loadConfig(
+          withDirs({ BACKLOG_LOG_DIR: '/work/logs', BACKLOG_DOWNLOADS_DIR: '/work/logs/dl' }),
+        ),
+      ConfigError,
+    );
+  });
+
+  it('設定ファイルそのものと重なったら起動しない', () => {
+    assert.throws(
+      () => loadConfig(withDirs({ BACKLOG_DOWNLOADS_DIR: '/work/backlog-policy.json' })),
+      ConfigError,
+    );
+  });
+
+  it('重なっていなければ通る', () => {
+    const config = loadConfig(
+      withDirs({ BACKLOG_ATTACHMENTS_ROOT: '/work/files', BACKLOG_DOWNLOADS_DIR: '/work/dl' }),
+    );
+
+    assert.equal(config.downloadsDir, '/work/dl');
+    assert.equal(config.attachmentsRoot, '/work/files');
+  });
+});

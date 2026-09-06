@@ -18,16 +18,17 @@ Backlog を Claude Code / Claude Desktop から扱う MCP サーバ。**イン�
 
 **環境変数が受け取るのはパスだけ。秘密は1つも入らない。**
 
-| 環境変数                   | 必須 | 内容                                                                               |
-| -------------------------- | :--: | ---------------------------------------------------------------------------------- |
-| `BACKLOG_SPACE_ID`         |  ✔   | スペースID **だけ**。URL は受け取らない                                            |
-| `BACKLOG_ENV_FILE`         |  ✔   | **暗号化された** `.env` のパス                                                     |
-| `BACKLOG_ENV_KEYS_FILE`    |  ✔   | 秘密鍵（`.env.keys`）のパス                                                        |
-| `BACKLOG_POLICY`           |  ✔   | ポリシーファイルのパス                                                             |
-| `BACKLOG_DOMAIN`           |      | `backlog.jp`（既定）/ `backlog.com` / `backlogtool.com`                            |
-| `BACKLOG_LOG_DIR`          |      | 監査ログの出力先。既定は**ポリシーファイルの隣**の `logs/`                         |
-| `BACKLOG_ATTACHMENTS_ROOT` |      | 添付を許すディレクトリ。**未設定なら添付の口そのものが開かない**（既定は置かない） |
-| `BACKLOG_READ_ONLY`        |      | `1` または `true` で全プロジェクトを `read` に切り下げる                           |
+| 環境変数                   | 必須 | 内容                                                                                                                                                                       |
+| -------------------------- | :--: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKLOG_SPACE_ID`         |  ✔   | スペースID **だけ**。URL は受け取らない                                                                                                                                    |
+| `BACKLOG_ENV_FILE`         |  ✔   | **暗号化された** `.env` のパス                                                                                                                                             |
+| `BACKLOG_ENV_KEYS_FILE`    |  ✔   | 秘密鍵（`.env.keys`）のパス                                                                                                                                                |
+| `BACKLOG_POLICY`           |  ✔   | ポリシーファイルのパス                                                                                                                                                     |
+| `BACKLOG_DOMAIN`           |      | `backlog.jp`（既定）/ `backlog.com` / `backlogtool.com`                                                                                                                    |
+| `BACKLOG_LOG_DIR`          |      | 監査ログの出力先。既定は**ポリシーファイルの隣**の `logs/`                                                                                                                 |
+| `BACKLOG_ATTACHMENTS_ROOT` |      | 添付を許すディレクトリ。**未設定なら添付の口そのものが開かない**（既定は置かない）                                                                                         |
+| `BACKLOG_DOWNLOADS_DIR`    |      | ダウンロードした添付のうち**テキストでないもの**の保存先。ダウンロードフォルダを指すと、チャットへ上げ直しやすい。**未設定ならバイナリの口だけが閉じる**（既定は置かない） |
+| `BACKLOG_READ_ONLY`        |      | `1` または `true` で全プロジェクトを `read` に切り下げる                                                                                                                   |
 
 URL ではなくスペースID を受けるのは、`https` 以外のスキーム・任意ホスト・パス注入を**設定として表現できなくする**ため。接続先は `https://{spaceId}.{domain}` としてサーバ側で組み立てる。
 
@@ -193,6 +194,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 | `get_issue`                 | issue     | read         |
 | `get_issue_comments`        | issue     | read         |
 | `list_related_issues`       | issue     | read         |
+| `list_issue_attachments`    | issue     | read         |
+| `get_issue_attachment`      | issue     | read         |
 | `add_issue_comment`         | issue     | comment      |
 | `create_issue`              | issue     | write        |
 | `update_issue`              | issue     | write        |
@@ -266,6 +269,11 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 （数値 ID が要らない）。応答は課題オブジェクトの配列なので課題と同じ形に整形する。`type` は
 現在つねに `RELATES` なので落とす。
 
+**「関連課題」は親子課題とは別の関係。** 実データで確認した — 親子を作った課題でも
+`relatedIssues` は0件だった。**子課題は `search_issues` の `parentIssueKey` で引く**
+（`GET /issues` の `parentIssueId[]`。これも課題キーで受けてサーバ内で ID に直す）。
+`childIssues` が件数、`parentIssueKey` が中身、という分担になる。
+
 ### 書き込みも名前で受ける
 
 `POST /issues` の必須は `projectId` / `summary` / `issueTypeId` / `priorityId` で**すべて数値 ID**、`PATCH /issues/:issueIdOrKey` も同様。素直に作ると「数値 ID を LLM に触らせない」設計に反するので、**起動時にマスタを解決して名前で受ける**。
@@ -290,6 +298,27 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 **載せていないもの**: `parentIssueId`（数値 ID しか受けない。親を指定するなら1往復増える）／`notifiedUserId[]`（LLM に通知先を決めさせない）。`categoryId[]` と `milestoneId[]` は**単数で受ける**（借り物がスカラーの配列を弾くため。引数が単数なので黙って減らされることはない）。
 
 **`update_issue` は指定した項目だけ変える。** 何も指定しない更新は「成功したが何も変わっていない」になるので送出する。
+
+### 添付のダウンロード — テキストは LLM、それ以外はディスク
+
+**囲み（`<untrusted>`）はテキストにしか効かない。** バイト列を LLM のコンテキストへ流すと**囲みの外側にコンテンツが出る**ので、そこは開けていない。
+
+| 中身       | 返すもの                                     | 誰が読むか                                                                                |
+| ---------- | -------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| テキスト系 | `<untrusted>` で囲んだ本文                   | **LLM。ディスクを触らない**（`BACKLOG_DOWNLOADS_DIR` が未設定でも動く）                   |
+| それ以外   | `BACKLOG_DOWNLOADS_DIR` へ保存してパスを返す | Claude Code なら LLM が Read できる。**Desktop は人が開いて、必要ならチャットへ上げ直す** |
+
+**人が1回挟まるのは妥協ではない。** 「AI が勝手にバイト列を引き込む」経路が無いということで、囲みを掛けられない問題を**人間の承認**で置き換えている。インジェクションが消えるわけではない（上げ直せばコンテキストには入る）が、防いでいるのは自動で引き込まれることのほう。
+
+判定はアップロード側の裏返し（`file-type` がバイナリを示さず、UTF-8 として読めればテキスト）。新しい依存は要らない。
+
+**`BACKLOG_DOWNLOADS_DIR` に既定を置かない。** OS 既定のダウンロードフォルダを推測しない — Windows の既定は移動でき、Linux は XDG でロケール依存になりうる（未確認）。**確かめていない値を既定にしない。**
+
+**読み取りルート・監査ログの出力先・設定ファイルと重なっていたら起動しない。** ダウンロードフォルダは**ブラウザが第三者のファイルを落とす場所**でもあるので、そこが `BACKLOG_ATTACHMENTS_ROOT` と重なると「ブラウザが落とした任意のファイルを Backlog へ上げられる」経路ができる。
+
+**保存側は読み取り側より厳しくする。** 人が開く場所に置くので、保存できるのは `.png` / `.jpg` / `.gif` / `.pdf` だけ（`.exe` / `.lnk` が着地する状態を作らない）。ファイル名は第三者が決めるので、ディレクトリ区切り・`..`・`:`・制御文字・Windows の予約名・末尾のドットと空白を**直さずに弾く**（直すと何が保存されたか予測できなくなる）。既存のファイルは上書きせず連番を付ける。
+
+`attachmentId` を引数に取る口は無い。`get_issue_attachment` は `get_wiki_page` と同じく**一覧の応答からしか `id` を採らない**。
 
 ### 添付は単独のツールにしない
 

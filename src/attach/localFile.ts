@@ -11,6 +11,7 @@ import { fileTypeFromBuffer } from 'file-type';
 import { AttachmentError } from '../contract.ts';
 import { toError } from '../shared/toError.ts';
 import type { AttachmentFile } from '../contract.ts';
+import type { FileHandle } from 'node:fs/promises';
 
 /**
  * 受け付ける拡張子と、その中身に求めるもの。
@@ -328,3 +329,182 @@ export const readAttachment = async (
 /** 設定のルートを絶対パスに直す。基準は呼び出し側が決める（cwd に依存させない）。 */
 export const resolveAttachmentRoot = (baseDir: string, value: string): string =>
   isAbsolute(value) ? value : resolve(baseDir, value);
+
+// ============================================================================
+// 保存側 — Backlog から降ってきたバイト列をディスクへ置く
+// ============================================================================
+
+/**
+ * ファイル名として受け付けない文字。**第三者が決める名前**なので、置く前に弾く。
+ *
+ * `requiredPathSegment`（`src/tool/tools.ts`）は URL の区画用で、求めるものが違う。
+ * こちらは**ファイルシステムの名前**として危ないものを見る。
+ *
+ * - ディレクトリ区切り（`/` `\`）— ルートの外へ出る
+ * - `:` — Windows のドライブ指定と NTFS の代替データストリーム
+ * - `* ? " < > |` — Windows が名前に使えない
+ */
+const UNSAFE_IN_FILENAME = /[/\\:*?"<>|]/u;
+
+/**
+ * 制御文字を含むか。**文字クラスに直接書かない** — ソースに制御文字そのものが
+ * 紛れ込むと、読む側にも道具にも見えない。符号位置で判定する。
+ */
+const hasControlChar = (name: string): boolean => {
+  for (const ch of name) {
+    if ((ch.codePointAt(0) ?? 0) < 0x20) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/** Windows の予約名。**拡張子が付いていても予約されている**（`CON.txt` も駄目）。 */
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\.|$)/iu;
+
+/**
+ * 保存してよいファイル名か検査する。**直さずに弾く。**
+ *
+ * サニタイズして「それらしい名前」に直すと、**何が保存されたか予測できなくなる**。
+ * 危ない名前はそのまま拒否して利用者に見せるほうがよい（規約 §5.4）。
+ *
+ * @param name - Backlog が返したファイル名
+ * @returns そのまま使える名前
+ * @throws {AttachmentError} 危ない形の場合
+ */
+const safeFileName = (name: string): string => {
+  if (name === '' || name === '.' || name === '..') {
+    throw new AttachmentError('添付のファイル名が空か、ディレクトリを指しています');
+  }
+  if (UNSAFE_IN_FILENAME.test(name) || hasControlChar(name)) {
+    throw new AttachmentError(`添付のファイル名に使えない文字が含まれています: ${name}`);
+  }
+  if (WINDOWS_RESERVED.test(name)) {
+    throw new AttachmentError(`添付のファイル名が予約語です: ${name}`);
+  }
+  // Windows は末尾のドットと空白を黙って落とすので、意図と違うファイルができる
+  if (name.endsWith('.') || name.endsWith(' ')) {
+    throw new AttachmentError(`添付のファイル名が「.」か空白で終わっています: ${name}`);
+  }
+  return name;
+};
+
+/**
+ * 保存を許す拡張子。**アップロード側のバイナリ集合と同じところから始める。**
+ *
+ * 読み取り側より緩めない。**人が開く場所に置く**ので、実行可能な形式（`.exe` / `.lnk` /
+ * `.scr` / `.bat`）が着地する状態を作らない。テキスト系はディスクを触らずに返すので
+ * ここには要らない。
+ */
+const SAVABLE_EXTENSIONS: readonly string[] = Object.keys(BINARY_EXTENSIONS);
+
+/** 衝突したときに試す連番の上限。ここまで埋まっているのは異常事態。 */
+const MAX_COLLISION_SUFFIX = 99;
+
+/**
+ * 重複しない名前で**新規作成として**開く。**上書きしない。**
+ *
+ * `name.pdf` → `name-2.pdf` → `name-3.pdf`。存在確認してから作ると隙ができるので、
+ * `wx`（既にあれば失敗）で開いて**作れた事実**を使う。
+ */
+const openFresh = async (
+  dir: string,
+  name: string,
+): Promise<{ readonly handle: FileHandle; readonly path: string }> => {
+  const ext = extname(name);
+  const stem = name.slice(0, name.length - ext.length);
+  for (let n = 1; n <= MAX_COLLISION_SUFFIX; n++) {
+    const candidate = join(dir, n === 1 ? name : `${stem}-${String(n)}${ext}`);
+    try {
+      return { handle: await open(candidate, 'wx'), path: candidate };
+    } catch (e) {
+      const error = toError(e);
+      if (!('code' in error) || error.code !== 'EEXIST') {
+        throw new AttachmentError(`添付を保存できませんでした: ${candidate}`, { cause: error });
+      }
+    }
+  }
+  throw new AttachmentError(
+    `同名のファイルが ${String(MAX_COLLISION_SUFFIX)} 件あります: ${join(dir, name)}`,
+  );
+};
+
+/**
+ * 添付をディスクへ保存する。**保存先は設定で与える**（クライアントからは変えられない）。
+ *
+ * 1. ファイル名として危なくないこと（**直さずに弾く**）
+ * 2. 拡張子が保存を許すものであること
+ * 3. 中身が拡張子と一致すること（`verifyContent`。読み取り側と同じ判定）
+ * 4. 重複しない名前で新規作成として開く（上書きしない）
+ *
+ * @param dir - 保存先。設定で与える絶対パス
+ * @param name - Backlog が返したファイル名。**第三者が決める**
+ * @param bytes - 中身
+ * @returns 保存したパス
+ * @throws {AttachmentError} 名前が危ない場合、拡張子が許されない場合、中身が一致しない場合、書けない場合
+ */
+export const saveAttachment = async (
+  dir: string,
+  name: string,
+  bytes: Uint8Array,
+): Promise<string> => {
+  const safe = safeFileName(name);
+  const suffix = extname(safe).toLowerCase();
+  if (!SAVABLE_EXTENSIONS.includes(suffix)) {
+    throw new AttachmentError(
+      `この形式は保存できません（保存できるのは ${SAVABLE_EXTENSIONS.join(' / ')}）: ${safe}`,
+    );
+  }
+  // 拡張子と中身が一致することを、読み取り側と同じ判定で確かめる
+  await verifyContent(bytes, contentRuleFor(safe));
+
+  const { handle, path } = await openFresh(dir, safe);
+  await using scoped = handle;
+  await scoped.write(bytes, 0, bytes.length, 0);
+  return path;
+};
+
+/**
+ * ダウンロードした添付の行き先。**テキストは LLM へ、それ以外はディスクへ。**
+ *
+ * 囲み（`<untrusted>`）はテキストにしか効かない。バイト列を LLM のコンテキストへ流すと
+ * **囲みの外側にコンテンツが出る初めてのケース**になるので、そこは開けない。代わりに
+ * ディスクへ置いてパスを返し、**人が見て選んで上げ直す**形にする（承認が1回挟まる）。
+ */
+export type ReceivedAttachment =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'saved'; readonly path: string };
+
+/**
+ * 降ってきたバイト列を、テキストとして返すか、ディスクへ置くかに割り振る。
+ *
+ * 判定は**アップロード側の裏返し**。`file-type` がバイナリを示さず、UTF-8 として
+ * 読めるならテキスト（`verifyContent` の `text` 側と同じ条件）。
+ *
+ * @param bytes - ダウンロードした中身
+ * @param name - Backlog が返したファイル名。**第三者が決める**
+ * @param downloadsDir - 保存先。未設定なら `null`（バイナリの口が開かない）
+ * @returns テキストか、保存したパス
+ * @throws {AttachmentError} バイナリなのに保存先が無い場合、名前や形式が受け付けられない場合
+ */
+export const receiveAttachment = async (
+  bytes: Uint8Array,
+  name: string,
+  downloadsDir: string | null,
+): Promise<ReceivedAttachment> => {
+  const detected = await fileTypeFromBuffer(bytes);
+  const looksText = detected === undefined || TEXT_LIKE_TYPES.includes(detected.ext);
+  if (looksText) {
+    try {
+      return { kind: 'text', text: new TextDecoder('utf-8', { fatal: true }).decode(bytes) };
+    } catch {
+      // 判定不能だが UTF-8 でもない。テキストとして扱えないのでディスクへ回す
+    }
+  }
+  if (downloadsDir === null) {
+    throw new AttachmentError(
+      'テキストではない添付を受け取る先が設定されていません（BACKLOG_DOWNLOADS_DIR が未設定）',
+    );
+  }
+  return { kind: 'saved', path: await saveAttachment(downloadsDir, name, bytes) };
+};

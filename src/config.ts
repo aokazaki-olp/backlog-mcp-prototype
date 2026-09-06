@@ -7,7 +7,7 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { config as loadEnvFile } from '@dotenvx/dotenvx';
 import { BACKLOG_DOMAINS, ConfigError } from './contract.ts';
-import { resolveAttachmentRoot } from './attach/localFile.ts';
+import { isInside, resolveAttachmentRoot } from './attach/localFile.ts';
 import { toError } from './shared/toError.ts';
 import type { BacklogDomain, ServerConfig } from './contract.ts';
 
@@ -175,6 +175,55 @@ const selfPathsOf = (env: NodeJS.ProcessEnv, policyPath: string): readonly strin
 };
 
 /**
+ * 書き込み先どうし・読み取りルートとの**重なり**を弾く。
+ *
+ * ダウンロード先は「人が開ける場所」を指すので、**ブラウザが第三者のファイルを落とす場所**と
+ * 重なりうる。そこが添付の読み取りルートと重なると、**ブラウザが落とした任意のファイルを
+ * Backlog へ上げられる**経路ができる。監査ログの出力先と重なれば、第三者由来のファイルが
+ * ログに紛れる。
+ *
+ * **どちらが親でも駄目**なので両向きに見る。同一パスも弾く（`isInside` は自分自身を
+ * `false` にするため、別に比べる）。
+ */
+const rejectOverlap = (
+  downloadsDir: string,
+  others: readonly { readonly path: string | null; readonly label: string }[],
+): void => {
+  for (const other of others) {
+    if (other.path === null) {
+      continue;
+    }
+    if (
+      downloadsDir === other.path ||
+      isInside(other.path, downloadsDir) ||
+      isInside(downloadsDir, other.path)
+    ) {
+      throw new ConfigError(
+        `BACKLOG_DOWNLOADS_DIR は ${other.label} と重ねられません（片方がもう片方の中にあります）`,
+      );
+    }
+  }
+};
+
+/**
+ * 添付のダウンロード先。**未設定なら `null`**（バイナリを保存する口が開かない）。
+ *
+ * **既定を置かない。** OS 既定のダウンロードフォルダを推測して既定にする案は採らない —
+ * Windows の既定は Known Folder として移動でき、Linux は XDG でロケール依存の名前に
+ * なりうる（**未確認**）。当たっているかに関係なく、**確かめていない値を既定にしない**。
+ * 既定を置くと「設定を書いていない利用者が、知らないディレクトリへ書く」状態にもなる
+ * （`BACKLOG_ATTACHMENTS_ROOT` と同じ立て方）。
+ *
+ * 相対指定の基準はほかと同じくポリシーファイルのディレクトリ。
+ */
+const resolveDownloadsDir = (value: string | undefined, policyPath: string): string | null => {
+  if (value === undefined || value === '') {
+    return null;
+  }
+  return resolveAttachmentRoot(dirname(policyPath), value);
+};
+
+/**
  * 環境変数から設定を組み立てる。
  *
  * **URL を受け取らない。** スペースID とドメイン（閉じた3値）だけを受け、
@@ -216,6 +265,19 @@ export const loadConfig = (
   // 絶対パスにしておく。ログの出力先の基準になるので、後から cwd が動いてもずれない
   const policyPath = resolve(required(env, 'BACKLOG_POLICY'));
 
+  const attachmentsRoot = resolveAttachmentsRoot(env['BACKLOG_ATTACHMENTS_ROOT'], policyPath);
+  const logDir = resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath);
+  const selfPaths = selfPathsOf(env, policyPath);
+  const downloadsDir = resolveDownloadsDir(env['BACKLOG_DOWNLOADS_DIR'], policyPath);
+  if (downloadsDir !== null) {
+    rejectOverlap(downloadsDir, [
+      { path: attachmentsRoot, label: 'BACKLOG_ATTACHMENTS_ROOT' },
+      { path: logDir, label: '監査ログの出力先' },
+      // 設定ファイルそのものを潰さない。読み取り側の selfPaths と対にする
+      ...selfPaths.map(path => ({ path, label: 'このサーバ自身の設定ファイル' })),
+    ]);
+  }
+
   return Object.freeze({
     spaceId,
     domain,
@@ -223,9 +285,10 @@ export const loadConfig = (
     baseUrl: `https://${spaceId}.${domain}`,
     apiKey: (overrides.resolveApiKey ?? decryptApiKey)(env),
     policyPath,
-    logDir: resolveLogDir(env['BACKLOG_LOG_DIR'], policyPath),
-    attachmentsRoot: resolveAttachmentsRoot(env['BACKLOG_ATTACHMENTS_ROOT'], policyPath),
-    selfPaths: selfPathsOf(env, policyPath),
+    logDir,
+    attachmentsRoot,
+    selfPaths,
+    downloadsDir,
     readOnly: rawReadOnly === '1' || rawReadOnly === 'true',
   });
 };

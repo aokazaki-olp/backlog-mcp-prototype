@@ -19,7 +19,7 @@ import {
 } from './mcp/audit.ts';
 import { serve } from './mcp/stdio.ts';
 import { explainPolicy, loadPolicy, writableProjectKeys } from './policy/policy.ts';
-import { readAttachment } from './attach/localFile.ts';
+import { readAttachment, receiveAttachment } from './attach/localFile.ts';
 import { DEFAULT_LIMITS, buildHandlers } from './tool/tools.ts';
 import { toError } from './shared/toError.ts';
 import type { ConfigOverrides } from './config.ts';
@@ -146,6 +146,9 @@ export const createHandlers = async (
             // 監査ログの出力先。配下に置いてよい添付は無いので丸ごと拒む
             selfDirs: [config.logDir],
           }),
+        // ダウンロードした添付の行き先もここで決める。テキストなら囲んで返し、
+        // それ以外は保存する。保存先が未設定ならバイナリの口だけが閉じる
+        receiveAttachment: (bytes, name) => receiveAttachment(bytes, name, config.downloadsDir),
       }),
       sink,
     );

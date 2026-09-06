@@ -18,4 +18,16 @@ import type { ResolvedRequest } from '../contract.ts';
  */
 export interface BacklogGateway {
   send(request: ResolvedRequest): Promise<unknown>;
+  /**
+   * **バイト列を受け取る**。添付のダウンロードだけが使う。
+   *
+   * `send` と分けているのは、借り物のクライアントが応答を1通りにしか解けないため。
+   * `BacklogApiClient` は `responseHandler: response => response.body` を焼き込んで
+   * いて（`src/libs/BacklogApiClient.js`）、**バイナリの応答では `body` が `null` になる**
+   * — 組み込みの Transport が `image/*` `application/pdf` などを本文として解かず、
+   * `bytes` にだけ入れるため。`src/libs/` はローカル編集できない（AGENTS.md）ので、
+   * **公開されている `extend`（Transport のデコレータ）で `bytes` を `body` に移す**
+   * 別クライアントを立てて、それをこの口に割り当てる。
+   */
+  sendBytes(request: ResolvedRequest): Promise<Uint8Array>;
 }

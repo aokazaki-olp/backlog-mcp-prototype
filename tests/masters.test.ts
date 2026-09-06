@@ -39,6 +39,9 @@ const makeFetcher = (
   const calls: ResolvedRequest[] = [];
   return {
     calls,
+    sendBytes() {
+      return Promise.reject(new Error('このテストでは使わない'));
+    },
     send(request) {
       calls.push(request);
       if (!(request.endpoint in responses)) {

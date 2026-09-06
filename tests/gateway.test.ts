@@ -25,6 +25,7 @@ const CONFIG: ServerConfig = {
   apiKey: 'secret-key-value',
   policyPath: '/dev/null',
   attachmentsRoot: null,
+  downloadsDir: null,
   selfPaths: [],
   logDir: '/dev/null',
   readOnly: false,
