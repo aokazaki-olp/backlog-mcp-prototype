@@ -371,6 +371,14 @@ Capabilities are declared per-request rather than once at initialization;
 an empty object means the client supports no optional capabilities.
 Servers MUST NOT infer capabilities from prior requests.
 
+#### `"io.modelcontextprotocol/logLevel"?: LoggingLevel` (deprecated)
+
+The desired log level for this request. Optional.
+
+If absent, the server MUST NOT send any [notifications/message](#loggingmessagenotification)
+notifications for this request. The client opts in to log messages by
+explicitly setting a level. Replaces the former `logging/setLevel` RPC.
+
 ### `RequestParams`
 
 Common params for any request.
@@ -1413,6 +1421,10 @@ interface LoggingMessageNotification {
 }
 ```
 
+#### `method: "notifications/message"` (deprecated)
+
+#### `params: LoggingMessageNotificationParams` (deprecated)
+
 ### `LoggingMessageNotificationParams`
 
 Parameters for a `notifications/message` notification.
@@ -1425,6 +1437,18 @@ interface LoggingMessageNotificationParams {
   data: unknown;
 }
 ```
+
+#### `level: LoggingLevel` (deprecated)
+
+The severity of this log message.
+
+#### `logger?: string` (deprecated)
+
+An optional name of the logger issuing this message.
+
+#### `data: unknown` (deprecated)
+
+The data to be logged, such as a string message or an object. Any JSON serializable type is allowed here.
 
 ## `notifications/progress`
 
@@ -2096,6 +2120,10 @@ interface ListRootsRequest {
 }
 ```
 
+#### `method: "roots/list"` (deprecated)
+
+#### `params?: { _meta?: MetaObject }` (deprecated)
+
 ### `ListRootsResult`
 
 The result returned by the client for a [roots/list](#listrootsrequest) request.
@@ -2107,6 +2135,8 @@ interface ListRootsResult {
   roots: Root[];
 }
 ```
+
+#### `roots: Root[]` (deprecated)
 
 ### `Root`
 
@@ -2120,6 +2150,20 @@ interface Root {
 }
 ```
 
+#### `uri: string` (deprecated)
+
+The URI identifying the root. This must start with `file://` for now.
+This restriction may be relaxed in future versions of the protocol to allow
+other URI schemes.
+
+#### `name?: string` (deprecated)
+
+An optional name for the root. This can be used to provide a human-readable
+identifier for the root, which may be useful for display purposes or for
+referencing the root in other parts of the application.
+
+#### `_meta?: MetaObject` (deprecated)
+
 ## `sampling/createMessage`
 
 ### `CreateMessageRequest`
@@ -2132,6 +2176,10 @@ interface CreateMessageRequest {
   params: CreateMessageRequestParams;
 }
 ```
+
+#### `method: "sampling/createMessage"` (deprecated)
+
+#### `params: CreateMessageRequestParams` (deprecated)
 
 ### `CreateMessageRequestParams`
 
@@ -2152,6 +2200,49 @@ interface CreateMessageRequestParams {
 }
 ```
 
+#### `messages: SamplingMessage[]` (deprecated)
+
+#### `modelPreferences?: ModelPreferences` (deprecated)
+
+The server's preferences for which model to select. The client MAY ignore these preferences.
+
+#### `systemPrompt?: string` (deprecated)
+
+An optional system prompt the server wants to use for sampling. The client MAY modify or omit this prompt.
+
+#### `includeContext?: "none" | "thisServer" | "allServers"` (deprecated)
+
+A request to include context from one or more MCP servers (including the caller), to be attached to the prompt.
+The client MAY ignore this request.
+
+Default is `"none"`. The values `"thisServer"` and `"allServers"` are deprecated (SEP-2596): servers SHOULD
+omit this field or use `"none"`, and SHOULD only use the deprecated values if the client declares [ClientCapabilities.sampling.context](#clientcapabilities-sampling).
+
+#### `temperature?: number` (deprecated)
+
+#### `maxTokens: number` (deprecated)
+
+The requested maximum number of tokens to sample (to prevent runaway completions).
+
+The client MAY choose to sample fewer tokens than the requested maximum.
+
+#### `stopSequences?: string[]` (deprecated)
+
+#### `metadata?: JSONObject` (deprecated)
+
+Optional metadata to pass through to the LLM provider. The format of this metadata is provider-specific.
+
+#### `tools?: Tool[]` (deprecated)
+
+Tools that the model may use during generation.
+The client MUST return an error if this field is provided but [ClientCapabilities.sampling.tools](#clientcapabilities-sampling) is not declared.
+
+#### `toolChoice?: ToolChoice` (deprecated)
+
+Controls how the model uses tools.
+The client MUST return an error if this field is provided but [ClientCapabilities.sampling.tools](#clientcapabilities-sampling) is not declared.
+Default is `{ mode: "auto" }`.
+
 ### `CreateMessageResult`
 
 The result returned by the client for a [sampling/createMessage](#createmessagerequest) request.
@@ -2168,6 +2259,16 @@ interface CreateMessageResult {
 }
 ```
 
+#### `model: string` (deprecated)
+
+The name of the model that generated the message.
+
+#### `stopReason?: string` (deprecated)
+
+The reason why sampling stopped, if known.
+
+Standard values:  `"endTurn"`: Natural end of the assistant's turn `"stopSequence"`: A stop sequence was encountered `"maxTokens"`: Maximum token limit was reached `"toolUse"`: The model wants to use one or more tools  This field is an open string to allow for provider-specific stop reasons.
+
 ### `ModelHint`
 
 Hints to use for model selection.
@@ -2180,6 +2281,12 @@ interface ModelHint {
   name?: string;
 }
 ```
+
+#### `name?: string` (deprecated)
+
+A hint for a model name.
+
+The client SHOULD treat this as a substring of a model name; for example:  `claude-3-5-sonnet` should match `claude-3-5-sonnet-20241022` `sonnet` should match `claude-3-5-sonnet-20241022`, `claude-3-sonnet-20240229`, etc. `claude` should match any Claude model  The client MAY also map the string to a different provider's model name or a different model family, as long as it fills a similar niche; for example:  `gemini-1.5-flash` could match `claude-3-haiku-20240307`
 
 ### `ModelPreferences`
 
@@ -2204,6 +2311,34 @@ interface ModelPreferences {
 }
 ```
 
+#### `hints?: ModelHint[]` (deprecated)
+
+Optional hints to use for model selection.
+
+If multiple hints are specified, the client MUST evaluate them in order
+(such that the first match is taken).
+
+The client SHOULD prioritize these hints over the numeric priorities, but
+MAY still use the priorities to select from ambiguous matches.
+
+#### `costPriority?: number` (deprecated)
+
+How much to prioritize cost when selecting a model. A value of 0 means cost
+is not important, while a value of 1 means cost is the most important
+factor.
+
+#### `speedPriority?: number` (deprecated)
+
+How much to prioritize sampling speed (latency) when selecting a model. A
+value of 0 means speed is not important, while a value of 1 means speed is
+the most important factor.
+
+#### `intelligencePriority?: number` (deprecated)
+
+How much to prioritize intelligence and capabilities when selecting a
+model. A value of 0 means intelligence is not important, while a value of 1
+means intelligence is the most important factor.
+
 ### `SamplingMessage`
 
 Describes a message issued to or received from an LLM API.
@@ -2215,6 +2350,12 @@ interface SamplingMessage {
   _meta?: MetaObject;
 }
 ```
+
+#### `role: Role` (deprecated)
+
+#### `content: SamplingMessageContentBlock | SamplingMessageContentBlock[]` (deprecated)
+
+#### `_meta?: MetaObject` (deprecated)
 
 ### `SamplingMessageContentBlock`
 
@@ -2239,6 +2380,10 @@ interface ToolChoice {
 }
 ```
 
+#### `mode?: "none" | "required" | "auto"` (deprecated)
+
+Controls the tool use ability of the model:  `"auto"`: Model decides whether to use tools (default) `"required"`: Model MUST use at least one tool before completing `"none"`: Model MUST NOT use any tools
+
 ### `ToolResultContent`
 
 The result of a tool use, provided by the user back to the assistant.
@@ -2254,6 +2399,40 @@ interface ToolResultContent {
 }
 ```
 
+#### `type: "tool_result"` (deprecated)
+
+#### `toolUseId: string` (deprecated)
+
+The ID of the tool use this result corresponds to.
+
+This MUST match the ID from a previous [ToolUseContent](#toolusecontent).
+
+#### `content: ContentBlock[]` (deprecated)
+
+The unstructured result content of the tool use.
+
+This has the same format as [CallToolResult.content](#calltoolresult-content) and can include text, images,
+audio, resource links, and embedded resources.
+
+#### `structuredContent?: unknown` (deprecated)
+
+An optional structured result value.
+
+This can be any JSON value (object, array, string, number, boolean, or null).
+If the tool defined an [Tool.outputSchema](#tool-outputschema), this SHOULD conform to that schema.
+
+#### `isError?: boolean` (deprecated)
+
+Whether the tool use resulted in an error.
+
+If true, the content typically describes the error that occurred.
+Default: false
+
+#### `_meta?: MetaObject` (deprecated)
+
+Optional metadata about the tool result. Clients SHOULD preserve this field when
+including tool results in subsequent sampling requests to enable caching optimizations.
+
 ### `ToolUseContent`
 
 A request from the assistant to call a tool.
@@ -2267,6 +2446,27 @@ interface ToolUseContent {
   _meta?: MetaObject;
 }
 ```
+
+#### `type: "tool_use"` (deprecated)
+
+#### `id: string` (deprecated)
+
+A unique identifier for this tool use.
+
+This ID is used to match tool results to their corresponding tool uses.
+
+#### `name: string` (deprecated)
+
+The name of the tool to call.
+
+#### `input: { [key: string]: unknown }` (deprecated)
+
+The arguments to pass to the tool, conforming to the tool's input schema.
+
+#### `_meta?: MetaObject` (deprecated)
+
+Optional metadata about the tool use. Clients SHOULD preserve this field when
+including tool uses in subsequent sampling requests to enable caching optimizations.
 
 ## `server/discover`
 
@@ -2357,6 +2557,14 @@ interface ClientCapabilities {
 
 Experimental, non-standard capabilities that the client supports.
 
+#### `roots?: {}` (deprecated)
+
+Present if the client supports listing roots.
+
+#### `sampling?: { context?: JSONObject; tools?: JSONObject }` (deprecated)
+
+Present if the client supports sampling from an LLM.
+
 #### `elicitation?: { form?: JSONObject; url?: JSONObject }`
 
 Present if the client supports elicitation from the server.
@@ -2420,6 +2628,10 @@ interface ServerCapabilities {
 #### `experimental?: { [key: string]: JSONObject }`
 
 Experimental, non-standard capabilities that the server supports.
+
+#### `logging?: JSONObject` (deprecated)
+
+Present if the server supports sending log messages to the client.
 
 #### `completions?: JSONObject`
 
