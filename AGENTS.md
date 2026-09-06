@@ -60,7 +60,8 @@ npm run verify:rules
 | ----------------------------------- | --------------------------------------------- |
 | `CODING_RULES.md`                   | `aokazaki-olp/coding-rules`                   |
 | `.agents/skills/` `.claude/skills/` | 別リポジトリ                                  |
-| `docs/reference/`                   | 生成物（`tools/backlog-docs/`）               |
+| `docs/reference/api/`               | 生成物（`tools/backlog-docs/`）               |
+| `docs/reference/mcp/`               | 生成物（`tools/mcp-docs/`）                   |
 | `src/libs/`                         | `aokazaki-olp/libraries` の**生成物**（後述） |
 
 ### `src/libs/` は借り物を「コンパイルした生成物」

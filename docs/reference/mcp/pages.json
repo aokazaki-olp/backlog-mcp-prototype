@@ -1,0 +1,1280 @@
+{
+  "source": "https://modelcontextprotocol.io",
+  "language": "en",
+  "fetchedAt": "2026-09-06",
+  "versions": [
+    "2025-06-18",
+    "2025-11-25",
+    "2026-07-28"
+  ],
+  "latest": "2026-07-28",
+  "schemaCommit": "e76e9c572c6f2bfcb730357101acc90f2f802e02",
+  "count": 137,
+  "pages": [
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Build an MCP client",
+      "description": "Get started building your own client that can integrate with all MCP servers.",
+      "sitePath": "/docs/2025-06-18/develop/build-client",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/build-client",
+      "file": "guides/2025-06-18/develop/build-client.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Build an MCP server",
+      "description": "Get started building your own server to use in Claude for Desktop and other clients.",
+      "sitePath": "/docs/2025-06-18/develop/build-server",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/build-server",
+      "file": "guides/2025-06-18/develop/build-server.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Build with Agent Skills",
+      "description": "Use agent skills to guide AI coding assistants through MCP server design and implementation",
+      "sitePath": "/docs/2025-06-18/develop/build-with-agent-skills",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/build-with-agent-skills",
+      "file": "guides/2025-06-18/develop/build-with-agent-skills.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Client Best Practices",
+      "description": "Patterns for scaling MCP host applications across many servers and tools.",
+      "sitePath": "/docs/2025-06-18/develop/clients/client-best-practices",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/clients/client-best-practices",
+      "file": "guides/2025-06-18/develop/clients/client-best-practices.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Connect to local MCP servers",
+      "description": "Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations",
+      "sitePath": "/docs/2025-06-18/develop/connect-local-servers",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/connect-local-servers",
+      "file": "guides/2025-06-18/develop/connect-local-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Connect to remote MCP Servers",
+      "description": "Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources",
+      "sitePath": "/docs/2025-06-18/develop/connect-remote-servers",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/develop/connect-remote-servers",
+      "file": "guides/2025-06-18/develop/connect-remote-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "What is the Model Context Protocol (MCP)?",
+      "description": "MCP (Model Context Protocol) is an open-source standard for connecting AI app…",
+      "sitePath": "/docs/2025-06-18/getting-started/intro",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/getting-started/intro",
+      "file": "guides/2025-06-18/getting-started/intro.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Architecture overview",
+      "description": "This overview of the Model Context Protocol (MCP) discusses its scope and cor…",
+      "sitePath": "/docs/2025-06-18/learn/architecture",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/learn/architecture",
+      "file": "guides/2025-06-18/learn/architecture.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Understanding MCP clients",
+      "description": "MCP clients are instantiated by host applications to communicate with particu…",
+      "sitePath": "/docs/2025-06-18/learn/client-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/learn/client-concepts",
+      "file": "guides/2025-06-18/learn/client-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Understanding MCP servers",
+      "description": "MCP servers are programs that expose specific capabilities to AI applications…",
+      "sitePath": "/docs/2025-06-18/learn/server-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/learn/server-concepts",
+      "file": "guides/2025-06-18/learn/server-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Versioning",
+      "description": "The Model Context Protocol uses string-based version identifiers following th…",
+      "sitePath": "/docs/2025-06-18/learn/versioning",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/learn/versioning",
+      "file": "guides/2025-06-18/learn/versioning.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "SDKs",
+      "description": "Official SDKs for building with Model Context Protocol",
+      "sitePath": "/docs/2025-06-18/sdk",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/sdk",
+      "file": "guides/2025-06-18/sdk.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Debugging",
+      "description": "A comprehensive guide to debugging Model Context Protocol (MCP) integrations",
+      "sitePath": "/docs/2025-06-18/tools/debugging",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/tools/debugging",
+      "file": "guides/2025-06-18/tools/debugging.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "MCP Inspector",
+      "description": "In-depth guide to using the MCP Inspector for testing and debugging Model Context Protocol servers",
+      "sitePath": "/docs/2025-06-18/tools/inspector",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/tools/inspector",
+      "file": "guides/2025-06-18/tools/inspector.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Understanding Authorization in MCP",
+      "description": "Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations",
+      "sitePath": "/docs/2025-06-18/tutorials/security/authorization",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/tutorials/security/authorization",
+      "file": "guides/2025-06-18/tutorials/security/authorization.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-06-18",
+      "title": "Security Best Practices",
+      "description": "Security considerations, attack vectors, and best practices for MCP implementations",
+      "sitePath": "/docs/2025-06-18/tutorials/security/security_best_practices",
+      "source": "https://modelcontextprotocol.io/docs/2025-06-18/tutorials/security/security_best_practices",
+      "file": "guides/2025-06-18/tutorials/security/security_best_practices.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Build an MCP client",
+      "description": "Get started building your own client that can integrate with all MCP servers.",
+      "sitePath": "/docs/2025-11-25/develop/build-client",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/build-client",
+      "file": "guides/2025-11-25/develop/build-client.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Build an MCP server",
+      "description": "Get started building your own server to use in Claude for Desktop and other clients.",
+      "sitePath": "/docs/2025-11-25/develop/build-server",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/build-server",
+      "file": "guides/2025-11-25/develop/build-server.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Build with Agent Skills",
+      "description": "Use agent skills to guide AI coding assistants through MCP server design and implementation",
+      "sitePath": "/docs/2025-11-25/develop/build-with-agent-skills",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/build-with-agent-skills",
+      "file": "guides/2025-11-25/develop/build-with-agent-skills.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Client Best Practices",
+      "description": "Patterns for scaling MCP host applications across many servers and tools.",
+      "sitePath": "/docs/2025-11-25/develop/clients/client-best-practices",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/clients/client-best-practices",
+      "file": "guides/2025-11-25/develop/clients/client-best-practices.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Connect to local MCP servers",
+      "description": "Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations",
+      "sitePath": "/docs/2025-11-25/develop/connect-local-servers",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/connect-local-servers",
+      "file": "guides/2025-11-25/develop/connect-local-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Connect to remote MCP Servers",
+      "description": "Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources",
+      "sitePath": "/docs/2025-11-25/develop/connect-remote-servers",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/develop/connect-remote-servers",
+      "file": "guides/2025-11-25/develop/connect-remote-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "What is the Model Context Protocol (MCP)?",
+      "description": "MCP (Model Context Protocol) is an open-source standard for connecting AI app…",
+      "sitePath": "/docs/2025-11-25/getting-started/intro",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/getting-started/intro",
+      "file": "guides/2025-11-25/getting-started/intro.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Architecture overview",
+      "description": "This overview of the Model Context Protocol (MCP) discusses its scope and cor…",
+      "sitePath": "/docs/2025-11-25/learn/architecture",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/learn/architecture",
+      "file": "guides/2025-11-25/learn/architecture.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Understanding MCP clients",
+      "description": "MCP clients are instantiated by host applications to communicate with particu…",
+      "sitePath": "/docs/2025-11-25/learn/client-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/learn/client-concepts",
+      "file": "guides/2025-11-25/learn/client-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Understanding MCP servers",
+      "description": "MCP servers are programs that expose specific capabilities to AI applications…",
+      "sitePath": "/docs/2025-11-25/learn/server-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/learn/server-concepts",
+      "file": "guides/2025-11-25/learn/server-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Versioning",
+      "description": "The Model Context Protocol uses string-based version identifiers following th…",
+      "sitePath": "/docs/2025-11-25/learn/versioning",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/learn/versioning",
+      "file": "guides/2025-11-25/learn/versioning.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "SDKs",
+      "description": "Official SDKs for building with Model Context Protocol",
+      "sitePath": "/docs/2025-11-25/sdk",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/sdk",
+      "file": "guides/2025-11-25/sdk.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Debugging",
+      "description": "A comprehensive guide to debugging Model Context Protocol (MCP) integrations",
+      "sitePath": "/docs/2025-11-25/tools/debugging",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/tools/debugging",
+      "file": "guides/2025-11-25/tools/debugging.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "MCP Inspector",
+      "description": "In-depth guide to using the MCP Inspector for testing and debugging Model Context Protocol servers",
+      "sitePath": "/docs/2025-11-25/tools/inspector",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/tools/inspector",
+      "file": "guides/2025-11-25/tools/inspector.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Understanding Authorization in MCP",
+      "description": "Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations",
+      "sitePath": "/docs/2025-11-25/tutorials/security/authorization",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/authorization",
+      "file": "guides/2025-11-25/tutorials/security/authorization.md"
+    },
+    {
+      "section": "guides",
+      "version": "2025-11-25",
+      "title": "Security Best Practices",
+      "description": "Security considerations, attack vectors, and best practices for MCP implementations",
+      "sitePath": "/docs/2025-11-25/tutorials/security/security_best_practices",
+      "source": "https://modelcontextprotocol.io/docs/2025-11-25/tutorials/security/security_best_practices",
+      "file": "guides/2025-11-25/tutorials/security/security_best_practices.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Build an MCP client",
+      "description": "Get started building your own client that can integrate with all MCP servers.",
+      "sitePath": "/docs/2026-07-28/develop/build-client",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/build-client",
+      "file": "guides/2026-07-28/develop/build-client.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Build an MCP server",
+      "description": "Get started building your own server to use in Claude for Desktop and other clients.",
+      "sitePath": "/docs/2026-07-28/develop/build-server",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/build-server",
+      "file": "guides/2026-07-28/develop/build-server.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Build with Agent Skills",
+      "description": "Use agent skills to guide AI coding assistants through MCP server design and implementation",
+      "sitePath": "/docs/2026-07-28/develop/build-with-agent-skills",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/build-with-agent-skills",
+      "file": "guides/2026-07-28/develop/build-with-agent-skills.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Client Best Practices",
+      "description": "Patterns for scaling MCP host applications across many servers and tools.",
+      "sitePath": "/docs/2026-07-28/develop/clients/client-best-practices",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/clients/client-best-practices",
+      "file": "guides/2026-07-28/develop/clients/client-best-practices.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Connect to local MCP servers",
+      "description": "Learn how to extend Claude Desktop with local MCP servers to enable file system access and other powerful integrations",
+      "sitePath": "/docs/2026-07-28/develop/connect-local-servers",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers",
+      "file": "guides/2026-07-28/develop/connect-local-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Connect to remote MCP Servers",
+      "description": "Learn how to connect Claude to remote MCP servers and extend its capabilities with internet-hosted tools and data sources",
+      "sitePath": "/docs/2026-07-28/develop/connect-remote-servers",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-remote-servers",
+      "file": "guides/2026-07-28/develop/connect-remote-servers.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "What is the Model Context Protocol (MCP)?",
+      "description": "MCP (Model Context Protocol) is an open-source standard for connecting AI app…",
+      "sitePath": "/docs/2026-07-28/getting-started/intro",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/getting-started/intro",
+      "file": "guides/2026-07-28/getting-started/intro.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Architecture overview",
+      "description": "This overview of the Model Context Protocol (MCP) discusses its scope and cor…",
+      "sitePath": "/docs/2026-07-28/learn/architecture",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/learn/architecture",
+      "file": "guides/2026-07-28/learn/architecture.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Understanding MCP clients",
+      "description": "MCP clients are instantiated by host applications to communicate with particu…",
+      "sitePath": "/docs/2026-07-28/learn/client-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/learn/client-concepts",
+      "file": "guides/2026-07-28/learn/client-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Understanding MCP servers",
+      "description": "MCP servers are programs that expose specific capabilities to AI applications…",
+      "sitePath": "/docs/2026-07-28/learn/server-concepts",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/learn/server-concepts",
+      "file": "guides/2026-07-28/learn/server-concepts.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Versioning",
+      "description": "The Model Context Protocol uses string-based version identifiers following th…",
+      "sitePath": "/docs/2026-07-28/learn/versioning",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/learn/versioning",
+      "file": "guides/2026-07-28/learn/versioning.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "SDKs",
+      "description": "Official SDKs for building with Model Context Protocol",
+      "sitePath": "/docs/2026-07-28/sdk",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/sdk",
+      "file": "guides/2026-07-28/sdk.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Debugging",
+      "description": "A comprehensive guide to debugging Model Context Protocol (MCP) integrations",
+      "sitePath": "/docs/2026-07-28/tools/debugging",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/debugging",
+      "file": "guides/2026-07-28/tools/debugging.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "MCP Inspector",
+      "description": "Interactive developer tooling for testing and debugging MCP servers, in the browser, on the command line, and in the terminal",
+      "sitePath": "/docs/2026-07-28/tools/inspector",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector",
+      "file": "guides/2026-07-28/tools/inspector.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Authorization",
+      "description": "How the MCP Inspector performs OAuth, re-authorizes mid-session, and shares tokens between its clients",
+      "sitePath": "/docs/2026-07-28/tools/inspector/authorization",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/authorization",
+      "file": "guides/2026-07-28/tools/inspector/authorization.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "CLI client",
+      "description": "Scripting the MCP Inspector: methods, output formats, exit codes, and CI recipes",
+      "sitePath": "/docs/2026-07-28/tools/inspector/cli",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/cli",
+      "file": "guides/2026-07-28/tools/inspector/cli.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Configuration and flags",
+      "description": "Catalog vs. config files, which client owns which flag, and every environment variable",
+      "sitePath": "/docs/2026-07-28/tools/inspector/configuration",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/configuration",
+      "file": "guides/2026-07-28/tools/inspector/configuration.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Protocol eras",
+      "description": "How the Inspector negotiates legacy vs. modern MCP, and how every feature is handled between protocol eras",
+      "sitePath": "/docs/2026-07-28/tools/inspector/protocol-eras",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/protocol-eras",
+      "file": "guides/2026-07-28/tools/inspector/protocol-eras.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Recipes",
+      "description": "Practical guides for transports, importing configs, reviewing MCP Apps, Docker, and network hosting",
+      "sitePath": "/docs/2026-07-28/tools/inspector/recipes",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/recipes",
+      "file": "guides/2026-07-28/tools/inspector/recipes.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "TUI client",
+      "description": "The terminal MCP Inspector: navigation, tabs, and keyboard reference",
+      "sitePath": "/docs/2026-07-28/tools/inspector/tui",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/tui",
+      "file": "guides/2026-07-28/tools/inspector/tui.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Web client",
+      "description": "A tab-by-tab walkthrough of the graphical MCP Inspector",
+      "sitePath": "/docs/2026-07-28/tools/inspector/web",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tools/inspector/web",
+      "file": "guides/2026-07-28/tools/inspector/web.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Understanding Authorization in MCP",
+      "description": "Learn how to implement secure authorization for MCP servers using OAuth 2.1 to protect sensitive resources and operations",
+      "sitePath": "/docs/2026-07-28/tutorials/security/authorization",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/authorization",
+      "file": "guides/2026-07-28/tutorials/security/authorization.md"
+    },
+    {
+      "section": "guides",
+      "version": "2026-07-28",
+      "title": "Security Best Practices",
+      "description": "Security considerations, attack vectors, and best practices for MCP implementations",
+      "sitePath": "/docs/2026-07-28/tutorials/security/security_best_practices",
+      "source": "https://modelcontextprotocol.io/docs/2026-07-28/tutorials/security/security_best_practices",
+      "file": "guides/2026-07-28/tutorials/security/security_best_practices.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Build an MCP App",
+      "description": "Getting started guide for building interactive UI applications with MCP Apps",
+      "sitePath": "/extensions/apps/build",
+      "source": "https://modelcontextprotocol.io/extensions/apps/build",
+      "file": "extensions/apps/build.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "MCP Apps",
+      "description": "Interactive UI applications that render inside MCP hosts like Claude Desktop",
+      "sitePath": "/extensions/apps/overview",
+      "source": "https://modelcontextprotocol.io/extensions/apps/overview",
+      "file": "extensions/apps/overview.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Enterprise-Managed Authorization",
+      "description": "Centralized access control for MCP in enterprise environments via identity providers",
+      "sitePath": "/extensions/auth/enterprise-managed-authorization",
+      "source": "https://modelcontextprotocol.io/extensions/auth/enterprise-managed-authorization",
+      "file": "extensions/auth/enterprise-managed-authorization.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "OAuth Client Credentials",
+      "description": "Machine-to-machine authentication for MCP using the OAuth 2.0 client credentials flow",
+      "sitePath": "/extensions/auth/oauth-client-credentials",
+      "source": "https://modelcontextprotocol.io/extensions/auth/oauth-client-credentials",
+      "file": "extensions/auth/oauth-client-credentials.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Authorization Extensions",
+      "description": "Supplementary authorization mechanisms for the Model Context Protocol",
+      "sitePath": "/extensions/auth/overview",
+      "source": "https://modelcontextprotocol.io/extensions/auth/overview",
+      "file": "extensions/auth/overview.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Extension Support Matrix",
+      "description": "Which MCP clients implement which official extensions",
+      "sitePath": "/extensions/client-matrix",
+      "source": "https://modelcontextprotocol.io/extensions/client-matrix",
+      "file": "extensions/client-matrix.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Extensions Overview",
+      "description": "Optional extensions to the Model Context Protocol",
+      "sitePath": "/extensions/overview",
+      "source": "https://modelcontextprotocol.io/extensions/overview",
+      "file": "extensions/overview.md"
+    },
+    {
+      "section": "extensions",
+      "version": null,
+      "title": "Tasks",
+      "description": "Asynchronous task execution for long-running MCP operations",
+      "sitePath": "/extensions/tasks/overview",
+      "source": "https://modelcontextprotocol.io/extensions/tasks/overview",
+      "file": "extensions/tasks/overview.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Architecture",
+      "description": "The Model Context Protocol (MCP) follows a client-host-server architecture wh…",
+      "sitePath": "/specification/2025-06-18/architecture",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/architecture",
+      "file": "specification/2025-06-18/architecture.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Authorization",
+      "description": "The Model Context Protocol provides authorization capabilities at the transpo…",
+      "sitePath": "/specification/2025-06-18/basic/authorization",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization",
+      "file": "specification/2025-06-18/basic/authorization.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Overview",
+      "description": "The Model Context Protocol consists of several key components that work toget…",
+      "sitePath": "/specification/2025-06-18/basic",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic",
+      "file": "specification/2025-06-18/basic.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Lifecycle",
+      "description": "The Model Context Protocol (MCP) defines a rigorous lifecycle for client-serv…",
+      "sitePath": "/specification/2025-06-18/basic/lifecycle",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/lifecycle",
+      "file": "specification/2025-06-18/basic/lifecycle.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Transports",
+      "description": "MCP uses JSON-RPC to encode messages. JSON-RPC messages MUST be UTF-8 encoded.",
+      "sitePath": "/specification/2025-06-18/basic/transports",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/transports",
+      "file": "specification/2025-06-18/basic/transports.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Cancellation",
+      "description": "The Model Context Protocol (MCP) supports optional cancellation of in-progres…",
+      "sitePath": "/specification/2025-06-18/basic/utilities/cancellation",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation",
+      "file": "specification/2025-06-18/basic/utilities/cancellation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Ping",
+      "description": "The Model Context Protocol includes an optional ping mechanism that allows ei…",
+      "sitePath": "/specification/2025-06-18/basic/utilities/ping",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/ping",
+      "file": "specification/2025-06-18/basic/utilities/ping.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Progress",
+      "description": "The Model Context Protocol (MCP) supports optional progress tracking for long…",
+      "sitePath": "/specification/2025-06-18/basic/utilities/progress",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/progress",
+      "file": "specification/2025-06-18/basic/utilities/progress.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Key Changes",
+      "description": "This document lists changes made to the Model Context Protocol (MCP) specific…",
+      "sitePath": "/specification/2025-06-18/changelog",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/changelog",
+      "file": "specification/2025-06-18/changelog.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Elicitation",
+      "description": "Elicitation is newly introduced in this version of the MCP specification and…",
+      "sitePath": "/specification/2025-06-18/client/elicitation",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/client/elicitation",
+      "file": "specification/2025-06-18/client/elicitation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Roots",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for clients to e…",
+      "sitePath": "/specification/2025-06-18/client/roots",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/client/roots",
+      "file": "specification/2025-06-18/client/roots.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Sampling",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to r…",
+      "sitePath": "/specification/2025-06-18/client/sampling",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/client/sampling",
+      "file": "specification/2025-06-18/client/sampling.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Specification",
+      "description": "This specification defines the authoritative protocol requirements, based on…",
+      "sitePath": "/specification/2025-06-18",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18",
+      "file": "specification/2025-06-18/index.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Schema Reference",
+      "description": "A response to a request that indicates an error occurred.",
+      "sitePath": "/specification/2025-06-18/schema",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/schema",
+      "file": "specification/2025-06-18/schema.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Overview",
+      "description": "Servers provide the fundamental building blocks for adding context to languag…",
+      "sitePath": "/specification/2025-06-18/server",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server",
+      "file": "specification/2025-06-18/server.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Prompts",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2025-06-18/server/prompts",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/prompts",
+      "file": "specification/2025-06-18/server/prompts.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Resources",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2025-06-18/server/resources",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/resources",
+      "file": "specification/2025-06-18/server/resources.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Tools",
+      "description": "The Model Context Protocol (MCP) allows servers to expose tools that can be i…",
+      "sitePath": "/specification/2025-06-18/server/tools",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/tools",
+      "file": "specification/2025-06-18/server/tools.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Completion",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to o…",
+      "sitePath": "/specification/2025-06-18/server/utilities/completion",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/completion",
+      "file": "specification/2025-06-18/server/utilities/completion.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Logging",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to s…",
+      "sitePath": "/specification/2025-06-18/server/utilities/logging",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/logging",
+      "file": "specification/2025-06-18/server/utilities/logging.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-06-18",
+      "title": "Pagination",
+      "description": "The Model Context Protocol (MCP) supports paginating list operations that may…",
+      "sitePath": "/specification/2025-06-18/server/utilities/pagination",
+      "source": "https://modelcontextprotocol.io/specification/2025-06-18/server/utilities/pagination",
+      "file": "specification/2025-06-18/server/utilities/pagination.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Architecture",
+      "description": "The Model Context Protocol (MCP) follows a client-host-server architecture wh…",
+      "sitePath": "/specification/2025-11-25/architecture",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/architecture",
+      "file": "specification/2025-11-25/architecture.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Authorization",
+      "description": "The Model Context Protocol provides authorization capabilities at the transpo…",
+      "sitePath": "/specification/2025-11-25/basic/authorization",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization",
+      "file": "specification/2025-11-25/basic/authorization.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Overview",
+      "description": "The Model Context Protocol consists of several key components that work toget…",
+      "sitePath": "/specification/2025-11-25/basic",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic",
+      "file": "specification/2025-11-25/basic.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Lifecycle",
+      "description": "The Model Context Protocol (MCP) defines a rigorous lifecycle for client-serv…",
+      "sitePath": "/specification/2025-11-25/basic/lifecycle",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle",
+      "file": "specification/2025-11-25/basic/lifecycle.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Transports",
+      "description": "MCP uses JSON-RPC to encode messages. JSON-RPC messages MUST be UTF-8 encoded.",
+      "sitePath": "/specification/2025-11-25/basic/transports",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/transports",
+      "file": "specification/2025-11-25/basic/transports.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Cancellation",
+      "description": "The Model Context Protocol (MCP) supports optional cancellation of in-progres…",
+      "sitePath": "/specification/2025-11-25/basic/utilities/cancellation",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/cancellation",
+      "file": "specification/2025-11-25/basic/utilities/cancellation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Ping",
+      "description": "The Model Context Protocol includes an optional ping mechanism that allows ei…",
+      "sitePath": "/specification/2025-11-25/basic/utilities/ping",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/ping",
+      "file": "specification/2025-11-25/basic/utilities/ping.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Progress",
+      "description": "The Model Context Protocol (MCP) supports optional progress tracking for long…",
+      "sitePath": "/specification/2025-11-25/basic/utilities/progress",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/progress",
+      "file": "specification/2025-11-25/basic/utilities/progress.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Tasks",
+      "description": "Tasks were introduced in version 2025-11-25 of the MCP specification and are…",
+      "sitePath": "/specification/2025-11-25/basic/utilities/tasks",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks",
+      "file": "specification/2025-11-25/basic/utilities/tasks.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Key Changes",
+      "description": "This document lists changes made to the Model Context Protocol (MCP) specific…",
+      "sitePath": "/specification/2025-11-25/changelog",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/changelog",
+      "file": "specification/2025-11-25/changelog.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Elicitation",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to r…",
+      "sitePath": "/specification/2025-11-25/client/elicitation",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/client/elicitation",
+      "file": "specification/2025-11-25/client/elicitation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Roots",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for clients to e…",
+      "sitePath": "/specification/2025-11-25/client/roots",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/client/roots",
+      "file": "specification/2025-11-25/client/roots.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Sampling",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to r…",
+      "sitePath": "/specification/2025-11-25/client/sampling",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/client/sampling",
+      "file": "specification/2025-11-25/client/sampling.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Specification",
+      "description": "This specification defines the authoritative protocol requirements, based on…",
+      "sitePath": "/specification/2025-11-25",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25",
+      "file": "specification/2025-11-25/index.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Schema Reference",
+      "description": "A response to a request that indicates an error occurred.",
+      "sitePath": "/specification/2025-11-25/schema",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/schema",
+      "file": "specification/2025-11-25/schema.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Overview",
+      "description": "Servers provide the fundamental building blocks for adding context to languag…",
+      "sitePath": "/specification/2025-11-25/server",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server",
+      "file": "specification/2025-11-25/server.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Prompts",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2025-11-25/server/prompts",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/prompts",
+      "file": "specification/2025-11-25/server/prompts.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Resources",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2025-11-25/server/resources",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/resources",
+      "file": "specification/2025-11-25/server/resources.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Tools",
+      "description": "The Model Context Protocol (MCP) allows servers to expose tools that can be i…",
+      "sitePath": "/specification/2025-11-25/server/tools",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/tools",
+      "file": "specification/2025-11-25/server/tools.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Completion",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to o…",
+      "sitePath": "/specification/2025-11-25/server/utilities/completion",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/completion",
+      "file": "specification/2025-11-25/server/utilities/completion.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Logging",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to s…",
+      "sitePath": "/specification/2025-11-25/server/utilities/logging",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging",
+      "file": "specification/2025-11-25/server/utilities/logging.md"
+    },
+    {
+      "section": "specification",
+      "version": "2025-11-25",
+      "title": "Pagination",
+      "description": "The Model Context Protocol (MCP) supports paginating list operations that may…",
+      "sitePath": "/specification/2025-11-25/server/utilities/pagination",
+      "source": "https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/pagination",
+      "file": "specification/2025-11-25/server/utilities/pagination.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Architecture",
+      "description": "The Model Context Protocol (MCP) follows a client-host-server architecture wh…",
+      "sitePath": "/specification/2026-07-28/architecture",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/architecture",
+      "file": "specification/2026-07-28/architecture.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Authorization Server Discovery",
+      "description": "This document describes the mechanisms by which MCP servers advertise their a…",
+      "sitePath": "/specification/2026-07-28/basic/authorization/authorization-server-discovery",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/authorization-server-discovery",
+      "file": "specification/2026-07-28/basic/authorization/authorization-server-discovery.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Client Registration",
+      "description": "MCP supports three client registration mechanisms. Choose based on your scena…",
+      "sitePath": "/specification/2026-07-28/basic/authorization/client-registration",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/client-registration",
+      "file": "specification/2026-07-28/basic/authorization/client-registration.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Authorization",
+      "description": "The Model Context Protocol provides authorization capabilities at the transpo…",
+      "sitePath": "/specification/2026-07-28/basic/authorization",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization",
+      "file": "specification/2026-07-28/basic/authorization.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Authorization Security Considerations",
+      "description": "This document outlines security requirements that implementers MUST consider…",
+      "sitePath": "/specification/2026-07-28/basic/authorization/security-considerations",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization/security-considerations",
+      "file": "specification/2026-07-28/basic/authorization/security-considerations.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Overview",
+      "description": "The Model Context Protocol consists of several key components that work toget…",
+      "sitePath": "/specification/2026-07-28/basic",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic",
+      "file": "specification/2026-07-28/basic.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Cancellation",
+      "description": "The Model Context Protocol (MCP) supports optional cancellation of in-progres…",
+      "sitePath": "/specification/2026-07-28/basic/patterns/cancellation",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/cancellation",
+      "file": "specification/2026-07-28/basic/patterns/cancellation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Overview",
+      "description": "This page defines the message patterns of the core protocol: the ways a clien…",
+      "sitePath": "/specification/2026-07-28/basic/patterns",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns",
+      "file": "specification/2026-07-28/basic/patterns.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Multi Round-Trip Requests",
+      "description": "Multi Round-Trip Requests (MRTR) was introduced in this version of the MCP sp…",
+      "sitePath": "/specification/2026-07-28/basic/patterns/mrtr",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr",
+      "file": "specification/2026-07-28/basic/patterns/mrtr.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Progress",
+      "description": "The Model Context Protocol (MCP) supports optional progress tracking for long…",
+      "sitePath": "/specification/2026-07-28/basic/patterns/progress",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/progress",
+      "file": "specification/2026-07-28/basic/patterns/progress.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Subscriptions",
+      "description": "subscriptions/listen opens a long-lived notification stream from the server t…",
+      "sitePath": "/specification/2026-07-28/basic/patterns/subscriptions",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/subscriptions",
+      "file": "specification/2026-07-28/basic/patterns/subscriptions.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Overview",
+      "description": "This page defines what a transport must provide to carry MCP messages, the st…",
+      "sitePath": "/specification/2026-07-28/basic/transports",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports",
+      "file": "specification/2026-07-28/basic/transports.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "stdio",
+      "description": "In the stdio transport, the client launches the MCP server as a subprocess. T…",
+      "sitePath": "/specification/2026-07-28/basic/transports/stdio",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio",
+      "file": "specification/2026-07-28/basic/transports/stdio.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Streamable HTTP",
+      "description": "Streamable HTTP was introduced in protocol version 2025-03-26 as a replacemen…",
+      "sitePath": "/specification/2026-07-28/basic/transports/streamable-http",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http",
+      "file": "specification/2026-07-28/basic/transports/streamable-http.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Versioning and Compatibility",
+      "description": "This page defines how a client and server agree on what they are speaking: th…",
+      "sitePath": "/specification/2026-07-28/basic/versioning",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning",
+      "file": "specification/2026-07-28/basic/versioning.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Key Changes",
+      "description": "This document lists changes made to the Model Context Protocol (MCP) specific…",
+      "sitePath": "/specification/2026-07-28/changelog",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/changelog",
+      "file": "specification/2026-07-28/changelog.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Elicitation",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to r…",
+      "sitePath": "/specification/2026-07-28/client/elicitation",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation",
+      "file": "specification/2026-07-28/client/elicitation.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Roots",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for clients to e…",
+      "sitePath": "/specification/2026-07-28/client/roots",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/client/roots",
+      "file": "specification/2026-07-28/client/roots.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Sampling",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to r…",
+      "sitePath": "/specification/2026-07-28/client/sampling",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/client/sampling",
+      "file": "specification/2026-07-28/client/sampling.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Deprecated Features",
+      "description": "This page is the registry of specification features that are currently in the…",
+      "sitePath": "/specification/2026-07-28/deprecated",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/deprecated",
+      "file": "specification/2026-07-28/deprecated.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Specification",
+      "description": "This specification defines the authoritative protocol requirements, based on…",
+      "sitePath": "/specification/2026-07-28",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28",
+      "file": "specification/2026-07-28/index.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Schema Reference",
+      "description": "A response to a request that indicates an error occurred.",
+      "sitePath": "/specification/2026-07-28/schema",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/schema",
+      "file": "specification/2026-07-28/schema.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Discovery",
+      "description": "server/discover lets a client query a server's supported protocol versions, c…",
+      "sitePath": "/specification/2026-07-28/server/discover",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/discover",
+      "file": "specification/2026-07-28/server/discover.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Overview",
+      "description": "Servers provide the fundamental building blocks for adding context to languag…",
+      "sitePath": "/specification/2026-07-28/server",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server",
+      "file": "specification/2026-07-28/server.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Prompts",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2026-07-28/server/prompts",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/prompts",
+      "file": "specification/2026-07-28/server/prompts.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Resources",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to e…",
+      "sitePath": "/specification/2026-07-28/server/resources",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/resources",
+      "file": "specification/2026-07-28/server/resources.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Tools",
+      "description": "The Model Context Protocol (MCP) allows servers to expose tools that can be i…",
+      "sitePath": "/specification/2026-07-28/server/tools",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/tools",
+      "file": "specification/2026-07-28/server/tools.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Caching",
+      "description": "The Model Context Protocol (MCP) supports caching for some results. This allo…",
+      "sitePath": "/specification/2026-07-28/server/utilities/caching",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/caching",
+      "file": "specification/2026-07-28/server/utilities/caching.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Completion",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to o…",
+      "sitePath": "/specification/2026-07-28/server/utilities/completion",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/completion",
+      "file": "specification/2026-07-28/server/utilities/completion.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Logging",
+      "description": "The Model Context Protocol (MCP) provides a standardized way for servers to s…",
+      "sitePath": "/specification/2026-07-28/server/utilities/logging",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/logging",
+      "file": "specification/2026-07-28/server/utilities/logging.md"
+    },
+    {
+      "section": "specification",
+      "version": "2026-07-28",
+      "title": "Pagination",
+      "description": "The Model Context Protocol (MCP) supports paginating list operations that may…",
+      "sitePath": "/specification/2026-07-28/server/utilities/pagination",
+      "source": "https://modelcontextprotocol.io/specification/2026-07-28/server/utilities/pagination",
+      "file": "specification/2026-07-28/server/utilities/pagination.md"
+    }
+  ],
+  "schema": [
+    {
+      "version": "2025-06-18",
+      "file": "schema/2025-06-18/schema.ts",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2025-06-18/schema.ts"
+    },
+    {
+      "version": "2025-06-18",
+      "file": "schema/2025-06-18/schema.json",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2025-06-18/schema.json"
+    },
+    {
+      "version": "2025-11-25",
+      "file": "schema/2025-11-25/schema.ts",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2025-11-25/schema.ts"
+    },
+    {
+      "version": "2025-11-25",
+      "file": "schema/2025-11-25/schema.json",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2025-11-25/schema.json"
+    },
+    {
+      "version": "2026-07-28",
+      "file": "schema/2026-07-28/schema.ts",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2026-07-28/schema.ts"
+    },
+    {
+      "version": "2026-07-28",
+      "file": "schema/2026-07-28/schema.json",
+      "source": "https://github.com/modelcontextprotocol/modelcontextprotocol/blob/e76e9c572c6f2bfcb730357101acc90f2f802e02/schema/2026-07-28/schema.json"
+    }
+  ]
+}

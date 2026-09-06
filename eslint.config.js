@@ -95,7 +95,9 @@ const commonRules = {
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/', 'dist/', 'docs/reference/', 'src/libs/'],
+    // 借り物・生成物は検査範囲の外（規約 §8.3）。`tools/*/raw/` はミラー生成が
+    // 取得した原文で、schema.ts 等の他所のコードが混ざる。
+    ignores: ['node_modules/', 'dist/', 'docs/reference/', 'src/libs/', 'tools/*/raw/'],
   },
 
   // 不要になった抑制コメントを検出してビルドを落とす（規約 §4.7・§8.1）
