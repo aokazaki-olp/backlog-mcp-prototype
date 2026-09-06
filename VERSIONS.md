@@ -24,6 +24,33 @@
 
 `src/libs/` へ vendoring した `BacklogApiClient` が `HttpCore.createTransport()` で `got` を使うため。推移的依存は 23 パッケージで、いずれも HTTP クライアントの構成要素（HTTP サーバ・OAuth・子プロセス起動は含まれない）。
 
+## 実行時依存 — `sonic-boom`（2026-09-07 追加）
+
+監査ログの記述子とローテーションを委ねる。**5.0.1 / MIT / 推移的依存は `atomic-sleep` の1つだけ**（65リリース・2017-12-23 以降）。
+
+pino の書き出し先そのもので、**ロガーではない** — レベルの概念が無いので、`DESIGN.md` §5 が
+ログのフレームワークを捨てた理由（`LOG_LEVEL=error` で監査が黙って消える）は掛からない。
+`sync` / `fsync` / `append` / `mode` / `reopen` が揃っており、手書きしていた部分と1対1で対応する。
+
+採った理由は**記述子の扱いの向き**。手書きの `fdFor` は「閉じてから開く」形で、開けなかったときに
+閉じ済みの番号が残り、その番号を他人が取ると**巻き添えの書き込みが監査ログのファイルへ入っていた**
+（実測。`EBADF` は出ないので誰も気づかない）。`reopen` は**開けてから閉じる**のでこの状態が作れない。
+
+**import の書き方に制約がある。** `.d.ts` は `export default` と `export class SonicBoom` の両方を
+宣言しているが、実行時の名前付き export は Node の lexer が検出できず `SyntaxError` になる。
+逆に既定 import は型の側で namespace 扱いになり `new` できない。**両方を満たすのは次の形だけ**
+（`as` は要らない）。
+
+```ts
+import SonicBoomModule from 'sonic-boom';
+import type { SonicBoom } from 'sonic-boom'; // 型だけ。実行時に消える
+new SonicBoomModule.SonicBoom({ dest, append: true, mkdir: true, mode: 0o600, sync: true });
+```
+
+**`'error'` リスナは必ず付ける。** 非同期に流れてくる失敗があり、リスナの無い `'error'` は
+`uncaughtException` になってプロセスごと落ちる。付けるかどうかは「続けるか止めるか」ではなく
+**「制御された停止か、既定のクラッシュか」**の選択になる。
+
 ### `@modelcontextprotocol/sdk` を採らなかった理由
 
 公式 SDK（1.30.0）の推移的依存は **91 パッケージ**で、`express` / `hono` / `@hono/node-server` / `cors` / `express-rate-limit`（HTTP トランスポート）、`jose` / `pkce-challenge`（OAuth 2.1）、`eventsource`（SSE）、そして **`cross-spawn`**（子プロセス起動）を含む。
