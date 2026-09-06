@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { before, describe, it } from 'node:test';
@@ -230,6 +237,51 @@ describe('readAttachment — サーバ自身の設定ファイル', () => {
     });
 
     assert.equal(file.filename, 'note.md');
+  });
+
+  it('コピーして別名にしても拒否する（中身で照合する）', async () => {
+    const copied = join(selfRoot, 'notes.json');
+    writeFileSync(copied, readFileSync(policyPath));
+
+    // 識別は別物になっている（ここが通るからこそ中身の照合が要る）
+    assert.notEqual(statSync(copied).ino, statSync(policyPath).ino);
+
+    await assert.rejects(
+      () => readAttachment(selfRoot, 'notes.json', { selfPaths: [policyPath] }),
+      AttachmentError,
+    );
+  });
+
+  it('拡張子を変えてコピーしても拒否する', async () => {
+    const copied = join(selfRoot, 'memo.txt');
+    writeFileSync(copied, readFileSync(envPath));
+
+    await assert.rejects(
+      () => readAttachment(selfRoot, 'memo.txt', { selfPaths: [envPath] }),
+      AttachmentError,
+    );
+  });
+
+  it('1バイト違えば通る（中身の一致だけを見ている）', async () => {
+    const almost = join(selfRoot, 'almost.json');
+    writeFileSync(almost, `${readFileSync(policyPath, 'utf8')} `);
+
+    const file = await readAttachment(selfRoot, 'almost.json', { selfPaths: [policyPath] });
+
+    assert.equal(file.filename, 'almost.json');
+  });
+
+  it('空のファイルは「設定と同じ」と判定しない（誤判定を作らない）', async () => {
+    const emptyConfig = join(selfRoot, 'empty-config.json');
+    const emptyAttachment = join(selfRoot, 'empty-note.md');
+    writeFileSync(emptyConfig, '');
+    writeFileSync(emptyAttachment, '');
+
+    const file = await readAttachment(selfRoot, 'empty-note.md', {
+      selfPaths: [emptyConfig],
+    });
+
+    assert.equal(file.data.length, 0);
   });
 
   it('エラーはどのファイルだったかを書かない（設定の在り処を教えない）', async () => {

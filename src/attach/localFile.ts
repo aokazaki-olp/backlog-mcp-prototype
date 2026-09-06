@@ -4,7 +4,8 @@
  * @description 添付するローカルファイルを検証して読み込む。**唯一のファイル読み取り面**
  */
 
-import { open, realpath, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { open, readFile, realpath, stat } from 'node:fs/promises';
 import { basename, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileTypeFromBuffer } from 'file-type';
 import { AttachmentError } from '../contract.ts';
@@ -64,6 +65,8 @@ interface FileIdentity {
   readonly dev: number;
   readonly ino: number;
   readonly path: string;
+  /** 中身の照合に使う。**サイズが違えば中身も違う**ので、ハッシュを取る前にここで落とす。 */
+  readonly size: number;
 }
 
 /** `ino` が使えるなら識別で、使えないならパスで比べる。 */
@@ -87,12 +90,48 @@ const identitiesOf = async (paths: readonly string[]): Promise<readonly FileIden
     try {
       const real = await realpath(path);
       const info = await stat(real);
-      found.push({ dev: info.dev, ino: info.ino, path: real });
+      found.push({ dev: info.dev, ino: info.ino, path: real, size: info.size });
     } catch {
       // 解決できないパスは比較対象にならない
     }
   }
   return found;
+};
+
+/**
+ * 中身が同じかを確かめる。**同じ場所にあるかとは別の問い。**
+ *
+ * 設定ファイルをコピーして別名にすれば、識別（`dev` / `ino`）の照合は通り抜ける。
+ * `backlog-policy.json` を `notes.json` にコピーして添付する、が実際に起きうる形。
+ *
+ * **中身そのものは持たない。** 比べるのはハッシュだけで、設定ファイルのバイト列を
+ * 変数に残さない（`.env.keys` は秘密鍵そのものなので、扱う量は少ないほどよい）。
+ * **サイズが一致したときだけハッシュを取る**ので、ふつうの添付では読みにすら行かない。
+ *
+ * **空のファイルは対象外。** 中身が無いものは秘密を持たないし、空の添付を「設定ファイルと
+ * 同じ」と言って拒むのは誤判定にしかならない。
+ */
+const digestOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+
+const matchesContent = async (
+  bytes: Uint8Array,
+  denied: readonly FileIdentity[],
+): Promise<boolean> => {
+  const sameSize = denied.filter(item => item.size > 0 && item.size === bytes.length);
+  if (sameSize.length === 0) {
+    return false;
+  }
+  const digest = digestOf(bytes);
+  for (const item of sameSize) {
+    try {
+      if (digestOf(await readFile(item.path)) === digest) {
+        return true;
+      }
+    } catch {
+      // 読めなくなったものは比較対象から外れる（網が狭くなるだけ）
+    }
+  }
+  return false;
 };
 
 export interface AttachmentLimits {
@@ -238,12 +277,11 @@ export const readAttachment = async (
 
   // **開いたハンドルそのもの**と突き合わせる。名前や拡張子では塞がない
   // （env のパスは利用者が決めるので、`secrets.json` と名付ければ allowlist を通ってしまう）
-  const self = { dev: info.dev, ino: info.ino, path: realPath };
-  for (const denied of await identitiesOf(options.selfPaths ?? [])) {
-    if (isSameFile(self, denied)) {
-      // どのファイルだったかは書かない（設定の在り処を教えることになる）
-      throw new AttachmentError('このサーバ自身の設定ファイルは添付できません');
-    }
+  const self = { dev: info.dev, ino: info.ino, path: realPath, size: info.size };
+  const denied = await identitiesOf(options.selfPaths ?? []);
+  if (denied.some(item => isSameFile(self, item))) {
+    // どのファイルだったかは書かない（設定の在り処を教えることになる）
+    throw new AttachmentError('このサーバ自身の設定ファイルは添付できません');
   }
   if (info.size > limits.maxBytes) {
     throw new AttachmentError(
@@ -256,6 +294,12 @@ export const readAttachment = async (
   if (bytesRead !== info.size) {
     // 途中で切り詰められたものを黙って送らない（規約 §5.4）
     throw new AttachmentError('添付するファイルを最後まで読めませんでした');
+  }
+
+  // 同じ場所にあるかだけでなく、**中身が同じか**も見る。コピーして別名にすれば
+  // 識別の照合は通り抜けるため
+  if (await matchesContent(bytes, denied)) {
+    throw new AttachmentError('このサーバ自身の設定ファイルと中身が同じファイルは添付できません');
   }
 
   const contentType = await verifyContent(bytes, rule);
