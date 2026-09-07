@@ -672,10 +672,12 @@ const filledCustomFieldCount = (value: unknown): number | undefined => {
  * | --- | --- |
  * | 落とす | `id` / `projectId` / `keyId`（連番。`issueKey` があれば足りる） |
  * | 落とす | `sharedFiles` / `stars`（使わない。`stars[].presenter` はユーザーごと入る） |
- * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 / `customFields` → **値が入っている**件数（下記） |
+ * | 畳む | `parentIssueId` → `hasParent` / `attachments` → 件数 |
+ * | 名前 → 値で返す | `customFields`（**値が入っている**件数も併せて返す。下記） |
  *
- * **`customFields` は値が入っている件数だけ返す**（`filledCustomFieldCount`）。
- * 定義されている属性は値の有無にかかわらず全部並ぶので、素の件数では意味を成さない。
+ * **`customFields` は名前 → 値で返す**（`pickCustomFields`）。**件数（`filledCustomFieldCount`）も
+ * 併せて返す** — 読めなかった要素があると数が合わなくなり、取りこぼしが見える（規約 §5.4）。
+ * 素の配列長を使わないのは、定義されている属性が値の有無にかかわらず全部並ぶため。
  *
  * 要素の形は実データで確認した（2026-09-06。仕様書の応答例は8箇所すべて `[]` で、
  * ここだけ仕様から決められなかった）。
@@ -685,10 +687,9 @@ const filledCustomFieldCount = (value: unknown): number | undefined => {
  *   "value": [{ "id": 2, "name": "b", "displayOrder": 1 }] }
  * ```
  *
- * **中身を返すかは別の判断として残す。** 属性名は要素の `name` に直接入っており、
- * リスト型の値も ID ではなく `{ id, name }` だった（仕様書の「リスト=値のID」は
- * 送信側の話で、応答には当てはまらない）。**定義の起動時解決は要らない。**
- * 返す段になったら、要素の `id` とリスト項目の `id` の両方を落とすこと。
+ * 属性名は要素の `name` に直接入っており、リスト型の値も ID ではなく `{ id, name }` だった
+ * （仕様書の「リスト=値のID」は送信側の話で、応答には当てはまらない）。**定義の起動時解決は
+ * 要らない。** 値の読み方と囲む基準は `pickCustomFieldValue` にある。
  */
 const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {

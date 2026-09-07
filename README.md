@@ -406,8 +406,9 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 | **名前で返す**   | `issueType` / `status` / `priority` / `resolution` / `assignee` / `category` / `milestone` / `versions` / `createdUser` / `updatedUser` |
 | **そのまま返す** | `startDate` / `dueDate` / `estimatedHours` / `actualHours` / `created` / `updated`（連番 ID ではないので推測に使えない）                |
 | **囲んで返す**   | `summary` / `description` / コメントの `content` と `changeLog` / Wiki の `content`（第三者が書ける）                                   |
-| **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount` / `customFields` → `customFieldCount`（後述）                         |
+| **畳む**         | `parentIssueId` → `hasParent` / `attachments` → `attachmentCount`                                                                       |
 | **数値で返す**   | `childIssueSummary` → `childIssues: { total, closed }`（数値2つなので囲まない。後述）                                                   |
+| **名前 → 値**    | `customFields`（`customFieldCount` も併せて返す。後述）                                                                                 |
 | **落とす**       | `id` / `projectId` / `keyId`（連番）、`sharedFiles` / `stars`（`stars[].presenter` はユーザーオブジェクトごと入る）                     |
 
 件数と名前の配列は、**空なら項目ごと出さない**（`0` や `[]` を全課題に載せるとノイズになる）。無いことは「項目が無い」で表す。
@@ -434,12 +435,12 @@ Wiki の本文は `GET /wikis/:wikiId` にしか無く、**一覧は `content` �
 
 値の読み方は**形で決める**。囲むかどうかだけ `fieldTypeId` を見る。
 
-| 実データの形                      | 返すもの                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| 文字列（文字列型・文章型）        | **囲む**。利用者の自由記述なので `description` と同じ扱い                      |
-| 文字列（日付型 `fieldTypeId: 4`） | そのまま。形が決まっている                                                     |
-| 数値                              | そのまま                                                                       |
-| `{ id, name }` / その配列         | `name` だけ。**選択肢は管理者が定義したもの**なので囲まない（`status` と同型） |
+| 実データの形                      | 返すもの                                                          |
+| --------------------------------- | ----------------------------------------------------------------- |
+| 文字列（文字列型・文章型）        | **囲む**。利用者の自由記述なので `description` と同じ扱い         |
+| 文字列（日付型 `fieldTypeId: 4`） | そのまま。形が決まっている                                        |
+| 数値                              | そのまま                                                          |
+| `{ id, name }` / その配列         | `name` だけ。**リスト項目の追加は「すべての権限」**なので**囲む** |
 
 **未知の `fieldTypeId` で文字列が来たら囲む側へ倒す。** 第三者が書けるか分からないものを素通しする
 より、余分に囲むほうが安全側。
