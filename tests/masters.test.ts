@@ -402,6 +402,37 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
   });
 });
 
+describe('resolveMasters — プロジェクト単位のマスタの形を検証する', () => {
+  // スペース単位のマスタ（/priorities 等）は上で固定してある。こちらは**プロジェクト id を
+  // 含むパス**なので、`makeFetcher` のフォールバックを具体パスで上書きしないと異常系に届かない。
+  const rejects = async (overrides: Record<string, unknown>): Promise<void> => {
+    await assert.rejects(
+      () => resolveMasters(makeFetcher({ ...projectMasterResponses, ...overrides }), ['PROJ']),
+      { name: 'MasterDataError', message: /\/projects\/151\// },
+    );
+  };
+
+  it('参加者の応答が配列でなければ送出する', async () => {
+    await rejects({ '/projects/151/users': { id: 1, name: '管理者' } });
+    await rejects({ '/projects/151/users': null });
+  });
+
+  it('参加者の要素の形が違えば送出する', async () => {
+    await rejects({ '/projects/151/users': [{ id: 1 }] });
+    await rejects({ '/projects/151/users': [{ id: '1', name: '管理者' }] });
+  });
+
+  it('参加者の応答が空なら送出する', async () => {
+    await rejects({ '/projects/151/users': [] });
+  });
+
+  it('空を許すマスタでも、配列でなければ送出する', async () => {
+    // 空（[]）は許すが、配列でないものは別（`toNameToIdAllowingEmpty`）
+    await rejects({ '/projects/151/categories': null });
+    await rejects({ '/projects/151/versions': 'いますぐ' });
+  });
+});
+
 describe('lookupName', () => {
   it('引けなければ送出し、選べる名前を挙げる（既定に落とさない）', () => {
     const map = new Map([

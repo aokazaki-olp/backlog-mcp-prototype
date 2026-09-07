@@ -125,6 +125,12 @@ const decryptApiKey = (env: NodeJS.ProcessEnv): string => {
   }
   // strict が効いていれば到達しない。ライブラリの挙動に防御を預けないための保険
   // （上流のテストは strict × 復号失敗の組み合わせを直接カバーしていない）
+  //
+  // **この分岐は意図的に未到達のまま置く。** 到達させるには復号そのものを差し替える口が要り、
+  // `ConfigOverrides` が宣言している「設定として危険な値を表現できるようにはならない」と向きが逆になる。
+  // dotenvx 2.23.0 では、復号できない値も**復号できたのに暗号文に見える値**も strict が送出する
+  // （実測。`tests/apiKey.test.ts` が実ライブラリで固定してある）。ここはその二重化にあたる。
+  // それでも消さないのは、**テストが走らない利用者の環境で毎回の起動時に効く**のがこちらだけだから。
   if (apiKey.startsWith(CIPHERTEXT_PREFIX)) {
     throw new ConfigError(`${API_KEY_NAME} が復号されていません`);
   }

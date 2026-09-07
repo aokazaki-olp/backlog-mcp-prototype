@@ -93,6 +93,19 @@ describe('API キーの復号 — 復号できなければ起動しない', () =
     assert.throws(() => loadConfig(envFor(sealed.env, other.keys)), ConfigError);
   });
 
+  it('復号できても encrypted: が残る値は送出する（上流の後検査を固定する）', async () => {
+    // **復号に成功しても、結果が暗号文に見える値は通さない**（strict が送出する。実測）。
+    // `config.ts` の保険は同じ述語（`startsWith('encrypted:')`）を持つので、上流側をここで固定する。
+    const looksEncrypted = await seal(makeRoot(), 'encrypted:looks-like-ciphertext');
+
+    // **文面まで見る。** クラスだけだと、上流が回帰して `config.ts` の保険が拾った場合も
+    // 同じ `ConfigError` になり、このテストが緑のまま通ってしまう。
+    assert.throws(() => loadConfig(envFor(looksEncrypted.env, looksEncrypted.keys)), {
+      name: 'ConfigError',
+      message: /復号できませんでした/,
+    });
+  });
+
   it('鍵ファイルを退避すると送出する', () => {
     const moved = `${sealed.keys}.bak`;
     renameSync(sealed.keys, moved);

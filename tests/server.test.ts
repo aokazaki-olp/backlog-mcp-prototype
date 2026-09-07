@@ -120,6 +120,31 @@ describe('handleMessage — JSON-RPC の作法', () => {
     assert.equal((response as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
   });
 
+  it('オブジェクトでないメッセージを弾く', async () => {
+    // `JSON.parse` は数値も文字列も配列も返す。**通ったのはオブジェクトだけという保証は無い**
+    const number = await handleMessage(42, makeHandlers(), SERVER_INFO);
+    const array = await handleMessage(
+      [{ jsonrpc: '2.0', method: 'ping' }],
+      makeHandlers(),
+      SERVER_INFO,
+    );
+    const nothing = await handleMessage(null, makeHandlers(), SERVER_INFO);
+
+    assert.equal((number as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
+    assert.equal((array as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
+    assert.equal((nothing as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
+  });
+
+  it('method が文字列でなければ弾く', async () => {
+    const response = await handleMessage(
+      { jsonrpc: '2.0', id: 1, method: 5 },
+      makeHandlers(),
+      SERVER_INFO,
+    );
+
+    assert.equal((response as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
+  });
+
   it('tools/call に name が無ければ INVALID_PARAMS', async () => {
     const response = await handleMessage(
       request(2, 'tools/call', { arguments: {} }),
