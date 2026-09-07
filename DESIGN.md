@@ -149,15 +149,23 @@ Electron が「コールバックに `IpcRendererEvent` を渡すな」と言う
 
 ## 4. 層と語彙 — 1プロセスの境界を lint で作る
 
-| 層                        | 知ってよい                                            | 知ってはいけない     |
-| ------------------------- | ----------------------------------------------------- | -------------------- |
-| `contract.ts`             | 型だけ（import ゼロの葉）                             | —                    |
-| `shared/`                 | 言語機能だけ（`assertNever` / `toError` / freeze）    | ランタイム依存       |
-| `policy/`                 | projectKey, toolName, can, toolset                    | エンドポイント, HTTP |
-| `domain/`                 | projectKey, issueKey, 「バグ」「高」などの名前        | MCP, スコープ        |
-| `tool/`                   | tool 名, inputSchema, annotations, content, untrusted | HTTP, status code    |
-| `mcp/`                    | JSON-RPC, stdio, 監査レコード                         | Backlog              |
-| `libs/`（借り物の生成物） | URL, method, headers, status, `/api/v2/…`             | MCP, ポリシー        |
+| 層                        | 知ってよい                                                            | 知ってはいけない             |
+| ------------------------- | --------------------------------------------------------------------- | ---------------------------- |
+| `contract.ts`             | 型だけ（import ゼロの葉）                                             | —                            |
+| `shared/`                 | 言語機能と純粋な計算（`assertNever` / `toError` / freeze / パス計算） | I/O, Backlog, MCP            |
+| `policy/`                 | projectKey, toolName, can, toolset                                    | エンドポイント, HTTP         |
+| `domain/`                 | projectKey, issueKey, 「バグ」「高」などの名前                        | MCP, スコープ                |
+| `tool/`                   | tool 名, inputSchema, annotations, content, untrusted                 | HTTP, status code            |
+| `mcp/`                    | JSON-RPC, stdio, 監査レコード                                         | Backlog                      |
+| `attach/`                 | **型システムの外側（ファイルの中身）**, パス, マジックバイト          | Backlog, MCP, ポリシー, HTTP |
+| `libs/`（借り物の生成物） | URL, method, headers, status, `/api/v2/…`                             | MCP, ポリシー                |
+
+**組み立て役は表の外にある。** `server.ts` は**全層を知る唯一の組み立て点**、`main.ts` は `process` の口だけ、
+`config.ts` は env と設定ファイルを読む口だけ。**語彙を分ける対象ではないので層として数えない**。
+表に無いことを「欠落」と読まないこと。
+
+**`tool/` は MCP のハンドラ型を知ってよい**（`McpHandlers` / `ToolDefinition` / `ToolResult`）。
+`buildHandlers` が返すものそのものなので、依存の向きは `tool/ → mcp/` で正しい。**型だけで値は取らない。**
 
 **policy と domain の両方を知るのは、各ツールの input 段だけ。** Electron の preload と同じ役どころで、
 そこ1箇所に閉じ込める。
@@ -217,7 +225,6 @@ import する。出力後は `.js` が実ファイルなので、lint の「相�
 | **添付ルートに既定を置く**                         | 置いた瞬間に「どこが読めるか」が暗黙になる。MCP 2026-07-28 で `roots` が非推奨になり（SEP-2577）クライアントから受け取る道も無いので、**設定で明示する以外に安全な決め方が無い**                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **関連課題を `issueId`（数値）で受ける**           | 原則4 に反する。課題キーで受けて `GET /issues/:key` から `id` を採る。**その課題のプロジェクトもポリシーで確認する** — 覆っていないプロジェクトへ読みに行かない                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **書き込みで数値 ID を受ける**                     | `POST /issues` の必須は全部 ID だが、受けると原則4 が崩れる。**起動時にマスタを解決して名前で受ける**（`priority` / `resolution` で既にやっている形の拡張）                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **全プロジェクトのマスタを起動時に引く**           | プロジェクト単位のマスタは5本ある。read しか無いプロジェクトのぶんまで引くと、使わない呼び出しが起動時に並ぶ。**`can: "write"` を許したものだけ**に絞る                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | **同名ユーザーを先勝ちで解決する**                 | 名前は一意とは限らない。しかも表示名とログイン名を同じ索引に入れるので、衝突は3通りある（表示名どうし／ログイン名と表示名／ログイン名どうし）。黙ってどちらかを選ぶと**別人に割り当てる**（規約 §5.4）。**複数の人が名乗る名前は引けなくして**、指せる名前を案内する                                                                                                                                                                                                                                                                                                                                                                    |
 | **`.ts` のまま配る**                               | Node が `node_modules` の下では型注釈除去をしないので**動かない**（実行時に `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`）。clone して使う分には `.ts` 直接実行のままでよい                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | **`private: true` を外す**                         | `npm pack` はこのままで動く。外すと公開レジストリへ `npm publish` できてしまうので、**事故防止として残す**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -239,8 +246,11 @@ HTTP トランスポート向け。**stdio でやる以上、スコープは自�
 | `server/discover` の `instructions` | 「LLM のツール理解を助ける自然言語ガイダンス」と定義されている。**untrusted の扱いを書く場所が仕様側にある**                                                                          |
 | stdio の `stderr`                   | 「クライアントは capture / forward / **ignore** してよい」。だから監査ログの出口を stderr だけにできない                                                                              |
 
-Tool Annotations Interest Group が `unsafeOutputHint` / `secretHint` / `trustedHint` を検討中
-（狙いは lethal trifecta）。**仕様に入ったら自前の `<untrusted>` から乗り換える対象。**
+`unsafeOutputHint`（SEP-1561）と `trustedHint`（SEP-1487）が提案されていたが、
+**どちらも 2026-06-26 に dormant として closed**（却下ではなく無活動。2026-09-07 に確認）。
+`2026-07-28` の `ToolAnnotations` は `title` / `readOnlyHint` / `destructiveHint` /
+`idempotentHint` / `openWorldHint` の5つだけで、**信頼を表す項目は無い**。
+**当面は自前の `<untrusted>` を持ち続けるしかない。**
 
 ---
 
@@ -423,7 +433,9 @@ libraries を直さなくても MCP サーバは安全になる**（上流の是
 > `npx` で入れたものは必ず `node_modules` に置かれるので、`.ts` のままでは配れない。
 
 > **`write` 系は済んだ**（`create_issue` / `update_issue`）。原則4 のとおり全項目を名前で受け、
-> **`can: "write"` を許したプロジェクトだけ**プロジェクト単位のマスタ5本を起動時に引く。
+> **許可プロジェクト全部**についてプロジェクト単位のマスタ5本を起動時に引く
+> （当初は `can: "write"` だけに絞っていたが、「状態で絞る」「担当者で絞る」は read の操作なので
+> 書き込みの有無で切り分けられない）。
 > 担当者の名前が複数の人に名乗られている場合は引けなくし、指せる名前を案内する
 > （黙って先勝ちにすると別人に割り当てる）。
 
@@ -435,13 +447,7 @@ libraries を直さなくても MCP サーバは安全になる**（上流の是
 
 > **PR レビュー投稿は済んだ**（`add_pull_request_comment`）。**行ごとのコメント API は
 > 存在しない**ので（パラメータは `content` / `attachmentId[]` / `notifiedUserId[]` の3つだけ）、
-> 1レビュー = 1コメントで本文に `src/main.ts:42` 形式の参照を書く。添付は 1 の段で足す。
+> 1レビュー = 1コメントで本文に `src/main.ts:42` 形式の参照を書く。添付は添付の段で足した。
 
-**この順にするのは、1 が型システムの外側（ファイルの中身）を扱う唯一の層だから。**
-先に済ませておくと、以降は既存の純関数テストの形に収まる。
-
-なお `contract.ts` の `FormFields` は `readonly FormValue[]`（スカラーの配列）を許すが、
-借り物の `ApiClient.splitFormFields` は**スカラーの配列を `TypeError` で弾く**（通るのはファイルの
-配列だけ）。今のツールは `content` しか送らないので当たらないが、**2 の `notifiedUserId[]` /
-`attachmentId[]` はまさにこれ**なので必ず当たる。対処は `FormFields` をスカラーだけに狭めること
-（型と実行時が今すぐ一致し、上流に手を入れる判断を先送りできる）。
+残っているのは `preset` だけなので、順序の議論は終わっている。
+**「ファイルの中身を扱う層」という語彙は §4 の表（`attach/`）へ移した。**

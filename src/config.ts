@@ -7,7 +7,7 @@
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { config as loadEnvFile } from '@dotenvx/dotenvx';
 import { BACKLOG_DOMAINS, ConfigError } from './contract.ts';
-import { isInside, resolveAttachmentRoot } from './attach/localFile.ts';
+import { isInside, resolveAttachmentRoot } from './shared/paths.ts';
 import { toError } from './shared/toError.ts';
 import type { BacklogDomain, ServerConfig } from './contract.ts';
 

@@ -12,12 +12,8 @@ import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { before, describe, it } from 'node:test';
 import { AttachmentError } from '../src/contract.ts';
-import {
-  isInside,
-  readAttachment,
-  receiveAttachment,
-  saveAttachment,
-} from '../src/attach/localFile.ts';
+import { readAttachment, receiveAttachment, saveAttachment } from '../src/attach/localFile.ts';
+import { isInside } from '../src/shared/paths.ts';
 
 /**
  * **実ファイルで確かめる。** 守りたい性質が `realpath` と symlink の挙動に乗っており、

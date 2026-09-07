@@ -164,6 +164,10 @@ expect_layer_error 'domain 層から tool 層への import を禁止する' \
   'src/domain/_probe.ts' \
   "import { buildTools } from '../tool/tools.ts';
 export const f = (): unknown => buildTools;"
+expect_layer_error 'attach 層から domain 層への import を禁止する' \
+  'src/attach/_probe.ts' \
+  "import { resolveMasters } from '../domain/masters.ts';
+export const f = (): unknown => resolveMasters;"
 
 echo
 echo '── 抑制コメント（規約 §4.7）'

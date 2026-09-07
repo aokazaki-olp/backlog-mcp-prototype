@@ -198,6 +198,18 @@ export default tseslint.config(
       ]),
     },
   },
+  {
+    files: ['src/attach/**/*.ts'],
+    rules: {
+      'no-restricted-imports': restrictedImports([
+        {
+          group: ['**/libs/**', '**/domain/**', '**/tool/**', '**/policy/**', '**/mcp/**'],
+          message:
+            'attach 層はファイルの中身とパスだけを知る。Backlog も MCP もポリシーも知らない。',
+        },
+      ]),
+    },
+  },
 
   // ── テスト（規約 §7.1: 本体と同じ制約をかけない）─────────────────
   // ただし実行可能性のガード（デコレータ・accessor）は緩めない。
