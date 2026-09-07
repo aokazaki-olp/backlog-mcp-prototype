@@ -238,6 +238,29 @@ describe('planToolCall — 絞り込みは引数で広げられない', () => {
     assert.equal('assigneeId[]' in (request.query ?? {}), false);
   });
 
+  it('assignedToMe と assignee の同時指定は送出する（黙って上書きしない）', () => {
+    // どちらも assigneeId[] に載るので、片方が黙って消える（規約 §5.4）
+    assert.throws(
+      () =>
+        planToolCall(contextOf(), 'search_issues', {
+          projectKey: 'PROJ',
+          assignedToMe: true,
+          assignee: '山田太郎',
+        }),
+      { name: 'TypeError', message: /assignedToMe.*assignee|assignee.*assignedToMe/ },
+    );
+  });
+
+  it('assignedToMe が false なら assignee と併記できる（境界 — 競合していない）', () => {
+    const request = planRequest(contextOf(), 'search_issues', {
+      projectKey: 'PROJ',
+      assignedToMe: false,
+      assignee: '山田太郎',
+    });
+
+    assert.equal(request.query?.['assigneeId[]'], 7);
+  });
+
   it('noDueDate は false のときだけ hasDueDate を送る（true は API がエラーにする）', () => {
     const on = planRequest(contextOf(), 'search_issues', { noDueDate: true });
     const off = planRequest(contextOf(), 'search_issues', { noDueDate: false });

@@ -228,14 +228,14 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 `search_issues` はプロジェクトの絞り込みを**ポリシー由来で組み立てる**（引数で広げる口が無い）。そのうえで次を受ける。
 
-| 引数                                                           | 備考                                                  |
-| -------------------------------------------------------------- | ----------------------------------------------------- |
-| `projectKey`                                                   | 1つに絞る。**絞る方向にしか効かない**（許可外は拒否） |
-| `status` / `issueType` / `category` / `milestone` / `assignee` | 名前で受ける。**`projectKey` が必須**                 |
-| `assignedToMe`                                                 | 自分が担当のものだけ。`projectKey` は不要             |
-| `priority`                                                     | スペース共通のマスタなので `projectKey` は不要        |
-| `dueDateSince` / `dueDateUntil` / `noDueDate`                  | 期限日                                                |
-| `sort` / `order` / `offset` / `count` / `keyword`              | 並び順とページング                                    |
+| 引数                                                           | 備考                                                                 |
+| -------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `projectKey`                                                   | 1つに絞る。**絞る方向にしか効かない**（許可外は拒否）                |
+| `status` / `issueType` / `category` / `milestone` / `assignee` | 名前で受ける。**`projectKey` が必須**                                |
+| `assignedToMe`                                                 | 自分が担当のものだけ。`projectKey` は不要（`assignee` とは併用不可） |
+| `priority`                                                     | スペース共通のマスタなので `projectKey` は不要                       |
+| `dueDateSince` / `dueDateUntil` / `noDueDate`                  | 期限日                                                               |
+| `sort` / `order` / `offset` / `count` / `keyword`              | 並び順とページング                                                   |
 
 **名前で絞るときに `projectKey` を必須にしているのは、状態や種別の ID がプロジェクトごとに違うため。** 跨いで名前を引くと曖昧になるので、単一プロジェクトへ絞らせる。`projectKey` はポリシーとの交差でしか効かないので、原則1（絞り込みはポリシー由来）は崩れない。
 

@@ -1262,7 +1262,14 @@ export const planToolCall = (
       putResolved(query, 'priorityId[]', optionalString(args, 'priority'), name =>
         lookupName(masters.priorityIds, name, '優先度'),
       );
+      // **`assignee` と競合する。** どちらも `assigneeId[]` に載るので、両方受けると
+      // 後から組み立てる `assignee` が黙って上書きする（規約 §5.4）。先に弾く
       if (optionalBoolean(args, 'assignedToMe') === true) {
+        if (optionalString(args, 'assignee') !== undefined) {
+          throw new TypeError(
+            'assignedToMe と assignee は同時に指定できません（どちらも担当者の絞り込みです）',
+          );
+        }
         query['assigneeId[]'] = masters.myUserId;
       }
 
@@ -2221,7 +2228,8 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
       assignee: NAMED_PROPERTIES.assignee,
       assignedToMe: {
         type: 'boolean',
-        description: 'true で自分が担当の課題だけに絞る。projectKey は不要',
+        description:
+          'true で自分が担当の課題だけに絞る。projectKey は不要。assignee とは同時に指定できない',
       },
       priority: NAMED_PROPERTIES.priority,
       dueDateSince: { type: 'string', description: '期限日の範囲の開始（yyyy-MM-dd）' },
