@@ -25,10 +25,11 @@ const POLICY_SOURCE = {
 
 const MASTER_RESPONSES: Record<string, unknown> = {
   '/projects': [
-    { id: 101, projectKey: 'PROJ' },
-    { id: 102, projectKey: 'SALES' },
-    { id: 103, projectKey: 'INFRA' },
-    { id: 999, projectKey: 'OTHER' },
+    // 実 API は name も返す（`tools/list` の説明に出す。根D）
+    { id: 101, projectKey: 'PROJ', name: 'プロジェクト' },
+    { id: 102, projectKey: 'SALES', name: '営業' },
+    { id: 103, projectKey: 'INFRA', name: '基盤' },
+    { id: 999, projectKey: 'OTHER', name: '別プロジェクト' },
   ],
   '/priorities': [{ id: 2, name: '高' }],
   '/resolutions': [{ id: 0, name: '対応済み' }],
@@ -2028,6 +2029,75 @@ describe('planToolCall — 添付', () => {
       TOOL_NAMES.some(name => name.includes('upload') || name.startsWith('add_attachment')),
       false,
     );
+  });
+
+  // --------------------------------------------------------------------------
+  // 根D — 起動時に確定している事実を schema に載せる
+  //
+  // `toDefinition` は既に `attachable` で schema を変えている（`withoutFileProperty`）。
+  // 同じ形を policy / masters にも広げる。DESIGN.md:109「tools/list とハンドラが同じ集合を
+  // 参照するのでズレようがない」の適用漏れを埋めるもの。
+  // --------------------------------------------------------------------------
+
+  const propertyOf = (
+    context: ToolContext,
+    toolName: string,
+    property: string,
+  ): Record<string, unknown> | undefined => {
+    const tool = buildHandlers(context)
+      .listTools()
+      .find(each => each.name === toolName);
+    const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+      typeof value === 'object' && value !== null && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : undefined;
+    const properties = asRecord(tool?.inputSchema['properties']);
+    return properties === undefined ? undefined : asRecord(properties[property]);
+  };
+
+  it('projectKey に許可キーの enum が入る', () => {
+    const found = propertyOf(handlersOf(), 'search_issues', 'projectKey');
+
+    assert.deepEqual(found?.['enum'], ['INFRA', 'PROJ', 'SALES']);
+  });
+
+  it('enum はツールごとに違う（そのツールを許したプロジェクトだけ）', () => {
+    // SALES は read のみ、INFRA は comment のみ（POLICY_SOURCE）
+    const found = propertyOf(handlersOf(), 'create_issue', 'projectKey');
+
+    assert.deepEqual(found?.['enum'], ['PROJ']);
+  });
+
+  it('説明にキーとプロジェクト名の対応が載る（キーだけでは選べない）', () => {
+    const found = propertyOf(handlersOf(), 'search_issues', 'projectKey');
+
+    assert.match(String(found?.['description']), /PROJ（プロジェクト）/);
+    assert.match(String(found?.['description']), /SALES（営業）/);
+  });
+
+  it('priority と resolution に enum が入る（スペース共通のマスタ）', () => {
+    assert.deepEqual(propertyOf(handlersOf(), 'search_issues', 'priority')?.['enum'], ['高']);
+    assert.deepEqual(propertyOf(handlersOf(), 'update_issue', 'resolution')?.['enum'], [
+      '対応済み',
+    ]);
+  });
+
+  it('プロジェクトごとに違うマスタには enum を入れない（境界）', () => {
+    // status / issueType / category / milestone / assignee はプロジェクトごとに違うので
+    // ツール単位の schema では表せない。`list_project_masters` が担う面
+    for (const property of ['status', 'issueType', 'category', 'milestone', 'assignee']) {
+      assert.equal(
+        'enum' in (propertyOf(handlersOf(), 'search_issues', property) ?? {}),
+        false,
+        property,
+      );
+    }
+  });
+
+  it('件数には上限を書かない（境界 — サーバが切り下げて申告する）', () => {
+    const found = propertyOf(handlersOf(), 'search_issues', 'count');
+
+    assert.equal('maximum' in (found ?? {}), false);
   });
 
   it('どのツールも attachmentId を引数に取らない', () => {

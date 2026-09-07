@@ -26,6 +26,13 @@ interface NamedId {
 export interface Masters {
   /** projectKey → projectId。ポリシーで許可されたプロジェクトのみ。 */
   readonly projectIds: ReadonlyMap<string, number>;
+  /**
+   * projectKey → プロジェクト名。**キーだけでは LLM が選べない**ので `tools/list` に出す（根D）。
+   *
+   * 名前を変えられるのは**管理者 / プロジェクト管理者**だけ（一次情報で確認・2026-09-07）。
+   * `status` と同じ「管理者定義」側なので囲まない（根B の分類）。
+   */
+  readonly projectNames: ReadonlyMap<string, string>;
   /** 優先度の名前 → id。 */
   readonly priorityIds: ReadonlyMap<string, number>;
   /** 完了理由の名前 → id。 */
@@ -215,6 +222,12 @@ interface BacklogProject {
 const isBacklogProject = (value: unknown): value is BacklogProject =>
   isRecord(value) && typeof value['id'] === 'number' && typeof value['projectKey'] === 'string';
 
+/** 名前は**あれば使う**。無ければキーだけで案内する（応答の形を理由に起動を止めない）。 */
+const projectNameOf = (value: unknown): string | undefined =>
+  isRecord(value) && typeof value['name'] === 'string' && value['name'] !== ''
+    ? value['name']
+    : undefined;
+
 const toMyUserId = (value: unknown): number => {
   if (!isRecord(value) || typeof value['id'] !== 'number') {
     throw new MasterDataError('GET /users/myself の応答に id がありません');
@@ -236,7 +249,10 @@ const toMyUserId = (value: unknown): number => {
 const resolveProjectIds = async (
   gateway: BacklogGateway,
   projectKeys: readonly string[],
-): Promise<ReadonlyMap<string, number>> => {
+): Promise<{
+  readonly projectIds: ReadonlyMap<string, number>;
+  readonly projectNames: ReadonlyMap<string, string>;
+}> => {
   // クエリを一切渡さない。`all` を「false で送る」のではなく「送らない」。
   const response = await gateway.send({ endpoint: '/projects', method: 'GET' });
 
@@ -245,14 +261,20 @@ const resolveProjectIds = async (
   }
 
   const available = new Map<string, number>();
+  const names = new Map<string, string>();
   for (const item of response) {
     if (!isBacklogProject(item)) {
       throw new MasterDataError('GET /projects の応答に projectKey / id でない要素があります');
     }
     available.set(item.projectKey, item.id);
+    const name = projectNameOf(item);
+    if (name !== undefined) {
+      names.set(item.projectKey, name);
+    }
   }
 
   const resolved = new Map<string, number>();
+  const resolvedNames = new Map<string, string>();
   const missing: string[] = [];
   for (const projectKey of projectKeys) {
     const projectId = available.get(projectKey);
@@ -261,6 +283,10 @@ const resolveProjectIds = async (
       continue;
     }
     resolved.set(projectKey, projectId);
+    const name = names.get(projectKey);
+    if (name !== undefined) {
+      resolvedNames.set(projectKey, name);
+    }
   }
 
   // 黙って落とさない（規約 §5.4）。解決できないキーが1つでもあれば起動しない。
@@ -271,7 +297,7 @@ const resolveProjectIds = async (
     );
   }
 
-  return freezeMap(resolved);
+  return { projectIds: freezeMap(resolved), projectNames: freezeMap(resolvedNames) };
 };
 
 /**
@@ -331,7 +357,7 @@ export const resolveMasters = async (
     throw new MasterDataError('解決するプロジェクトキーが1つもありません');
   }
 
-  const [projectIds, priorities, resolutions, myself] = await Promise.all([
+  const [projects, priorities, resolutions, myself] = await Promise.all([
     resolveProjectIds(gateway, projectKeys),
     gateway.send({ endpoint: '/priorities', method: 'GET' }),
     gateway.send({ endpoint: '/resolutions', method: 'GET' }),
@@ -340,7 +366,7 @@ export const resolveMasters = async (
 
   const perProject = new Map<string, ProjectMasters>();
   const resolved = await Promise.all(
-    [...projectIds].map(async ([projectKey, projectId]) => {
+    [...projects.projectIds].map(async ([projectKey, projectId]) => {
       return [projectKey, await resolveProjectMasters(gateway, projectKey, projectId)] as const;
     }),
   );
@@ -349,7 +375,8 @@ export const resolveMasters = async (
   }
 
   return Object.freeze({
-    projectIds,
+    projectIds: projects.projectIds,
+    projectNames: projects.projectNames,
     priorityIds: toNameToId(priorities, 'GET /priorities'),
     resolutionIds: toNameToId(resolutions, 'GET /resolutions'),
     myUserId: toMyUserId(myself),

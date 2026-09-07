@@ -2534,9 +2534,66 @@ const withoutFileProperty = (schema: Record<string, unknown>): Record<string, un
   return { ...schema, properties: rest };
 };
 
-const toDefinition = (toolName: ToolName, attachable: boolean): ToolDefinition => {
+/**
+ * **起動時に確定している事実を schema に差し込む。**
+ *
+ * `INPUT_SCHEMAS` は雛形のまま静的に置き、加工はここだけで行う（`withoutFileProperty` と同じ形）。
+ * DESIGN.md:109 は正規形の利点として「`tools/list` とハンドラが**同じ集合を参照する**ので
+ * ズレようがない」と書いているが、効いていたのは「どのツールを載せるか」だけだった。
+ * **同じ集合を「どのプロジェクトキーを渡せるか」にも当てる。**
+ *
+ * 入れるのは**ツール単位で1つに決まるもの**だけ。`status` / `issueType` / `category` /
+ * `milestone` / `assignee` は**プロジェクトごとに違う**ので入れない（`list_project_masters` の面）。
+ *
+ * プロジェクト名を説明に添えるのは、**キーだけでは LLM が選べない**ため。
+ * 名前を変えられるのは管理者 / プロジェクト管理者だけなので、`status` と同じ扱いで囲まない（根B）。
+ */
+const withRuntimeFacts = (
+  schema: Readonly<Record<string, unknown>>,
+  toolName: ToolName,
+  policy: ResolvedPolicy,
+  masters: Masters,
+): Record<string, unknown> => {
+  const properties = schema['properties'];
+  if (!isRecord(properties)) {
+    return { ...schema };
+  }
+  const patched: Record<string, unknown> = { ...properties };
+  /** 値の集合を差し込む。`extra` を渡したときだけ説明に1行足す。 */
+  const patch = (key: string, values: readonly string[], extra?: string): void => {
+    const property = patched[key];
+    if (!isRecord(property) || values.length === 0) {
+      return;
+    }
+    const base = typeof property['description'] === 'string' ? property['description'] : '';
+    patched[key] = {
+      ...property,
+      enum: [...values],
+      description: extra === undefined ? property['description'] : `${base}\n${extra}`,
+    };
+  };
+
+  const projectKeys = projectKeysFor(policy, toolName);
+  // **キーだけでは選べない。** 「営業の課題」と言われて SALES を選ぶには名前が要る
+  const labelled = projectKeys.map(key => {
+    const name = masters.projectNames.get(key);
+    return name === undefined ? key : `${key}（${name}）`;
+  });
+  patch('projectKey', projectKeys, `使えるプロジェクト: ${labelled.join(' / ')}`);
+  patch('priority', [...masters.priorityIds.keys()]);
+  patch('resolution', [...masters.resolutionIds.keys()]);
+
+  return { ...schema, properties: patched };
+};
+
+const toDefinition = (
+  toolName: ToolName,
+  attachable: boolean,
+  policy: ResolvedPolicy,
+  masters: Masters,
+): ToolDefinition => {
   const spec = TOOL_SPECS[toolName];
-  const schema = INPUT_SCHEMAS[toolName];
+  const schema = withRuntimeFacts(INPUT_SCHEMAS[toolName], toolName, policy, masters);
   return {
     name: toolName,
     title: spec.title,
@@ -2599,8 +2656,9 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
 
   return {
     listTools(): readonly ToolDefinition[] {
+      // **生の gateway は渡さない**（根A）。schema を組むのに要るのは policy と masters だけ
       return TOOL_NAMES.filter(toolName => enabled.has(toolName)).map(toolName =>
-        toDefinition(toolName, attachable),
+        toDefinition(toolName, attachable, context.policy, context.masters),
       );
     },
 
