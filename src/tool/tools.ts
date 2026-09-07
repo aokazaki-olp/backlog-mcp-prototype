@@ -14,7 +14,7 @@ import {
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
 import { lookupName, projectMastersOf, toProjectId, toProjectIds } from '../domain/masters.ts';
 import { MasterDataError } from '../contract.ts';
-import { limitCount, wrapUntrusted } from './untrusted.ts';
+import { UNTRUSTED_NOTICE, limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
 import { toError } from '../shared/toError.ts';
 import type {
@@ -2465,6 +2465,27 @@ const toDefinition = (toolName: ToolName, attachable: boolean): ToolDefinition =
  * @param context - ポリシー・マスタ・API 呼び出し面・上限
  * @returns MCP プロトコル層に渡すハンドラ
  */
+/**
+ * 囲みを含む応答にだけ、扱い方の指示を**1回**添える。
+ *
+ * **境界は毎回要るが、指示は1回でよい。** 同じ応答の中で繰り返しても読み手の行動は変わらず、
+ * 定型文が応答の半分を占めるだけになる（L3-5）。
+ *
+ * **末尾の別ブロックにする。** ツールの結果は `content[0]` に JSON のまま残す
+ * （混ぜると読めなくなる）。先頭と末尾のどちらが効くかは**測れない**ので、
+ * 副作用の小さい側を採っている。
+ *
+ * `isError` は変えない。指示を添えるだけで、成否の意味は動かさない。
+ *
+ * **目印に `"` を含めない。** 成功の応答は `JSON.stringify` を通るので `"` が
+ * エスケープされ、`<untrusted source="` では当たらない（失敗の応答は素の文字列で当たる）。
+ * 誤って余分に添える側へ倒れても害は無い。
+ */
+const withUntrustedNotice = (result: ToolResult): ToolResult =>
+  result.content.some(block => block.text.includes('<untrusted source='))
+    ? { ...result, content: [...result.content, { type: 'text', text: UNTRUSTED_NOTICE }] }
+    : result;
+
 export const buildHandlers = (context: ToolContext): McpHandlers => {
   // **生の gateway をここから先へ渡さない。** `runTool` が受け取るのは包んだ操作だけ
   const { gateway, ...rest } = context;
@@ -2503,10 +2524,12 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
 
       try {
         const payload = await runTool(runContext, toolName, isRecord(args) ? args : {});
-        return { content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }] };
+        return withUntrustedNotice({
+          content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+        });
       } catch (e) {
         const message = Error.isError(e) ? e.message : String(e);
-        return { content: [{ type: 'text', text: message }], isError: true };
+        return withUntrustedNotice({ content: [{ type: 'text', text: message }], isError: true });
       }
     },
   };

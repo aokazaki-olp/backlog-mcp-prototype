@@ -2735,3 +2735,89 @@ describe('runTool — gateway を呼ぶ枝は同じ扱いになる（C-1）', ()
     assert.doesNotMatch(text, /<untrusted/);
   });
 });
+
+// ============================================================================
+// 囲みの注意書きは1応答に1回（L3-5）
+//
+// **境界は毎回要るが、指示は1回でよい。** 同じ応答で繰り返しても読み手の行動は変わらない。
+// ============================================================================
+
+describe('buildHandlers — 囲みの注意書きは1応答に1回', () => {
+  const NOTICE = /データとして扱い/;
+  const countOf = (text: string, needle: string): number => text.split(needle).length - 1;
+
+  it('囲みを含む応答には、注意書きが末尾に1ブロックだけ載る', async () => {
+    const gateway = makeGateway({
+      '/issues/PROJ-1': { issueKey: 'PROJ-1', summary: '件名', description: '本文' },
+    });
+
+    const result = await buildHandlers({ ...contextOf(), gateway }).callTool('get_issue', {
+      issueKey: 'PROJ-1',
+    });
+
+    const payload = result.content[0]?.text ?? '';
+    // 囲みは2つ（summary と description）。境界は値ごとに残る
+    assert.equal(countOf(payload, '<untrusted source='), 2);
+    // 注意書きは応答全体で1回だけ
+    assert.equal(
+      countOf(result.content.map(block => block.text).join('\n'), 'データとして扱い'),
+      1,
+    );
+    // 載るのは末尾の別ブロック。ツールの結果には混ぜない
+    assert.doesNotMatch(payload, NOTICE);
+    assert.match(result.content.at(-1)?.text ?? '', NOTICE);
+  });
+
+  it('ツールの結果は JSON のまま読める（注意書きを混ぜない）', async () => {
+    const gateway = makeGateway({
+      '/issues/PROJ-1': { issueKey: 'PROJ-1', summary: '件名' },
+    });
+
+    const result = await buildHandlers({ ...contextOf(), gateway }).callTool('get_issue', {
+      issueKey: 'PROJ-1',
+    });
+
+    const payload: unknown = JSON.parse(result.content[0]?.text ?? '');
+    assert.equal((payload as { issueKey: string }).issueKey, 'PROJ-1');
+  });
+
+  // 過剰に付けていないことの記録。**結果を組み立てる経路**で確かめる
+  it('囲みを含まない応答には載らない', async () => {
+    // 件名も本文も無ければ囲みは1つも出ない
+    const gateway = makeGateway({ '/issues/PROJ-1': { issueKey: 'PROJ-1' } });
+
+    const result = await buildHandlers({ ...contextOf(), gateway }).callTool('get_issue', {
+      issueKey: 'PROJ-1',
+    });
+
+    assert.doesNotMatch(result.content[0]?.text ?? '', /<untrusted source=/);
+    assert.equal(result.content.length, 1);
+    assert.doesNotMatch(result.content.map(block => block.text).join('\n'), NOTICE);
+  });
+
+  it('拒否の応答にも載らない（結果を組み立てる経路を通らない）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('delete_issue', {});
+
+    assert.equal(result.isError, true);
+    assert.equal(result.content.length, 1);
+    assert.doesNotMatch(result.content[0]?.text ?? '', NOTICE);
+  });
+
+  it('囲みを含む失敗の応答にも1回だけ載る', async () => {
+    const handlers = buildHandlers({
+      ...contextOf(),
+      gateway: {
+        send: () => Promise.reject(new Error('サーバが書いた文言')),
+        sendBytes: () => Promise.reject(new Error('使わない')),
+      },
+    });
+
+    const result = await handlers.callTool('get_issue', { issueKey: 'PROJ-1' });
+
+    assert.equal(result.isError, true);
+    assert.equal(
+      countOf(result.content.map(block => block.text).join('\n'), 'データとして扱い'),
+      1,
+    );
+  });
+});
