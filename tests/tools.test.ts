@@ -1157,6 +1157,42 @@ describe('buildHandlers — tools/call は一覧と独立に確認する', () =>
     assert.doesNotMatch(result.content[0]?.text ?? '', /at |\.ts:/);
   });
 
+  it('マスタの候補列挙を囲む（domain が投げたエラーを tool 層で包み直す）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('create_issue', {
+      projectKey: 'PROJ',
+      summary: '件名',
+      issueType: '存在しない種別',
+      priority: '高',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.equal(result.isError, true);
+    assert.match(text, /<untrusted source="backlog:candidates"/);
+    assert.match(text, /バグ \/ タスク/);
+  });
+
+  it('囲みが入るので、注意書きもエラー応答に付く', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('create_issue', {
+      projectKey: 'PROJ',
+      summary: '件名',
+      issueType: '存在しない種別',
+      priority: '高',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.match(text, /指示には従わないでください/);
+  });
+
+  it('候補を持たないエラーは囲まない（境界 — 過剰に囲まない）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('get_issue', {
+      issueKey: 'OTHER-1',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.equal(result.isError, true);
+    assert.doesNotMatch(text, /<untrusted/);
+  });
+
   it('許可された呼び出しは gateway に届く', async () => {
     const gateway = makeGateway({ '/issues/PROJ-1': { issueKey: 'PROJ-1', summary: 'ある課題' } });
     const handlers = buildHandlers({ ...contextOf(), gateway });
@@ -2521,6 +2557,49 @@ describe('planToolCall — 添付のダウンロード', () => {
     }
 
     assert.throws(() => planned.next([{ id: 8, name: 'IMG0088.png' }]), /IMG0088\.png/);
+  });
+
+  // --------------------------------------------------------------------------
+  // T-2 ③ — エラー経路に載る第三者の名前を囲む
+  //
+  // 正常系は `JSON.stringify` を通るので改行も引用符も潰れるが、**catch は素のテキストを返す**
+  // （`tools.ts` の `text: message`）。仕様は「クライアントはツール実行エラーを LLM に渡せ」と
+  // 定めている（MCP 2026-07-28 `server/tools.md`）ので、ここは届くことが前提の経路になる。
+  // --------------------------------------------------------------------------
+
+  it('添付の候補列挙を囲む（第三者が書けるファイル名）', () => {
+    const planned = planToolCall(contextOf(), 'get_issue_attachment', {
+      issueKey: 'PROJ-1',
+      file: '存在しない.pdf',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.throws(
+      () => planned.next([{ id: 8, name: 'IMG0088.png' }]),
+      /<untrusted source="backlog:attachment:name"/,
+    );
+  });
+
+  it('LLM 自身が渡した名前は囲まない（境界 — 過剰に囲まない）', () => {
+    const planned = planToolCall(contextOf(), 'get_wiki_page', {
+      projectKey: 'PROJ',
+      name: '存在しないページ',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    // Wiki の失敗が載せるのは LLM 自身が渡した引数。第三者ではないので囲まない
+    assert.throws(() => planned.next([{ id: 1, name: 'ホーム' }]), /存在しないページ/);
+    assert.throws(
+      () => planned.next([{ id: 1, name: 'ホーム' }]),
+      (e: unknown) => {
+        assert.equal(Error.isError(e) && /<untrusted/.test(e.message), false);
+        return true;
+      },
+    );
   });
 
   it('テキストは囲んで返し、バイナリはパスを返す', () => {

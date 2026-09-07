@@ -389,9 +389,9 @@ const MAX_LISTED_NAMES = 20;
  * **`issueType` / `category` / マイルストーン / 担当者は第三者が書ける**
  * （追加も更新も「すべての権限」。担当者の表示名は本人が変更できる）。
  *
- * **ここは囲んでいない。** このメッセージは「次の呼び出しに渡す名前」を教える面で、
- * 囲むと識別子として使えなくなる。添付のファイル名（`tools.ts`）と同じトレードオフなので、
- * **まとめて裁定する**（レビュー台帳の T-2）。
+ * **候補はメッセージに入れず `candidates` で渡す**（T-2 ③・2026-09-07 裁定）。
+ * ここは `domain/` なので `untrusted` を知らない（DESIGN.md §4 の語彙表）。
+ * 囲んで文言に組むのは `tool/` 層の seam の仕事で、**この関数は候補を構造で運ぶだけ**。
  *
  * @param map - 名前 → id
  * @param name - 引きたい名前
@@ -409,13 +409,12 @@ export const lookupName = (
     return id;
   }
   const names = [...map.keys()];
-  const listed = names.slice(0, MAX_LISTED_NAMES).join(' / ');
-  const suffix =
-    names.length > MAX_LISTED_NAMES ? ` ほか${String(names.length - MAX_LISTED_NAMES)}件` : '';
+  const listed = names.slice(0, MAX_LISTED_NAMES);
   throw new MasterDataError(
     names.length === 0
       ? `${what}「${name}」は指定できません（このプロジェクトには定義がありません）`
-      : `${what}「${name}」は見つかりません（選べるのは ${listed}${suffix}）`,
+      : `${what}「${name}」は見つかりません`,
+    { candidates: listed, omittedCandidates: names.length - listed.length },
   );
 };
 

@@ -1048,7 +1048,11 @@ const findWikiId = (raw: unknown, name: string): number => {
  *
  * 見つからなければ**候補を挙げて送出する**（黙って空を返さない。規約 §5.4）。
  */
-const findAttachment = (raw: unknown, name: string): { readonly id: number } => {
+const findAttachment = (
+  raw: unknown,
+  name: string,
+  limits: ToolLimits,
+): { readonly id: number } => {
   const items = asArray(raw, 'GET /issues/*/attachments');
   for (const item of items) {
     if (isRecord(item) && item['name'] === name && typeof item['id'] === 'number') {
@@ -1059,9 +1063,16 @@ const findAttachment = (raw: unknown, name: string): { readonly id: number } => 
     .map(item => (isRecord(item) ? pickString(item['name']) : undefined))
     .filter(each => each !== undefined)
     .slice(0, 20);
-  throw new Error(
-    `添付「${name}」が見つかりません（この課題にあるのは ${available.length === 0 ? '(なし)' : available.join(' / ')}）`,
-  );
+  // **ファイル名は第三者が完全に制御できる。** 素で出すと改行が本物になり地の文に化ける
+  // （正常系は `JSON.stringify` を通るので潰れるが、catch は素のテキストを返す）
+  const listed =
+    available.length === 0
+      ? '(なし)'
+      : wrapUntrusted(available.join(' / '), {
+          source: { subject: 'backlog:attachment', field: 'name' },
+          maxLength: limits.maxTextLength,
+        });
+  throw new Error(`添付「${name}」が見つかりません（この課題にあるのは ${listed}）`);
 };
 
 /** 添付の1件。**`id` は返さない**（返しても使い道が無いようにしてある）。 */
@@ -1071,7 +1082,9 @@ const shapeAttachment = (raw: unknown, limits: ToolLimits): Record<string, unkno
   }
   return {
     // ファイル名は次の呼び出しに渡す識別子。囲むと識別子として使えない
-    // （`list_wiki_pages` のページ名と同じ扱い）
+    // （`list_wiki_pages` のページ名と同じ扱い）。**T-2 ① で現状維持と裁定した**（2026-09-07）。
+    // 正常系は `JSON.stringify` を通るので構造は壊せない。素で出るのはエラー経路だけで、
+    // そちらは `findAttachment` と `guardCandidates` が囲む
     name: pickString(raw['name']),
     size: pickNumber(raw['size']),
     createdUser: wrapName(raw['createdUser'], 'backlog:attachment', 'createdUser', limits),
@@ -1378,7 +1391,7 @@ export const planToolCall = (
         // 1本目は一覧。attachmentId は**この応答からしか採らない**（引数で渡す口が無い）
         request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
         next: raw => {
-          const { id } = findAttachment(raw, file);
+          const { id } = findAttachment(raw, file, limits);
           return {
             kind: 'download',
             request: {
@@ -1992,9 +2005,13 @@ type RunContext = Omit<ToolContext, 'gateway'> & GatewayCalls;
 /**
  * gateway を呼び、失敗したら**下から来たメッセージを囲んで**投げ直す形に包む。
  *
- * `planToolCall` が投げるのはこちらが書いた文言（`ScopeDeniedError` 等）だが、
  * gateway が投げるのは Backlog サーバが書いた文字列を含む（`Backlog API エラー: …`）。
  * 課題本文と同じ untrusted なので、そのまま LLM へ返さない。
+ *
+ * **`planToolCall` の側にも第三者の文字列は出る**（添付の候補・マスタの候補）。
+ * 以前ここには「`planToolCall` が投げるのはこちらが書いた文言」と書いてあったが、
+ * `findAttachment` が候補を並べる時点で既に偽だった。**そちらは `guardCandidates` と
+ * `findAttachment` の中で囲む**（T-2 ③）。この関数が担うのは gateway の口だけ。
  *
  * **包むのは呼ぶ枝ごとではなく、口そのもの。** 以前は `send` を包む関数を用意して
  * 各枝から呼んでいたが、`sendBytes` を足したときに `download` の枝が貼り忘れた
@@ -2028,6 +2045,44 @@ const guardGateway = (gateway: BacklogGateway, limits: ToolLimits): GatewayCalls
     call: request => guarded(() => gateway.send(request)),
     callBytes: request => guarded(() => gateway.sendBytes(request)),
   };
+};
+
+/**
+ * `domain/` が投げたエラーに載る**候補の名前を囲んで**投げ直す。
+ *
+ * `lookupName`（`masters.ts`）が返す候補は「次の呼び出しに渡せる名前」だが、そこに入るのは
+ * **第三者が書ける名前**（`issueType` / カテゴリー / マイルストーン / 担当者の表示名）。
+ * `domain/` は `untrusted` を知らない（DESIGN.md §4 の層と語彙の表）ので、
+ * 候補は `MasterDataError` の構造フィールドで運ばれてくる。**囲んで文言に組むのはここ。**
+ *
+ * **包むのは呼び出しごとではなく、口そのもの。** `lookupName` は16箇所から呼ばれており、
+ * 1箇所でも貼り忘れるとそこだけ素で出る（根A で同じ形を踏んだ）。
+ *
+ * **候補を持たないエラーは素通しする。** 囲むのは第三者が書けるものだけで、
+ * こちらが書いた文言（`ScopeDeniedError` 等）は囲まない。
+ */
+const guardCandidates = async <T>(run: () => Promise<T>, limits: ToolLimits): Promise<T> => {
+  try {
+    return await run();
+  } catch (e) {
+    const original = toError(e);
+    // realm を跨ぐと `instanceof` は誤判定する（規約 §6.2）。構造で判定する
+    const raw: unknown = 'candidates' in original ? original.candidates : undefined;
+    const candidates: readonly unknown[] = Array.isArray(raw) ? (raw as readonly unknown[]) : [];
+    if (candidates.length === 0) {
+      throw e;
+    }
+    const omitted: unknown = 'omittedCandidates' in original ? original.omittedCandidates : 0;
+    const suffix = typeof omitted === 'number' && omitted > 0 ? ` ほか${String(omitted)}件` : '';
+    const listed = wrapUntrusted(candidates.join(' / '), {
+      source: { subject: 'backlog', field: 'candidates' },
+      maxLength: limits.maxTextLength,
+    });
+    // 元は cause に残す（規約 §6.2）。監査ログと stderr からは元の形で辿れる
+    throw new MasterDataError(`${original.message}（選べるのは ${listed}${suffix}）`, {
+      cause: original,
+    });
+  }
 };
 
 /**
@@ -2570,7 +2625,10 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
       }
 
       try {
-        const payload = await runTool(runContext, toolName, isRecord(args) ? args : {});
+        const payload = await guardCandidates(
+          () => runTool(runContext, toolName, isRecord(args) ? args : {}),
+          runContext.limits,
+        );
         return withUntrustedNotice({
           content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
         });

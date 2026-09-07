@@ -436,6 +436,17 @@ export class ConfigError extends Error {
 }
 
 /**
+ * `MasterDataError` に添える追加情報。
+ *
+ * **`candidates` に入るのは第三者が書ける名前**なので、`MasterDataError` はそれを
+ * メッセージに載せない。載せると `domain/` が囲めないまま LLM へ届く（T-2 ③）。
+ */
+export interface MasterDataErrorOptions extends ErrorOptions {
+  readonly candidates?: readonly string[];
+  readonly omittedCandidates?: number;
+}
+
+/**
  * 起動時のマスタ解決の失敗。起動時に投げて、サーバを立ち上げない。
  *
  * `resolution` を名前に使わないのは、Backlog の「完了理由（resolutions）」と
@@ -443,6 +454,21 @@ export class ConfigError extends Error {
  */
 export class MasterDataError extends Error {
   override readonly name = 'MasterDataError';
+  /**
+   * 引けなかったときに選べる名前。**メッセージには入っていない。**
+   *
+   * ここには**第三者が書ける名前**が入る（`issueType` / カテゴリー / 担当者の表示名など）。
+   * 囲めるのは `tool/` 層だけなので（DESIGN.md §4 の語彙表）、そこまで**構造で運ぶ**。
+   */
+  readonly candidates: readonly string[];
+  /** 候補のうち載せなかった件数。**打ち切りを黙って捨てない**（規約 §5.4）。 */
+  readonly omittedCandidates: number;
+
+  constructor(message: string, options?: MasterDataErrorOptions) {
+    super(message, options);
+    this.candidates = options?.candidates ?? [];
+    this.omittedCandidates = options?.omittedCandidates ?? 0;
+  }
 }
 
 /** Backlog のスペースが載るドメイン。一次情報ミラーで確認した閉じた3値。 */

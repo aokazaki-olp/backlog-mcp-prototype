@@ -434,14 +434,39 @@ describe('resolveMasters — プロジェクト単位のマスタの形を検証
 });
 
 describe('lookupName', () => {
-  it('引けなければ送出し、選べる名前を挙げる（既定に落とさない）', () => {
+  it('引けなければ送出し、選べる名前は構造で渡す（既定に落とさない）', () => {
     const map = new Map([
       ['バグ', 1],
       ['タスク', 2],
     ]);
 
     assert.equal(lookupName(map, 'バグ', '課題種別'), 1);
-    assert.throws(() => lookupName(map, '存在しない', '課題種別'), /バグ \/ タスク/);
+    // **候補はメッセージに入れない**（T-2 ③）。`issueType` は第三者が書けるので、
+    // 囲めるのは `tool/` 層だけ。ここは構造で運ぶところまでを固定する
+    try {
+      lookupName(map, '存在しない', '課題種別');
+      assert.fail('送出するはず');
+    } catch (e) {
+      // テストは単一 realm なので instanceof で足りる（規約 §6.2 の懸念は当たらない）
+      assert.equal(e instanceof MasterDataError, true);
+      const error = e as MasterDataError;
+      assert.doesNotMatch(error.message, /バグ|タスク/);
+      assert.deepEqual(error.candidates, ['バグ', 'タスク']);
+      assert.equal(error.omittedCandidates, 0);
+    }
+  });
+
+  it('候補が多いときは打ち切った件数を渡す（黙って削らない）', () => {
+    const map = new Map([...Array(25).keys()].map(index => [`名前${String(index)}`, index]));
+
+    try {
+      lookupName(map, '存在しない', '課題種別');
+      assert.fail('送出するはず');
+    } catch (e) {
+      const error = e as MasterDataError;
+      assert.equal(error.candidates.length, 20);
+      assert.equal(error.omittedCandidates, 5);
+    }
   });
 
   it('定義が無いときは「定義がありません」と言う', () => {
