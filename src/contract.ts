@@ -147,7 +147,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'key',
     title: '課題を取得する',
     description:
-      '課題キー（例: PROJ-123）を指定して課題を取得する。カスタム属性は名前 → 値で返し、値が入っている件数を customFieldCount で返す。',
+      '課題キー（例: PROJ-123）を指定して課題を取得する。カスタム属性は名前 → 値で返し、値が入っている件数を customFieldCount で返す。子課題なら親の課題キーも返す（一覧では hasParent だけ）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,

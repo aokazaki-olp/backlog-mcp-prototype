@@ -743,7 +743,8 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     dueDate: pickString(raw['dueDate']),
     estimatedHours: pickNumber(raw['estimatedHours']),
     actualHours: pickNumber(raw['actualHours']),
-    // 連番 ID は落とすが、「子課題である」事実は残す
+    // 連番 ID は落とすが、「子課題である」事実は残す。
+    // **親の課題キーは `get_issue` だけが1手足して補う**（L3-13）— 一覧で辿ると N 件ぶんの往復になる
     hasParent: pickNumber(raw['parentIssueId']) !== undefined,
     attachmentCount: countOf(raw['attachments']),
     // 件数は中身と両方返す。読めなかった要素があると数が合わなくなり、取りこぼしが見える
@@ -1418,9 +1419,28 @@ export const planToolCall = (
     case 'get_issue': {
       const { issueKey } = resolveIssueKey(context, toolName, requiredString(args, 'issueKey'));
       return {
-        kind: 'send',
+        kind: 'chain',
         request: { endpoint: `/issues/${issueKey}`, method: 'GET' },
-        shape: raw => shapeIssue(raw, limits),
+        next: raw => {
+          const shaped = shapeIssue(raw, limits);
+          // **親の課題キーは応答から作れない**（`parentIssueId` は数値で、キーは持たない）。
+          // 単体取得のときだけ1手足して辿る（L3-13）。一覧で同じことをすると N 件ぶんの
+          // 往復になるので、そちらは `hasParent` のままにする
+          const parentIssueId = isRecord(raw) ? pickNumber(raw['parentIssueId']) : undefined;
+          if (parentIssueId === undefined) {
+            return { kind: 'none', result: shaped };
+          }
+          return {
+            kind: 'send',
+            // 数値 ID を渡すのは**サーバ内**。LLM には親のキーだけを返す（原則4）
+            request: { endpoint: `/issues/${String(parentIssueId)}`, method: 'GET' },
+            shape: parent => {
+              const parentIssueKey = isRecord(parent) ? pickString(parent['issueKey']) : undefined;
+              // 親のキーが読めなくても**本体は返す**（規約 §5.4 — 補助の失敗で結果を捨てない）
+              return parentIssueKey === undefined ? shaped : { ...shaped, parentIssueKey };
+            },
+          };
+        },
       };
     }
 

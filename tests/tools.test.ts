@@ -131,7 +131,13 @@ const planRequest = (
   args: Record<string, unknown>,
 ): ResolvedRequest => requestOf(planToolCall(context, toolName, args));
 
-/** 1往復で終わるツールの `shape` を取り出す。`chain` が返ったら失敗させる。 */
+/**
+ * **本体の応答をどう整えるか**だけを取り出す。補助の往復は「取れなかった」側に倒す。
+ *
+ * `both` の2本目（件数）も `chain` の2本目（親の課題キー）も**補助**で、
+ * 落ちても本体は返る設計になっている。ここではその「落ちた側」を使って、
+ * **本体の整形だけ**を見る（補助そのものは各ツールのテストで見る）。
+ */
 const shapeOf = (
   context: PlanContext,
   toolName: ToolName,
@@ -139,12 +145,24 @@ const shapeOf = (
 ): ((raw: unknown) => unknown) => {
   const planned = planToolCall(context, toolName, args);
   if (planned.kind === 'both') {
-    // 件数は別のテストで見る。**取得は成功したが読めなかった**扱いにして本体だけを見る
-    // （`failed` にすると totalUnavailable が付き、他のテストの期待と混ざる）
+    // **取得は成功したが読めなかった**扱いにする（`failed` にすると totalUnavailable が付く）
     return raw => planned.shape(raw, { kind: 'ok', value: undefined });
   }
+  if (planned.kind === 'chain') {
+    return raw => {
+      const next = planned.next(raw);
+      if (next.kind === 'none') {
+        return next.result;
+      }
+      if (next.kind !== 'send') {
+        assert.fail(`${toolName} の2本目は send か none のはず`);
+      }
+      // 補助の応答が読めなかった場合。本体だけが返る
+      return next.shape(undefined);
+    };
+  }
   if (planned.kind !== 'send') {
-    assert.fail(`${toolName} は1往復で終わるはず`);
+    assert.fail(`${toolName} は1〜2往復で終わるはず`);
   }
   return planned.shape;
 };
@@ -1974,6 +1992,82 @@ describe('planToolCall — offset は API が持つところだけ開ける（L3
         toolName,
       );
     }
+  });
+});
+
+describe('planToolCall — get_issue は親の課題キーまで返す（L3-13）', () => {
+  // 応答には `parentIssueId`（数値）しか無い。**課題キーを得るにはもう1本要る**ので、
+  // 単体取得のときだけ辿る。一覧で辿ると N 件ぶんの往復になる
+
+  it('親がいれば1手足して親の課題キーを返す', () => {
+    const planned = planToolCall(contextOf(), 'get_issue', { issueKey: 'PROJ-2' });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    assert.equal(planned.request.endpoint, '/issues/PROJ-2');
+    const second = planned.next({ ...MIRROR_ISSUE, issueKey: 'PROJ-2', parentIssueId: 555 });
+    if (second.kind !== 'send') {
+      assert.fail('2本目で終わるはず');
+    }
+    assert.equal(second.request.endpoint, '/issues/555');
+
+    const payload = second.shape({ issueKey: 'PROJ-1' }) as Record<string, unknown>;
+    assert.equal(payload['parentIssueKey'], 'PROJ-1');
+    assert.equal(payload['hasParent'], true);
+  });
+
+  it('親がいなければ往復を増やさない（境界）', () => {
+    const planned = planToolCall(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+
+    const second = planned.next({ ...MIRROR_ISSUE, parentIssueId: null });
+    if (second.kind !== 'none') {
+      assert.fail('API へ行かずに終わるはず');
+    }
+    const payload = second.result as Record<string, unknown>;
+    assert.equal(payload['hasParent'], false);
+    assert.equal(payload['parentIssueKey'], undefined);
+  });
+
+  it('親の課題キーが読めなくても本体は返す（規約 §5.4 — 黙って捨てない）', () => {
+    const planned = planToolCall(contextOf(), 'get_issue', { issueKey: 'PROJ-2' });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+    const second = planned.next({ ...MIRROR_ISSUE, parentIssueId: 555 });
+    if (second.kind !== 'send') {
+      assert.fail('send のはず');
+    }
+
+    const payload = second.shape({ 形が違う: true }) as Record<string, unknown>;
+    assert.equal(payload['hasParent'], true);
+    assert.equal(payload['parentIssueKey'], undefined);
+  });
+
+  it('一覧では往復を増やさない（境界 — N 件ぶん叩かない）', () => {
+    const shape = shapeOf(contextOf(), 'search_issues', {});
+    const payload = shape([{ ...MIRROR_ISSUE, parentIssueId: 555 }]) as {
+      items: Record<string, unknown>[];
+    };
+
+    assert.equal(payload.items[0]?.['hasParent'], true);
+    assert.equal(payload.items[0]['parentIssueKey'], undefined);
+  });
+
+  it('数値の parentIssueId は返さない（境界 — 原則4）', () => {
+    const planned = planToolCall(contextOf(), 'get_issue', { issueKey: 'PROJ-2' });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+    const second = planned.next({ ...MIRROR_ISSUE, parentIssueId: 555 });
+    if (second.kind !== 'send') {
+      assert.fail('send のはず');
+    }
+
+    assert.doesNotMatch(JSON.stringify(second.shape({ issueKey: 'PROJ-1' })), /555/);
   });
 });
 
