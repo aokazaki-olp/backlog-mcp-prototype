@@ -385,6 +385,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 **ドキュメントは単体取得のツールを作っていない。** `GET /documents/:documentId` と一覧は応答の形が同じで、**一覧に本文（`plain`）が入っている**。Wiki と違って2往復が要らない。`plain` が本文の全文であることは実スペースで確認済み（約1,300文字のドキュメントが末尾まで入っていた）。
 
+**どのプロジェクトのものかは `projectKey` で返す。** 応答には `projectId`（数値）が載っているので、起動時に解決したマスタで逆引きしてキーに直す（数値 ID は出さない。原則4）。引けなければ項目ごと落とす — 許可外のプロジェクトが混ざっていても、そこが黙って通ることはない。絞り込みの `projectKey` も受ける（`search_issues` と同じく**絞る方向にしか効かない**）。
+
 **ドキュメントは作成できるが、更新はできない。** Backlog の API に `PATCH` / `PUT` が無い（`POST /documents` が唯一の書き込み）。`create_document` は `parentId` / `addLast` / `emoji` を受け取らない — `parentId` はドキュメントの ID そのもので、数値 ID を触らせない方針に反する。タグの付け外し（`POST` / `DELETE /documents/:documentId/tags`）と削除も `documentId` 直指定なので作らない。
 
 **リポジトリ名はパスに載るので検証している。** 借り物の URL 組み立ては文字列連結で、正規化は URL パーサが行う。`..` を素通しすると `/projects/101/git/repositories/../../../../space/pullRequests` が `/api/v2/space/pullRequests` になり、**別のエンドポイントに到達する**（手元で確認）。`/` `\\` `?` `#` `%` と `.` `..` を弾き、残りは `encodeURIComponent` で載せる。

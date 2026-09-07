@@ -466,6 +466,26 @@ export const toProjectId = (masters: Masters, projectKey: string): number => {
 };
 
 /**
+ * projectId から projectKey を引く。**逆引きは「引けたら返す」**（引けなくても送出しない）。
+ *
+ * 応答に載っている `projectId` を出力の `projectKey` に直すために使う。**数値 ID は出さない**
+ * （原則4）ので、引けなければ**項目ごと落とす** — 推測で埋めるより、無いことを無いと示す。
+ * 許可外のプロジェクトが応答に混ざれば引けないので、**そこが黙って通ることもない**。
+ *
+ * @param masters - 解決済みマスタ
+ * @param projectId - Backlog の応答に載っていた数値 ID
+ * @returns プロジェクトキー。引けなければ `undefined`
+ */
+export const projectKeyOf = (masters: Masters, projectId: number): string | undefined => {
+  for (const [projectKey, id] of masters.projectIds) {
+    if (id === projectId) {
+      return projectKey;
+    }
+  }
+  return undefined;
+};
+
+/**
  * 許可されたプロジェクトキーすべての projectId を返す。
  *
  * 絞り込みパラメータを**ポリシー由来の値で上書き**するために使う（LLM が渡した

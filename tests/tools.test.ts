@@ -1716,6 +1716,46 @@ describe('planToolCall — document は絞り込みをポリシーで組み立�
     assert.throws(() => planToolCall(contextOf(), 'search_documents', { offset: -1 }), TypeError);
   });
 
+  it('projectKey で絞れる（L3-8）', () => {
+    const request = planRequest(contextOf(), 'search_documents', { projectKey: 'PROJ' });
+
+    assert.deepEqual(request.query?.['projectId[]'], [101]);
+  });
+
+  it('許可外の projectKey は拒否する（境界 — 絞る方向にしか効かない）', () => {
+    assert.throws(() => planToolCall(contextOf(), 'search_documents', { projectKey: 'OTHER' }), {
+      name: 'ScopeDeniedError',
+    });
+  });
+
+  it('どのプロジェクトのドキュメントか返す（L3-8）', () => {
+    const shape = shapeOf(contextOf(), 'search_documents', {});
+    const payload = shape([
+      { projectId: 101, title: '設計メモ', plain: '本文' },
+      { projectId: 102, title: '営業メモ', plain: '本文' },
+    ]) as { items: Record<string, unknown>[] };
+
+    assert.equal(payload.items[0]?.['projectKey'], 'PROJ');
+    assert.equal(payload.items[1]?.['projectKey'], 'SALES');
+  });
+
+  it('数値の projectId は返さない（境界 — 原則4）', () => {
+    const shape = shapeOf(contextOf(), 'search_documents', {});
+    const payload = shape([{ projectId: 101, title: '設計メモ', plain: '本文' }]);
+
+    assert.doesNotMatch(JSON.stringify(payload), /"projectId"/);
+    assert.doesNotMatch(JSON.stringify(payload), /101/);
+  });
+
+  it('引けないプロジェクトなら projectKey を出さない（境界 — 推測で埋めない）', () => {
+    const shape = shapeOf(contextOf(), 'search_documents', {});
+    const payload = shape([{ projectId: 999, title: '別のもの', plain: '本文' }]) as {
+      items: Record<string, unknown>[];
+    };
+
+    assert.equal(payload.items[0]?.['projectKey'], undefined);
+  });
+
   it('本文と表題を囲み、id / projectId / json は返さない', () => {
     const shape = shapeOf(contextOf(), 'search_documents', {});
     const shaped = (

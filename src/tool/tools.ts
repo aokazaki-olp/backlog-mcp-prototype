@@ -13,7 +13,13 @@ import {
   UnknownToolError,
 } from '../contract.ts';
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
-import { lookupName, projectMastersOf, toProjectId, toProjectIds } from '../domain/masters.ts';
+import {
+  lookupName,
+  projectKeyOf,
+  projectMastersOf,
+  toProjectId,
+  toProjectIds,
+} from '../domain/masters.ts';
 import { MasterDataError } from '../contract.ts';
 import { UNTRUSTED_NOTICE, limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
@@ -957,7 +963,11 @@ const shapePullRequest = (
  * **一覧の `plain` は本文の全文である**（実スペースで確認。約1,300文字のドキュメントが
  * 末尾まで入っており、切り詰めは無かった）。ミラーの応答例だけでは決まらなかった点。
  */
-const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
+const shapeDocument = (
+  raw: unknown,
+  limits: ToolLimits,
+  masters: Masters,
+): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: 'ドキュメントの形が想定と違います' };
   }
@@ -969,7 +979,12 @@ const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown
       maxLength: limits.maxTextLength,
     });
 
+  const projectId = pickNumber(raw['projectId']);
+
   return {
+    // **どのプロジェクトのものか返す**（L3-8）。数値 ID は出さずキーに直す（原則4）。
+    // 引けなければ項目ごと落とす — 推測で埋めない
+    projectKey: projectId === undefined ? undefined : projectKeyOf(masters, projectId),
     tags: wrapNames(raw['tags'], 'backlog:document', 'tags', limits),
     attachmentCount: countOf(raw['attachments']),
     createdUser: wrapName(raw['createdUser'], 'backlog:document', 'createdUser', limits),
@@ -1746,9 +1761,15 @@ export const planToolCall = (
 
     case 'search_documents': {
       const count = boundedCount(args, limits);
-      // projectId はポリシー由来。引数から受け取る口を作っていない。
+      // projectId はポリシー由来。**引数の projectKey は「絞る」方向にしか効かない**
+      // （`search_issues` と同じ形。指定が無ければ許可された全プロジェクトが対象）
+      const narrowed =
+        args['projectKey'] === undefined || args['projectKey'] === null
+          ? undefined
+          : resolveProjectKey(context, toolName, args);
       const query: Record<string, unknown> = {
-        'projectId[]': scopedProjectIds(context, toolName),
+        'projectId[]':
+          narrowed === undefined ? scopedProjectIds(context, toolName) : [narrowed.projectId],
         // **offset は API の必須パラメータ**（ミラーで確認）。既定は 0 だが、
         // 固定にすると21件目以降へ到達する手段が無くなる（L3-4）
         offset: optionalOffset(args, 'offset') ?? 0,
@@ -1766,7 +1787,7 @@ export const planToolCall = (
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'ドキュメント一覧'), count);
           return listPayload(
-            items.map(item => shapeDocument(item, limits)),
+            items.map(item => shapeDocument(item, limits, masters)),
             truncated,
             count,
           );
@@ -1789,7 +1810,7 @@ export const planToolCall = (
       return {
         kind: 'send',
         request: { endpoint: '/documents', method: 'POST', form },
-        shape: raw => shapeDocument(raw, limits),
+        shape: raw => shapeDocument(raw, limits, masters),
       };
     }
 
@@ -2432,6 +2453,11 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
   search_documents: {
     type: 'object',
     properties: {
+      projectKey: {
+        type: 'string',
+        description:
+          '1つのプロジェクトに絞る。省略すると許可された全プロジェクトが対象。応答の projectKey で、どのプロジェクトのものか分かる',
+      },
       keyword: { type: 'string', description: '検索キーワード' },
       offset: OFFSET_PROPERTY,
       count: COUNT_PROPERTY,
