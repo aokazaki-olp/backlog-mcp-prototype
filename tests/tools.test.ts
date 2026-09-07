@@ -1949,6 +1949,54 @@ describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
   });
 });
 
+describe('tools/list の description は使い分けを言う（L3-9 / L3-14）', () => {
+  const describeOf = (toolName: string): string =>
+    buildHandlers(handlersOf())
+      .listTools()
+      .find(each => each.name === toolName)?.description ?? '';
+
+  const propertyDescription = (toolName: string, property: string): string => {
+    const tool = buildHandlers({ ...handlersOf(), attachmentsRoot: '/allowed' })
+      .listTools()
+      .find(each => each.name === toolName);
+    const properties = tool?.inputSchema['properties'];
+    if (typeof properties !== 'object' || properties === null) {
+      return '';
+    }
+    const found = (properties as Record<string, unknown>)[property];
+    return typeof found === 'object' &&
+      found !== null &&
+      typeof (found as Record<string, unknown>)['description'] === 'string'
+      ? ((found as Record<string, unknown>)['description'] as string)
+      : '';
+  };
+
+  it('Wiki とドキュメントの使い分けが読める（L3-9）', () => {
+    // 事実はミラーで確認: ドキュメントに更新の API が無い／Wiki は新規スペースで提供終了
+    for (const toolName of ['list_wiki_pages', 'search_documents']) {
+      assert.match(describeOf(toolName), /Wiki|ドキュメント/, toolName);
+    }
+    assert.match(describeOf('search_documents'), /Wiki/);
+    assert.match(describeOf('list_wiki_pages'), /ドキュメント/);
+  });
+
+  it('共有の file は「1回の呼び出しにつき1件」と言う（L3-14）', () => {
+    // `FILE_PROPERTY` は6ツールで共有していて、コメント系は2つだけ
+    for (const toolName of [
+      'create_issue',
+      'update_issue',
+      'create_pull_request',
+      'update_pull_request',
+      'add_issue_comment',
+      'add_pull_request_comment',
+    ]) {
+      const text = propertyDescription(toolName, 'file');
+      assert.doesNotMatch(text, /1コメントにつき/, toolName);
+      assert.match(text, /1件/, toolName);
+    }
+  });
+});
+
 describe('planToolCall — offset は API が持つところだけ開ける（L3-4）', () => {
   // ミラー（`fetched: 2026-08-30`）で確認した。offset を持つのは3本だけ:
   //   GET /issues / GET /documents（必須）/ GET /projects/*/git/repositories/*/pullRequests

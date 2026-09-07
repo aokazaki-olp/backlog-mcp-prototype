@@ -169,7 +169,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'Wiki ページ一覧を取得する',
     description:
-      '許可されたプロジェクトの Wiki ページ一覧を取得する。上限まで返す（ページングの手段が API に無いので、続きは keyword で絞る）。',
+      '許可されたプロジェクトの Wiki ページ一覧を取得する。上限まで返す（ページングの手段が API に無いので、続きは keyword で絞る）。Wiki は**あとから書き換えられる**文書で、ページ名で指す。書き換えないものは Backlog の別機能である「ドキュメント」（search_documents）を使う。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -234,7 +234,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'ドキュメントを検索する',
     description:
-      '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。続きは offset で取得する。',
+      '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。続きは offset で取得する。ドキュメントは Backlog の別機能で、**作成はできるが更新の API が無い**（書き換えるものは Wiki を使う）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -245,7 +245,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'ドキュメントを作成する',
     description:
-      'プロジェクトキー・タイトル・本文を指定してドキュメントを作成する。本文は Markdown。Backlog に更新の API が無いので、作成したドキュメントを後から書き換えることはできない。',
+      'プロジェクトキー・タイトル・本文を指定してドキュメントを作成する。本文は Markdown。Backlog に更新の API が無いので、作成したドキュメントを後から書き換えることはできない（書き換える見込みがあるなら create_wiki_page を使う）。',
     readOnly: false,
     writesLocalFile: false,
     destructive: false,
@@ -301,7 +301,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     requires: 'write',
     scopeKind: 'filter',
     title: 'Wiki ページを作成する',
-    description: 'プロジェクトキー・ページ名・本文を指定して Wiki ページを追加する。',
+    description:
+      'プロジェクトキー・ページ名・本文を指定して Wiki ページを追加する。Wiki は update_wiki_page で書き換えられる（ドキュメントには更新の API が無い）。',
     readOnly: false,
     writesLocalFile: false,
     destructive: false,
