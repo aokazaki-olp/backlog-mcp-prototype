@@ -5,6 +5,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { cutCodeUnits } from '../shared/cutCodeUnits.ts';
 
 /**
  * これは**緩和であって防御ではない**。
@@ -71,7 +72,7 @@ const MAX_SUBJECT_LENGTH = 80;
 
 /** 上限を超えたら切って、切ったことが見えるようにする（黙って削らない。規約 §5.4）。 */
 const clip = (text: string, maxLength: number): string =>
-  text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+  text.length > maxLength ? `${cutCodeUnits(text, maxLength)}…` : text;
 
 /**
  * 由来を属性値に載せてよい1本の文字列へ組み立てる。
@@ -111,7 +112,7 @@ const renderSource = (source: UntrustedSource): string => {
 export const wrapUntrusted = (text: string, options: WrapOptions): string => {
   const nonce = randomBytes(6).toString('hex');
   const truncated = text.length > options.maxLength;
-  const body = truncated ? `${text.slice(0, options.maxLength)}\n${TRUNCATED_NOTICE}` : text;
+  const body = truncated ? `${cutCodeUnits(text, options.maxLength)}\n${TRUNCATED_NOTICE}` : text;
 
   // 乱数の区切りが本文に現れることは実質ないが、現れたら囲みが破れるので落としておく。
   const safe = body.replaceAll(nonce, '');

@@ -2510,6 +2510,71 @@ describe('tools/list — write 系はポリシーに従う', () => {
 // 囲みの source — 第三者が書いた文字列が属性を壊さないこと
 // ============================================================================
 
+describe('wrapUntrusted — 打ち切りはサロゲートペアを割らない', () => {
+  // `String.prototype.length` と `slice` は UTF-16 の符号単位で数える。
+  // 絵文字や一部の漢字は2単位なので、上限ちょうどで切ると**片割れだけが残る**。
+  // 片割れは単独では文字にならず、JSON へ出ると \ud83d のような孤立エスケープになる。
+  const surrogates = (text: string): number => {
+    let found = 0;
+    for (let i = 0; i < text.length; i++) {
+      const code = text.charCodeAt(i);
+      if (code >= 0xd800 && code <= 0xdfff) {
+        const paired =
+          code <= 0xdbff &&
+          i + 1 < text.length &&
+          text.charCodeAt(i + 1) >= 0xdc00 &&
+          text.charCodeAt(i + 1) <= 0xdfff;
+        if (paired) {
+          i++;
+          continue;
+        }
+        found++;
+      }
+    }
+    return found;
+  };
+
+  it('本文の打ち切りで片割れを残さない', () => {
+    // 🍣 は2符号単位。奇数の上限にすると必ずペアの途中で切れる
+    const wrapped = wrapUntrusted('🍣'.repeat(10), {
+      source: { subject: 'backlog:issue:PROJ-1', field: 'description' },
+      maxLength: 5,
+    });
+
+    assert.equal(surrogates(wrapped), 0);
+  });
+
+  it('由来の名前の打ち切りでも片割れを残さない', () => {
+    // 𠮷 は BMP の外にある**漢字**。`\p{L}` に当たるので source の許可文字を通り抜け、
+    // 60符号単位の上限で切られる（🍣 のような記号は先に `_` へ落ちるのでここには来ない）。
+    // 先頭に1単位の「あ」を置くと、上限がペアの途中に落ちる
+    const wrapped = wrapUntrusted('本文', {
+      source: { subject: 'backlog:document', name: `あ${'𠮷'.repeat(50)}`, field: 'title' },
+      maxLength: 100,
+    });
+
+    assert.equal(surrogates(wrapped), 0);
+  });
+
+  it('打ち切った事実は残る（境界 — 黙って削らない）', () => {
+    const wrapped = wrapUntrusted('🍣'.repeat(10), {
+      source: { subject: 'backlog:issue:PROJ-1', field: 'description' },
+      maxLength: 5,
+    });
+
+    assert.match(wrapped, /打ち切りました/);
+  });
+
+  it('ペアを割らない位置ならそのまま切る（境界 — 過剰に削らない）', () => {
+    const wrapped = wrapUntrusted('あ'.repeat(10), {
+      source: { subject: 'backlog:issue:PROJ-1', field: 'description' },
+      maxLength: 5,
+    });
+
+    assert.match(wrapped, /^あ{5}$/mu);
+  });
+});
+
 describe('wrapUntrusted — source は属性値として安全な形に落とす', () => {
   /** 囲みの1行目。`source` に `"` も改行も入っていないことを形で見る。 */
   const HEADER = /^<untrusted source="[^"\n]*" nonce="[0-9a-f]{12}">$/;

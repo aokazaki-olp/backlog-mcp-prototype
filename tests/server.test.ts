@@ -251,6 +251,19 @@ describe('withAudit', () => {
     ]);
   });
 
+  it('64符号単位で切るとき、サロゲートペアを割らない', async () => {
+    const sink = collectAudit();
+    // 𠮷 は2符号単位。奇数の位置から始めると上限がペアの途中に落ちる
+    await withAudit(makeHandlers(), sink).callTool('add_issue_comment', {
+      issueKey: 'PROJ-1',
+      file: `a${'𠮷'.repeat(50)}.md`,
+    });
+
+    const line = sink.lines[0] ?? '';
+    // 孤立サロゲートは JSON へ \ud842 の形で出る（対になっていれば文字として出る）
+    assert.doesNotMatch(line, /\\u[dD][89abAB][0-9a-fA-F]{2}/);
+  });
+
   it('拒否も記録する', async () => {
     const sink = collectAudit();
     const denying: McpHandlers = {

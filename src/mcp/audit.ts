@@ -9,6 +9,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import SonicBoomModule from 'sonic-boom';
 import { ConfigError } from '../contract.ts';
+import { cutCodeUnits } from '../shared/cutCodeUnits.ts';
 import { toError } from '../shared/toError.ts';
 import type { McpHandlers, ToolDefinition, ToolResult } from './protocol.ts';
 import type { SonicBoom } from 'sonic-boom';
@@ -187,7 +188,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 /**
  * 識別子だけを取り出す。**文字列と数値の両方を拾う**（PR 番号は数値）。
  *
- * 値は64文字で切る。長さで記録が壊れないようにするためで、識別子としてはこれで足りる。
+ * 値は64符号単位で切る。長さで記録が壊れないようにするためで、識別子としてはこれで足りる。
+ * **サロゲートペアの途中では切らない**（`file` は利用者が書いたパスで、BMP の外の文字が入りうる）。
  */
 const identify = (args: unknown): Record<string, string | number> => {
   if (!isRecord(args)) {
@@ -197,7 +199,7 @@ const identify = (args: unknown): Record<string, string | number> => {
   for (const name of IDENTIFYING_ARGS) {
     const value = args[name];
     if (typeof value === 'string') {
-      result[name] = value.slice(0, 64);
+      result[name] = cutCodeUnits(value, 64);
       continue;
     }
     if (typeof value === 'number' && Number.isFinite(value)) {
