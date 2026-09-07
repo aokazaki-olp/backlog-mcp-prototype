@@ -57,8 +57,10 @@ export const createBacklogGateway = (
     async sendBytes(request: ResolvedRequest): Promise<Uint8Array> {
       const raw: unknown = await bytesClient.get(request.endpoint, request.query);
       if (!(raw instanceof Uint8Array)) {
-        // 生バイトが取れないのは想定外。黙って空を返さない（規約 §5.4）
-        throw new Error(`${request.endpoint} からバイト列を受け取れませんでした`);
+        // 生バイトが取れないのは想定外。黙って空を返さない（規約 §5.4）。
+        // **エンドポイントは載せない**（L3-15）— この文言は `guardGateway` に包まれて
+        // LLM へ届く経路にあり、パスには添付の数値 ID が入る（原則4 と向きが逆になる）
+        throw new Error('Backlog から添付のバイト列を受け取れませんでした');
       }
       return raw;
     },

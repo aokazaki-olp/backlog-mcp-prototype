@@ -198,4 +198,36 @@ describe('createBacklogGateway — 応答', () => {
 
     assert.deepEqual(result, { issueKey: 'PROJ-1' });
   });
+
+  it('バイト列が取れなければ送出する（黙って空を返さない）', async () => {
+    // バイナリの応答は `bytes` に入る。`body` にも `bytes` にも無いのは想定外
+    const transport = makeTransport(null);
+
+    await assert.rejects(
+      () =>
+        createBacklogGateway(CONFIG, { transport }).sendBytes({
+          endpoint: '/issues/PROJ-1/attachments/8',
+          method: 'GET',
+        }),
+      /バイト列を受け取れませんでした/,
+    );
+  });
+
+  it('その文言に内部のエンドポイントパスを出さない（L3-15）', async () => {
+    // この文言は `guardGateway` に包まれて LLM へ届く。パスには添付の数値 ID が入る
+    const transport = makeTransport(null);
+
+    await assert.rejects(
+      () =>
+        createBacklogGateway(CONFIG, { transport }).sendBytes({
+          endpoint: '/issues/PROJ-1/attachments/8',
+          method: 'GET',
+        }),
+      (e: unknown) => {
+        assert.equal(Error.isError(e), true);
+        assert.doesNotMatch(Error.isError(e) ? e.message : '', /\/issues|attachments|8/u);
+        return true;
+      },
+    );
+  });
 });

@@ -461,7 +461,8 @@ describe('get_wiki_page — 名前 → ID をサーバ内で解決する', () =>
   it('一覧の応答が配列でなければ送出する', () => {
     const { next } = planChain({ projectKey: 'PROJ', name: 'Home' });
 
-    assert.throws(() => next({ id: 112, name: 'Home' }), /配列/);
+    // 文言は利用者の語彙で言う（L3-15。内部のエンドポイントパスは出さない）
+    assert.throws(() => next({ id: 112, name: 'Home' }), /Wiki ページ一覧の応答が想定と違います/);
   });
 
   it('許可外のプロジェクトは1本目すら組み立てない', () => {
@@ -2981,6 +2982,45 @@ describe('buildHandlers — SuppressedError の向き', () => {
 // 添付のダウンロード — テキストは囲んで返し、それ以外はディスクへ
 // ============================================================================
 
+describe('L3-15 — エラー文言に内部のエンドポイントパスを出さない', () => {
+  // LLM に届く文言（`tools.ts` の catch は素のテキストを返す）に `/issues/...` のような
+  // 内部のパスが出ると、**こちらの API の組み立て方をそのまま見せる**ことになる。
+  // しかも数値 ID を含む経路があり、原則4（数値 ID を LLM に触らせない）と向きが逆になる。
+
+  const failureText = (toolName: ToolName, args: Record<string, unknown>): string => {
+    const shape = shapeOf(contextOf(), toolName, args);
+    try {
+      shape('配列ではない');
+      assert.fail('送出するはず');
+    } catch (e) {
+      return Error.isError(e) ? e.message : String(e);
+    }
+  };
+
+  it('応答の形が違うときの文言にパスを出さない', () => {
+    for (const [toolName, args] of [
+      ['search_issues', {}],
+      ['get_issue_comments', { issueKey: 'PROJ-1' }],
+      ['list_issue_attachments', { issueKey: 'PROJ-1' }],
+      ['list_related_issues', { issueKey: 'PROJ-1' }],
+      ['list_wiki_pages', { projectKey: 'PROJ' }],
+      ['list_git_repositories', { projectKey: 'PROJ' }],
+      ['list_pull_requests', { projectKey: 'PROJ', repository: 'app' }],
+      ['get_pull_request_comments', { projectKey: 'PROJ', repository: 'app', number: 7 }],
+      ['search_documents', {}],
+      ['list_project_activities', { projectKey: 'PROJ' }],
+    ] as const) {
+      const text = failureText(toolName, args);
+      assert.doesNotMatch(text, /GET |\/issues|\/wikis|\/documents|\/projects/u, toolName);
+    }
+  });
+
+  it('何が読めなかったかは分かる（境界 — 情報を削りすぎない）', () => {
+    assert.match(failureText('search_issues', {}), /課題/);
+    assert.match(failureText('list_wiki_pages', { projectKey: 'PROJ' }), /Wiki/);
+  });
+});
+
 describe('planToolCall — 添付のダウンロード', () => {
   it('list_issue_attachments は名前とサイズを返し、id は返さない', () => {
     const shape = shapeOf(contextOf(), 'list_issue_attachments', { issueKey: 'PROJ-1' });
@@ -3354,7 +3394,7 @@ describe('runTool — gateway を呼ぶ枝は同じ扱いになる（C-1）', ()
 
   it('バイト列を受け取れなかったときの文言も囲まれる（同じ口から出る）', async () => {
     const { text } = await callDownload(() =>
-      Promise.reject(new Error('/issues/PROJ-1/attachments/8 からバイト列を受け取れませんでした')),
+      Promise.reject(new Error('Backlog から添付のバイト列を受け取れませんでした')),
     );
 
     assert.match(text, /<untrusted source="backlog:error"/);

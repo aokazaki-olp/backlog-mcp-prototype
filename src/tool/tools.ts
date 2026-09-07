@@ -1027,9 +1027,17 @@ const shapeActivity = (
   };
 };
 
-const asArray = (value: unknown, where: string): readonly unknown[] => {
+/**
+ * 一覧の応答を配列として受け取る。**読めなければ送出する**（黙って空を返さない。規約 §5.4）。
+ *
+ * `what` に**内部のエンドポイントパスを書かない**（L3-15）。この文言は catch を通って
+ * 素のテキストで LLM へ届く経路にあり、パスを出すと API の組み立て方をそのまま見せる。
+ * 数値 ID を含む経路もあり、原則4（数値 ID を LLM に触らせない）とも向きが逆になる。
+ * **利用者の語彙で「何が読めなかったか」を言う。**
+ */
+const asArray = (value: unknown, what: string): readonly unknown[] => {
   if (!Array.isArray(value)) {
-    throw new Error(`${where} の応答が配列ではありません`);
+    throw new Error(`${what}の応答が想定と違います`);
   }
   return value;
 };
@@ -1044,7 +1052,7 @@ const asArray = (value: unknown, where: string): readonly unknown[] => {
  * 見つからなければ送出する（規約 §5.4 — 黙って空を返さない）。
  */
 const findWikiId = (raw: unknown, name: string): number => {
-  for (const item of asArray(raw, 'GET /wikis')) {
+  for (const item of asArray(raw, 'Wiki ページ一覧')) {
     if (!isRecord(item) || item['name'] !== name) {
       continue;
     }
@@ -1069,7 +1077,7 @@ const findAttachment = (
   name: string,
   limits: ToolLimits,
 ): { readonly id: number; readonly duplicates: number } => {
-  const items = asArray(raw, 'GET /issues/*/attachments');
+  const items = asArray(raw, '課題の添付ファイル一覧');
   const matched = items.filter(
     item => isRecord(item) && item['name'] === name && typeof item['id'] === 'number',
   );
@@ -1378,7 +1386,7 @@ export const planToolCall = (
           },
         ],
         shape: (raw, counted) => {
-          const { items, truncated } = limitCount(asArray(raw, 'GET /issues'), count);
+          const { items, truncated } = limitCount(asArray(raw, '課題一覧'), count);
           const payload = listPayload(
             items.map(item => shapeIssue(item, limits)),
             truncated,
@@ -1411,7 +1419,7 @@ export const planToolCall = (
           query: { count: probeCount(count), order: 'desc' },
         },
         shape: raw => {
-          const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/comments'), count);
+          const { items, truncated } = limitCount(asArray(raw, '課題のコメント一覧'), count);
           return listPayload(
             items.map(item => shapeComment(item, `backlog:issue:${issueKey}`, limits)),
             truncated,
@@ -1428,7 +1436,7 @@ export const planToolCall = (
         kind: 'send',
         request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
         shape: raw => {
-          const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/attachments'), count);
+          const { items, truncated } = limitCount(asArray(raw, '課題の添付ファイル一覧'), count);
           return listPayload(
             items.map(item => shapeAttachment(item, limits)),
             truncated,
@@ -1498,10 +1506,7 @@ export const planToolCall = (
         kind: 'send',
         request: { endpoint: `/issues/${issueKey}/relatedIssues`, method: 'GET' },
         shape: raw => {
-          const { items, truncated } = limitCount(
-            asArray(raw, 'GET /issues/*/relatedIssues'),
-            count,
-          );
+          const { items, truncated } = limitCount(asArray(raw, '関連課題の一覧'), count);
           // 応答は課題オブジェクトの配列。`type` は現在つねに RELATES なので落とす。
           // **これは Backlog の「関連課題」で、親子課題とは別の関係**（実データで確認:
           // 親子を作った課題でも relatedIssues は 0 件）。子課題は search_issues の
@@ -1534,7 +1539,7 @@ export const planToolCall = (
         kind: 'send',
         request: { endpoint: '/wikis', method: 'GET', query },
         shape: raw => {
-          const { items, truncated } = limitCount(asArray(raw, 'GET /wikis'), limits.maxCount);
+          const { items, truncated } = limitCount(asArray(raw, 'Wiki ページ一覧'), limits.maxCount);
           return listPayload(
             items.map(item => shapeWikiPage(item, limits)),
             truncated,
@@ -1632,7 +1637,7 @@ export const planToolCall = (
         request: { endpoint: `/projects/${String(projectId)}/git/repositories`, method: 'GET' },
         shape: raw => {
           const { items, truncated } = limitCount(
-            asArray(raw, 'GET /projects/*/git/repositories'),
+            asArray(raw, 'Git リポジトリ一覧'),
             limits.maxCount,
           );
           return listPayload(
@@ -1656,10 +1661,7 @@ export const planToolCall = (
           query: { count: probeCount(count) },
         },
         shape: raw => {
-          const { items, truncated } = limitCount(
-            asArray(raw, 'GET /projects/*/git/repositories/*/pullRequests'),
-            count,
-          );
+          const { items, truncated } = limitCount(asArray(raw, 'プルリクエスト一覧'), count);
           return listPayload(
             items.map(item =>
               shapePullRequest(item, `backlog:pr:${projectKey}/${repository}`, limits),
@@ -1700,7 +1702,7 @@ export const planToolCall = (
         },
         shape: raw => {
           const { items, truncated } = limitCount(
-            asArray(raw, 'GET /projects/*/git/repositories/*/pullRequests/*/comments'),
+            asArray(raw, 'プルリクエストのコメント一覧'),
             count,
           );
           const source = `backlog:pr:${projectKey}/${repository}#${String(number)}`;
@@ -1758,7 +1760,7 @@ export const planToolCall = (
         kind: 'send',
         request: { endpoint: '/documents', method: 'GET', query },
         shape: raw => {
-          const { items, truncated } = limitCount(asArray(raw, 'GET /documents'), count);
+          const { items, truncated } = limitCount(asArray(raw, 'ドキュメント一覧'), count);
           return listPayload(
             items.map(item => shapeDocument(item, limits)),
             truncated,
@@ -1825,10 +1827,7 @@ export const planToolCall = (
           query: { count: probeCount(count), order: 'desc' },
         },
         shape: raw => {
-          const { items, truncated } = limitCount(
-            asArray(raw, 'GET /projects/*/activities'),
-            count,
-          );
+          const { items, truncated } = limitCount(asArray(raw, 'プロジェクトの活動一覧'), count);
           return listPayload(
             items.map(item => shapeActivity(item, projectKey, limits)),
             truncated,
