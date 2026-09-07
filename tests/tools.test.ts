@@ -2100,6 +2100,48 @@ describe('planToolCall — 添付', () => {
     assert.equal('maximum' in (found ?? {}), false);
   });
 
+  it('必須の file は添付が無効でも消さない（消すと呼べない schema になる）', () => {
+    // `get_issue_attachment` の `file` は**取得するファイル名**で、添付アップロードの口
+    // （共有 `FILE_PROPERTY`）とは別物。名前が同じだけ。しかも有効化の env も別
+    // （こちらは BACKLOG_DOWNLOADS_DIR、添付の口は BACKLOG_ATTACHMENTS_ROOT）
+    const context: ToolContext = { ...handlersOf(), downloadsDir: '/downloads' };
+
+    assert.notEqual(propertyOf(context, 'get_issue_attachment', 'file'), undefined);
+  });
+
+  it('required に挙げた項目が properties に必ずある', () => {
+    // 消した結果 required だけが残ると、additionalProperties: false と合わさって
+    // **仕様に従うクライアントが呼べない** schema になる
+    const context: ToolContext = { ...handlersOf(), downloadsDir: '/downloads' };
+
+    for (const tool of buildHandlers(context).listTools()) {
+      const schema = tool.inputSchema;
+      const properties = schema['properties'];
+      const required = schema['required'];
+      if (!Array.isArray(required)) {
+        // 必須引数を持たないツール（`search_issues` など）。照合するものが無い
+        continue;
+      }
+      for (const key of required as readonly string[]) {
+        assert.equal(
+          typeof properties === 'object' && properties !== null && key in properties,
+          true,
+          `${tool.name} の required "${key}"`,
+        );
+      }
+    }
+  });
+
+  it('省略可の file は添付が無効なら消す（回帰）', () => {
+    assert.equal(propertyOf(handlersOf(), 'add_issue_comment', 'file'), undefined);
+  });
+
+  it('添付が有効なら省略可の file も残る（境界）', () => {
+    const context: ToolContext = { ...handlersOf(), attachmentsRoot: '/allowed' };
+
+    assert.notEqual(propertyOf(context, 'add_issue_comment', 'file'), undefined);
+  });
+
   it('どのツールも attachmentId を引数に取らない', () => {
     // ツール名ではなく**引数の面**で固定する。名前は増えるが、この不変条件は変わらない
     const schemas = JSON.stringify(

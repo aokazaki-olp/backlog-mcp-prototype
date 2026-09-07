@@ -2525,10 +2525,20 @@ const configAllows = (context: PlanContext, toolName: ToolName): boolean =>
  * 受け付けて実行時に送出する形だと、**使えない引数を LLM に見せている**ことになる。
  * `tools/list` の段で消せば書きようがない（原則1 と同じ「到達不能」の形）。
  * **ツールごと消さない** — コメント自体は添付が無くても使える。
+ *
+ * **`required` に挙がっている `file` は消さない。** 消すと `required` だけが残り、
+ * `additionalProperties: false` と合わさって**仕様に従うクライアントが呼べない** schema になる。
+ * 該当するのは `get_issue_attachment` の `file`（取得するファイル名）で、
+ * 添付アップロードの口（共有 `FILE_PROPERTY`。常に省略可）とは**名前が同じだけの別物**。
+ * 有効化の設定も別で（`downloadsDir` と `attachmentsRoot`）、片方だけ設定された状態が普通に起きる。
  */
 const withoutFileProperty = (schema: Record<string, unknown>): Record<string, unknown> => {
   const properties = schema['properties'];
   if (!isRecord(properties) || !('file' in properties)) {
+    return schema;
+  }
+  const required = schema['required'];
+  if (Array.isArray(required) && required.includes('file')) {
     return schema;
   }
   const { file: _file, ...rest } = properties;
