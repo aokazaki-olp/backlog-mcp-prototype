@@ -327,6 +327,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 
 `attachmentId` を引数に取る口は無い。`get_issue_attachment` は `get_wiki_page` と同じく**一覧の応答からしか `id` を採らない**。
 
+**同名の添付が複数あったら、先頭を返して件数も返す**（`duplicates` と `note`）。名前でしか指せない設計なので送出すると代替手段が無くなるが、黙って選ぶと別のファイルを返しうる。**Backlog 側が同名をリネームするかは未確認**（API ミラー152本とヘルプセンター ja 110記事を全走査して記述ゼロ、2026-09-07）。リネームされるなら `duplicates` は出ないので害が無い。
+
 ### 添付は単独のツールにしない
 
 `add_issue_comment` と `add_pull_request_comment` が任意で `file` を取る。**アップロード専用のツールは作らない。**

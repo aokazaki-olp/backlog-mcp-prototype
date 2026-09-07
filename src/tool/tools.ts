@@ -1068,12 +1068,21 @@ const findAttachment = (
   raw: unknown,
   name: string,
   limits: ToolLimits,
-): { readonly id: number } => {
+): { readonly id: number; readonly duplicates: number } => {
   const items = asArray(raw, 'GET /issues/*/attachments');
-  for (const item of items) {
-    if (isRecord(item) && item['name'] === name && typeof item['id'] === 'number') {
-      return { id: item['id'] };
-    }
+  const matched = items.filter(
+    item => isRecord(item) && item['name'] === name && typeof item['id'] === 'number',
+  );
+  const first = matched[0];
+  if (isRecord(first) && typeof first['id'] === 'number') {
+    // **同名が複数あっても取得は閉じない。** 名前でしか指せない設計（原則2 — `attachmentId` を
+    // 渡す口が無い）なので、送出すると代替手段が無くなる。代わりに**選んだ事実を出力に載せる**
+    // （規約 §5.4 のサンプリング）。
+    //
+    // **Backlog 側が同名をリネームするかは未確認**（API ミラー152本・ヘルプセンター ja 110記事を
+    // 全走査して記述ゼロ。2026-09-07）。リネームされるなら `duplicates` は 1 のままで害が無く、
+    // されないなら黙って別ファイルを返す事故が消える。
+    return { id: first['id'], duplicates: matched.length };
   }
   const available = items
     .map(item => (isRecord(item) ? pickString(item['name']) : undefined))
@@ -1437,7 +1446,15 @@ export const planToolCall = (
         // 1本目は一覧。attachmentId は**この応答からしか採らない**（引数で渡す口が無い）
         request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
         next: raw => {
-          const { id } = findAttachment(raw, file, limits);
+          const { id, duplicates } = findAttachment(raw, file, limits);
+          // 同名が複数あったら**選んだ事実を載せる**（L1-7。規約 §5.4 のサンプリング）
+          const ambiguity =
+            duplicates > 1
+              ? {
+                  duplicates,
+                  note: `この課題には同名の添付が ${String(duplicates)} 件あります。一覧の先頭の1件を返しました`,
+                }
+              : {};
           return {
             kind: 'download',
             request: {
@@ -1449,6 +1466,7 @@ export const planToolCall = (
               received.kind === 'text'
                 ? {
                     file,
+                    ...ambiguity,
                     content: wrapUntrusted(received.text, {
                       source: {
                         subject: `backlog:issue:${issueKey}`,
@@ -1460,8 +1478,12 @@ export const planToolCall = (
                   }
                 : {
                     file,
+                    ...ambiguity,
                     savedTo: received.path,
-                    note: 'テキストではないのでディスクへ保存しました。中身を読ませたい場合はこのファイルを開いてください',
+                    note:
+                      duplicates > 1
+                        ? `テキストではないのでディスクへ保存しました。なお、この課題には同名の添付が ${String(duplicates)} 件あり、一覧の先頭の1件を返しました`
+                        : 'テキストではないのでディスクへ保存しました。中身を読ませたい場合はこのファイルを開いてください',
                   },
           };
         },

@@ -7,6 +7,7 @@ import { DEFAULT_LIMITS, buildHandlers, planToolCall } from '../src/tool/tools.t
 import { wrapUntrusted } from '../src/tool/untrusted.ts';
 import type { UntrustedSource } from '../src/tool/untrusted.ts';
 import type { ResolvedRequest, ToolName } from '../src/contract.ts';
+import type { ReceivedAttachment } from '../src/attach/localFile.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
 import type { Masters } from '../src/domain/masters.ts';
 import type { ToolDefinition } from '../src/mcp/protocol.ts';
@@ -3026,6 +3027,87 @@ describe('planToolCall — 添付のダウンロード', () => {
     }
 
     assert.throws(() => planned.next([{ id: 8, name: 'IMG0088.png' }]), /IMG0088\.png/);
+  });
+
+  // --------------------------------------------------------------------------
+  // L1-7 — 同名の添付が複数あるとき、黙って先頭を選ばない
+  //
+  // **Backlog 側がリネームするかは未確認**（API ミラー152本とヘルプセンター ja 110記事を
+  // 全走査して記述ゼロ・2026-09-07）。リネームされるなら `duplicates` は一度も出ないので害が無く、
+  // されないなら黙って別ファイルを返す事故が消える。**どちらでも正しい側に倒してある。**
+  // --------------------------------------------------------------------------
+
+  const downloadOf = (
+    listed: readonly Record<string, unknown>[],
+    file = 'spec.pdf',
+  ): { readonly shape: (received: ReceivedAttachment) => unknown } => {
+    const planned = planToolCall(contextOf(), 'get_issue_attachment', {
+      issueKey: 'PROJ-1',
+      file,
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+    const second = planned.next(listed);
+    if (second.kind !== 'download') {
+      assert.fail('download のはず');
+    }
+    return second;
+  };
+
+  it('同名が複数あったら件数を出力に載せる（規約 §5.4）', () => {
+    const { shape } = downloadOf([
+      { id: 8, name: 'spec.pdf' },
+      { id: 9, name: 'spec.pdf' },
+      { id: 10, name: 'other.pdf' },
+    ]);
+    const payload = shape({ kind: 'saved', path: '/downloads/spec.pdf' }) as Record<
+      string,
+      unknown
+    >;
+
+    assert.equal(payload['duplicates'], 2);
+    assert.match(String(payload['note']), /同名/);
+  });
+
+  it('テキストで返す経路にも載せる（囲みの外に足す）', () => {
+    const { shape } = downloadOf([
+      { id: 8, name: 'spec.pdf' },
+      { id: 9, name: 'spec.pdf' },
+    ]);
+    const payload = shape({ kind: 'text', text: '中身' }) as Record<string, unknown>;
+
+    assert.equal(payload['duplicates'], 2);
+  });
+
+  it('同名が1件なら載せない（境界 — 過剰に足さない）', () => {
+    const { shape } = downloadOf([
+      { id: 8, name: 'spec.pdf' },
+      { id: 9, name: 'other.pdf' },
+    ]);
+    const payload = shape({ kind: 'text', text: '中身' }) as Record<string, unknown>;
+
+    assert.equal(payload['duplicates'], undefined);
+    assert.equal(payload['note'], undefined);
+  });
+
+  it('選ぶのは一覧の先頭の一致（回帰 — 選び方は変えない）', () => {
+    const planned = planToolCall(contextOf(), 'get_issue_attachment', {
+      issueKey: 'PROJ-1',
+      file: 'spec.pdf',
+    });
+    if (planned.kind !== 'chain') {
+      assert.fail('chain のはず');
+    }
+    const second = planned.next([
+      { id: 8, name: 'spec.pdf' },
+      { id: 9, name: 'spec.pdf' },
+    ]);
+    if (second.kind !== 'download') {
+      assert.fail('download のはず');
+    }
+
+    assert.equal(second.request.endpoint, '/issues/PROJ-1/attachments/8');
   });
 
   // --------------------------------------------------------------------------
