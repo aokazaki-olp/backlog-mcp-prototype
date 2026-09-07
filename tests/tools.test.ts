@@ -1194,6 +1194,78 @@ describe('buildHandlers — tools/call は一覧と独立に確認する', () =>
     assert.doesNotMatch(text, /<untrusted/);
   });
 
+  it('宣言していない引数を弾く（additionalProperties: false を実際に守る）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('get_issue', {
+      issueKey: 'PROJ-1',
+      projectKey: 'SECRET',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.equal(result.isError, true);
+    assert.match(text, /未知の引数 "projectKey"/);
+    assert.match(text, /渡せるのは issueKey/);
+  });
+
+  it('未知の引数を複数まとめて言う（往復を増やさない）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('get_issue', {
+      issueKey: 'PROJ-1',
+      typo: 1,
+      projectKey: 'SECRET',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.match(text, /"typo"/);
+    assert.match(text, /"projectKey"/);
+  });
+
+  it('必須引数を持たないツールでも弾く', async () => {
+    // `search_issues` は required が無い。読み取り関数だけでは未知のキーに触れられない
+    const result = await buildHandlers(handlersOf()).callTool('search_issues', { typo: 1 });
+
+    assert.equal(result.isError, true);
+  });
+
+  it('引数がオブジェクトでなければ拒否する', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('search_issues', 'PROJ-1');
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.equal(result.isError, true);
+    assert.match(text, /オブジェクト/);
+  });
+
+  it('引数を省略しても通る（境界 — 必須が無いツール）', async () => {
+    const gateway = makeGateway({ '/issues': [] });
+    const result = await buildHandlers({ ...contextOf(), gateway }).callTool(
+      'search_issues',
+      undefined,
+    );
+
+    assert.equal(result.isError, undefined);
+  });
+
+  it('省略可の既知の引数は通る（境界 — 過剰に弾かない）', async () => {
+    const gateway = makeGateway({ '/issues/PROJ-1/comments': [] });
+    const result = await buildHandlers({ ...contextOf(), gateway }).callTool('get_issue_comments', {
+      issueKey: 'PROJ-1',
+      count: 5,
+    });
+
+    assert.equal(result.isError, undefined);
+  });
+
+  it('添付が未設定でも file は未知の引数にしない（境界 — 原因を言い当てるエラーを残す）', async () => {
+    const result = await buildHandlers(handlersOf()).callTool('add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'x',
+      file: 'a.png',
+    });
+    const text = result.content.map(block => block.text).join('\n');
+
+    assert.equal(result.isError, true);
+    assert.doesNotMatch(text, /未知の引数/);
+    assert.match(text, /BACKLOG_ATTACHMENTS_ROOT/);
+  });
+
   it('許可された呼び出しは gateway に届く', async () => {
     const gateway = makeGateway({ '/issues/PROJ-1': { issueKey: 'PROJ-1', summary: 'ある課題' } });
     const handlers = buildHandlers({ ...contextOf(), gateway });

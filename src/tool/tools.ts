@@ -2656,6 +2656,49 @@ const withUntrustedNotice = (result: ToolResult): ToolResult =>
     ? { ...result, content: [...result.content, { type: 'text', text: UNTRUSTED_NOTICE }] }
     : result;
 
+/**
+ * **宣言していない引数を弾く。**
+ *
+ * `INPUT_SCHEMAS` は全ツールで `additionalProperties: false` を宣言しているのに、
+ * 引数の検査は読み取り関数（`requiredString` など）に埋まっている。読み取り関数は
+ * **読んだキーしか見えない**ので、読まなかったキーを検出できる位置にいない。ここでしか塞げない。
+ *
+ * 黙って無視すると、綴り違いの絞り込みが「絞り込まずに全件返した」結果として届く（規約 §5.4）。
+ * MCP 仕様も Servers **MUST**「Validate all tool inputs」と定めている
+ * （`server/tools.md` の Security Considerations。2026-07-28 版・2026-09-07 確認）。
+ *
+ * **照合先は宣言のもと（`INPUT_SCHEMAS`）で、`tools/list` に出した schema ではない。**
+ * 添付が未設定のときの `file` は `withOptionalAttachment` が
+ * 「`BACKLOG_ATTACHMENTS_ROOT` が未設定」と原因を言い当てるので、その案内を残す。
+ *
+ * **`enum` はここで見ない**（`projectKey` / `priority` / `resolution`）。
+ * ポリシーとマスタが候補付きのエラーを返しており、先に弾くとその案内が消える。
+ *
+ * 形は `policy.ts` の「未知の項目」と揃えてある（渡せるものを併せて言う）。
+ *
+ * @param toolName - 対象のツール
+ * @param args - クライアントが渡した `arguments`
+ * @returns 検査を通った引数（省略なら空のオブジェクト）
+ * @throws {TypeError} オブジェクトでない場合、宣言していないキーを含む場合
+ */
+const checkedArguments = (toolName: ToolName, args: unknown): Record<string, unknown> => {
+  if (args == null) {
+    return {};
+  }
+  if (!isRecord(args)) {
+    throw new TypeError('arguments にはオブジェクトを指定してください');
+  }
+  const properties = INPUT_SCHEMAS[toolName]['properties'];
+  const allowed = isRecord(properties) ? Object.keys(properties) : [];
+  const unexpected = Object.keys(args).filter(key => !allowed.includes(key));
+  if (unexpected.length === 0) {
+    return args;
+  }
+  // 引数名はクライアントが書いた文字列。素で出すと改行で応答の形を崩せるので JSON で囲む
+  const listed = unexpected.map(key => JSON.stringify(key)).join(' / ');
+  throw new TypeError(`未知の引数 ${listed}（渡せるのは ${allowed.join(' / ')}）`);
+};
+
 export const buildHandlers = (context: ToolContext): McpHandlers => {
   // **生の gateway をここから先へ渡さない。** `runTool` が受け取るのは包んだ操作だけ
   const { gateway, ...rest } = context;
@@ -2695,7 +2738,7 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
 
       try {
         const payload = await guardCandidates(
-          () => runTool(runContext, toolName, isRecord(args) ? args : {}),
+          () => runTool(runContext, toolName, checkedArguments(toolName, args)),
           runContext.limits,
         );
         return withUntrustedNotice({
