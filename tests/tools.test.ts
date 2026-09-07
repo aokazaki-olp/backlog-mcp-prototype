@@ -2830,6 +2830,61 @@ describe('planToolCall — update_pull_request', () => {
     assert.equal(planned.kind, 'chain');
   });
 
+  it('関連課題がポリシー外なら、添付を上げる前に拒否する（L1-10）', async () => {
+    const gateway = makeGateway({ '/space/attachment': { id: 4242 } });
+    let read = 0;
+    const handlers = buildHandlers({
+      ...contextOf(),
+      gateway,
+      attachmentsRoot: '/allowed',
+      readAttachment: () => {
+        read++;
+        return Promise.resolve({
+          kind: 'file' as const,
+          filename: 'diff.txt',
+          contentType: 'text/plain',
+          data: new Uint8Array([0x61]),
+        });
+      },
+    });
+
+    // OTHER はポリシーに無い。以前は添付を上げ切ってから判定していた
+    const result = await handlers.callTool('update_pull_request', {
+      ...base,
+      relatedIssueKey: 'OTHER-1',
+      file: 'diff.txt',
+    });
+
+    assert.equal(result.isError, true);
+    assert.equal(read, 0, 'ローカルファイルを読んでいる');
+    assert.deepEqual(gateway.calls, [], 'Backlog へ何か送っている');
+  });
+
+  it('関連課題の形が不正でも、添付を上げる前に拒否する（L1-10）', async () => {
+    const gateway = makeGateway({ '/space/attachment': { id: 4242 } });
+    const handlers = buildHandlers({
+      ...contextOf(),
+      gateway,
+      attachmentsRoot: '/allowed',
+      readAttachment: () =>
+        Promise.resolve({
+          kind: 'file' as const,
+          filename: 'diff.txt',
+          contentType: 'text/plain',
+          data: new Uint8Array([0x61]),
+        }),
+    });
+
+    const result = await handlers.callTool('update_pull_request', {
+      ...base,
+      relatedIssueKey: '123',
+      file: 'diff.txt',
+    });
+
+    assert.equal(result.isError, true);
+    assert.deepEqual(gateway.calls, []);
+  });
+
   it('添付と関連課題を両方指定しても上限に達しない', async () => {
     // attach → upload → 課題の解決 → 本体 の4手。MAX_HOPS はこれより大きい
     const gateway = makeGateway({

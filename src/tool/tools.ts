@@ -1153,18 +1153,38 @@ const ISSUE_KEY_ARGS = {
   parentIssueKey: '親課題',
 } as const;
 
-const withResolvedIssueId = (
+/**
+ * 課題キーの形とポリシーだけを先に確かめる。**I/O を伴わない。**
+ *
+ * **判定と ID 解決を分けてある**（L1-10）。以前は1つの関数で、`withOptionalAttachment` の
+ * 内側から呼ばれていたため、**添付を上げ切ってからポリシー違反が分かる**順序になっていた。
+ * 判定は純粋なので、いくらでも前に出せる。
+ *
+ * @returns 指定があれば検証済みの課題キー。無指定なら `undefined`
+ */
+const checkedIssueKeyArg = (
   context: PlanContext,
   toolName: ToolName,
   args: Record<string, unknown>,
   argName: keyof typeof ISSUE_KEY_ARGS,
+): string | undefined => {
+  const given = optionalString(args, argName);
+  return given === undefined ? undefined : resolveIssueKey(context, toolName, given).issueKey;
+};
+
+/**
+ * 検証済みの課題キーを数値 ID に直してから本体を送る。**判定は済んでいる前提。**
+ *
+ * 呼ぶ前に `checkedIssueKeyArg` を通すこと。ここでは往復するだけで、拒否はしない。
+ */
+const withResolvedIssueId = (
+  issueKey: string | undefined,
+  argName: keyof typeof ISSUE_KEY_ARGS,
   send: (issueId?: number) => PlannedCall,
 ): PlannedCall => {
-  const given = optionalString(args, argName);
-  if (given === undefined) {
+  if (issueKey === undefined) {
     return send();
   }
-  const { issueKey } = resolveIssueKey(context, toolName, given);
   return {
     kind: 'chain',
     request: { endpoint: `/issues/${issueKey}`, method: 'GET' },
@@ -1319,7 +1339,8 @@ export const planToolCall = (
       const offset = optionalOffset(args, 'offset');
       // 子課題を引く唯一の手段。relatedIssues は「関連課題」で親子とは別の関係なので、
       // 子課題は返らない（実データで確認）。親は数値 ID を要るので課題キーから解決する
-      return withResolvedIssueId(context, toolName, args, 'parentIssueKey', parentIssueId => ({
+      const parentKey = checkedIssueKeyArg(context, toolName, args, 'parentIssueKey');
+      return withResolvedIssueId(parentKey, 'parentIssueKey', parentIssueId => ({
         // 件数は同じ絞り込みで別途引く。「あと何件あるか」を言えるようにするため（§5.4）
         kind: 'both',
         requests: [
@@ -1842,9 +1863,11 @@ export const planToolCall = (
         },
         shape: raw => shapeIssue(raw, limits),
       });
+      // **判定は添付より先**（L1-10）。上げ切ってからポリシー違反が分かる形にしない
+      const parentKey = checkedIssueKeyArg(context, toolName, args, 'parentIssueKey');
       // 添付（2手）→ 親課題の解決（1手）→ 本体、で最長4手。MAX_HOPS の内側
       return withOptionalAttachment(context, args, attachmentId =>
-        withResolvedIssueId(context, toolName, args, 'parentIssueKey', parentIssueId =>
+        withResolvedIssueId(parentKey, 'parentIssueKey', parentIssueId =>
           post(attachmentId, parentIssueId),
         ),
       );
@@ -1922,8 +1945,10 @@ export const planToolCall = (
       );
 
       const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests`;
+      // **判定は添付より先**（L1-10）
+      const relatedKey = checkedIssueKeyArg(context, toolName, args, 'relatedIssueKey');
       const post = (attachmentId?: number): PlannedCall =>
-        withResolvedIssueId(context, toolName, args, 'relatedIssueKey', issueId => ({
+        withResolvedIssueId(relatedKey, 'relatedIssueKey', issueId => ({
           kind: 'send',
           // notifiedUserId は載せない。LLM に通知先を決めさせない
           request: {
@@ -1968,8 +1993,10 @@ export const planToolCall = (
 
       const source = `backlog:pr:${projectKey}/${repository}#${String(number)}`;
       const endpoint = `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests/${String(number)}`;
+      // **判定は添付より先**（L1-10）
+      const relatedKey = checkedIssueKeyArg(context, toolName, args, 'relatedIssueKey');
       const post = (attachmentId?: number): PlannedCall =>
-        withResolvedIssueId(context, toolName, args, 'relatedIssueKey', issueId => ({
+        withResolvedIssueId(relatedKey, 'relatedIssueKey', issueId => ({
           kind: 'send',
           request: {
             endpoint,
