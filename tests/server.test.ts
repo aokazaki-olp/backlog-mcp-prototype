@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import { describe, it } from 'node:test';
+import { UnknownToolError } from '../src/contract.ts';
 import { AuditUnwritableError, withAudit } from '../src/mcp/audit.ts';
 import {
   DEFAULT_PROTOCOL_VERSION,
@@ -145,6 +146,42 @@ describe('handleMessage — JSON-RPC の作法', () => {
     assert.equal((response as { error: { code: number } }).error.code, RPC_ERROR.INVALID_REQUEST);
   });
 
+  it('未知のツール名は Protocol Error（仕様の Error Handling）', async () => {
+    // MCP 仕様 `server/tools.md` の Error Handling は「Unknown tool」を Protocol Error に
+    // 分類している（2026-07-28 版・ミラーで確認）。`isError` は「モデルが自己修正して
+    // 再試行するための feedback」で、存在しないツール名はそこに当たらない
+    const failing: McpHandlers = {
+      listTools: () => [],
+      callTool: (name: string) => Promise.reject(new UnknownToolError(name)),
+    };
+
+    const response = await handleMessage(
+      request(3, 'tools/call', { name: 'delete_issue', arguments: {} }),
+      failing,
+      SERVER_INFO,
+    );
+
+    const error = (response as { error: { code: number; message: string } }).error;
+    assert.equal(error.code, RPC_ERROR.INVALID_PARAMS);
+    assert.match(error.message, /delete_issue/);
+  });
+
+  it('ツールの実行エラーは isError のまま返す（境界 — Protocol Error にしない）', async () => {
+    const failing: McpHandlers = {
+      listTools: () => [],
+      callTool: () => Promise.resolve({ content: [{ type: 'text', text: '拒否' }], isError: true }),
+    };
+
+    const response = await handleMessage(
+      request(4, 'tools/call', { name: 'get_issue', arguments: {} }),
+      failing,
+      SERVER_INFO,
+    );
+
+    assert.equal('error' in (response ?? {}), false);
+    assert.equal((response as { result: { isError: boolean } }).result.isError, true);
+  });
+
   it('tools/call に name が無ければ INVALID_PARAMS', async () => {
     const response = await handleMessage(
       request(2, 'tools/call', { arguments: {} }),
@@ -262,6 +299,23 @@ describe('withAudit', () => {
     const line = sink.lines[0] ?? '';
     // 孤立サロゲートは JSON へ \ud842 の形で出る（対になっていれば文字として出る）
     assert.doesNotMatch(line, /\\u[dD][89abAB][0-9a-fA-F]{2}/);
+  });
+
+  it('未知のツール名も記録してから投げ直す（監査は残す）', async () => {
+    const sink = collectAudit();
+    const failing: McpHandlers = {
+      listTools: () => [],
+      callTool: (name: string) => Promise.reject(new UnknownToolError(name)),
+    };
+
+    await assert.rejects(() => withAudit(failing, sink).callTool('delete_issue', {}), {
+      name: 'UnknownToolError',
+    });
+
+    const record = JSON.parse(sink.lines[0] ?? '{}') as Record<string, unknown>;
+    assert.equal(record['tool'], 'delete_issue');
+    assert.equal(record['ok'], false);
+    assert.equal(record['thrown'], 'UnknownToolError');
   });
 
   it('拒否も記録する', async () => {

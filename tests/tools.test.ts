@@ -1221,8 +1221,20 @@ describe('buildHandlers — tools/call は一覧と独立に確認する', () =>
     assert.equal(result.isError, true);
   });
 
-  it('未知のツール名を拒否する', async () => {
-    const result = await buildHandlers(handlersOf()).callTool('delete_issue', {});
+  it('未知のツール名は送出する（仕様は Protocol Error。L3-12）', async () => {
+    await assert.rejects(() => buildHandlers(handlersOf()).callTool('delete_issue', {}), {
+      name: 'UnknownToolError',
+      message: /delete_issue/,
+    });
+  });
+
+  it('ポリシーや設定で閉じているツールは isError のまま（境界 — 存在はする）', async () => {
+    // 「そんなツールは無い」と「あるが今は使えない」は別物。後者は言い分けが要るので
+    // ツール実行エラー（`isError`）に残す。仕様も自己修正できる失敗をこちらへ分類している
+    const result = await buildHandlers(handlersOf({ projects: ['SALES'] })).callTool(
+      'add_issue_comment',
+      { issueKey: 'SALES-1', content: 'x' },
+    );
 
     assert.equal(result.isError, true);
   });
@@ -3495,7 +3507,11 @@ describe('buildHandlers — 囲みの注意書きは1応答に1回', () => {
   });
 
   it('拒否の応答にも載らない（結果を組み立てる経路を通らない）', async () => {
-    const result = await buildHandlers(handlersOf()).callTool('delete_issue', {});
+    // ポリシーで閉じているツール。`runTool` へ入る前に早期 return する経路
+    const result = await buildHandlers(handlersOf({ projects: ['SALES'] })).callTool(
+      'add_issue_comment',
+      { issueKey: 'SALES-1', content: 'x' },
+    );
 
     assert.equal(result.isError, true);
     assert.equal(result.content.length, 1);

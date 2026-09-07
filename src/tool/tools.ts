@@ -10,6 +10,7 @@ import {
   ScopeDeniedError,
   TOOL_NAMES,
   TOOL_SPECS,
+  UnknownToolError,
 } from '../contract.ts';
 import { isAllowed, listedTools, projectKeysFor } from '../policy/policy.ts';
 import { lookupName, projectMastersOf, toProjectId, toProjectIds } from '../domain/masters.ts';
@@ -2808,14 +2809,18 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
         ? (name as ToolName)
         : undefined;
 
+      // **そんな名前のツールは無い。** 仕様は Protocol Error に分類している（L3-12）。
+      // 送出して `mcp/` 層に JSON-RPC の error へ直させる（`isError` にすると
+      // 「再試行すれば直る失敗」として扱われる）
+      if (toolName === undefined) {
+        throw new UnknownToolError(name);
+      }
+
       // 一覧に出していないツール名でも呼べる。ここで必ず確認する。
-      if (toolName === undefined || !enabled.has(toolName)) {
-        // 設定で閉じているのか、ポリシーで閉じているのかを言い分ける（規約 §5.4）。
-        // どちらも「呼べない」だが、直し方が違う
-        const missing =
-          toolName === undefined || !listed.has(toolName)
-            ? undefined
-            : TOOL_SPECS[toolName].requiresConfig;
+      // **ここから先は「実在するが今は使えない」**なので、理由を言い分けて `isError` で返す
+      // （規約 §5.4。設定で閉じているのかポリシーで閉じているのかは直し方が違う）
+      if (!enabled.has(toolName)) {
+        const missing = listed.has(toolName) ? TOOL_SPECS[toolName].requiresConfig : undefined;
         const reason =
           missing === undefined
             ? `利用できないツールです: ${name}`

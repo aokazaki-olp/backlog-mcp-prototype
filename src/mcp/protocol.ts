@@ -230,8 +230,18 @@ export const handleMessage = async (
       if (typeof name !== 'string') {
         return failure(id, RPC_ERROR.INVALID_PARAMS, 'name には string を指定してください');
       }
-      const result = await handlers.callTool(name, request.params?.['arguments']);
-      return success(id, result);
+      try {
+        const result = await handlers.callTool(name, request.params?.['arguments']);
+        return success(id, result);
+      } catch (e) {
+        // **存在しないツール名は Protocol Error**（仕様の Error Handling。L3-12）。
+        // realm を跨ぐと `instanceof` は誤判定するので構造で見る（規約 §6.2）
+        if (Error.isError(e) && e.name === 'UnknownToolError') {
+          return failure(id, RPC_ERROR.INVALID_PARAMS, e.message);
+        }
+        // それ以外は畳まない。`serve` が INTERNAL に直すか、監査の停止として扱う
+        throw e;
+      }
     }
     default: {
       return assertNever(request.method);

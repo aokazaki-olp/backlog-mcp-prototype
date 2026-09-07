@@ -466,6 +466,30 @@ export class AttachmentError extends Error {
   override readonly name = 'AttachmentError';
 }
 
+/**
+ * **そのツール名は存在しない。**
+ *
+ * MCP 仕様 `server/tools.md` の Error Handling は「Unknown tool」を
+ * **Protocol Error**（JSON-RPC の `error`。既定は `-32602`）に分類しており、
+ * `isError` は「モデルが自己修正して**再試行**するための feedback」に当てている
+ * （2026-07-28 版・ミラーで確認）。**存在しない名前は再試行で直らない。**
+ *
+ * **「あるが今は使えない」とは別物。** ポリシーや設定で閉じているツールは実在するので、
+ * 理由を言い分けたうえで `isError` のまま返す（規約 §5.4）。
+ *
+ * 置き場がここなのは、送出するのが `tool/` 層・拾って JSON-RPC へ直すのが `mcp/` 層で、
+ * **両方が知ってよい葉モジュールがここしか無い**ため（DESIGN.md §4 の層と語彙の表）。
+ */
+export class UnknownToolError extends Error {
+  override readonly name = 'UnknownToolError';
+  readonly toolName: string;
+
+  constructor(toolName: string, options?: ErrorOptions) {
+    super(`利用できないツールです: ${toolName}`, options);
+    this.toolName = toolName;
+  }
+}
+
 /** ポリシー違反。API に到達する前に返す。 */
 export class ScopeDeniedError extends Error {
   override readonly name = 'ScopeDeniedError';
