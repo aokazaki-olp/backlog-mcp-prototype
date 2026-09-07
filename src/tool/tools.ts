@@ -2605,17 +2605,21 @@ const toDefinition = (
 ): ToolDefinition => {
   const spec = TOOL_SPECS[toolName];
   const schema = withRuntimeFacts(INPUT_SCHEMAS[toolName], toolName, policy, masters);
+  // 仕様の `readOnlyHint` は「環境を変えない」。**Backlog を書き換えないことでは足りない** —
+  // `get_issue_attachment` は Backlog を読むだけだが、添付をディスクへ保存する（L3-6）
+  const readOnlyHint = spec.readOnly && !spec.writesLocalFile;
   return {
     name: toolName,
     title: spec.title,
     description: spec.description,
     inputSchema: attachable ? schema : withoutFileProperty(schema),
     annotations: {
-      readOnlyHint: spec.readOnly,
-      // 削除系を作っていないので、どのツールも破壊的ではない。
-      // 既定が true なので、書かないと全ツールが破壊的扱いになる。
-      destructiveHint: false,
-      idempotentHint: spec.readOnly,
+      readOnlyHint,
+      // 既定が true なので必ず書く。ただし値はツールごとに決める（`ToolSpec.destructive`）
+      destructiveHint: spec.destructive,
+      // `readOnlyHint == false` のときだけ意味を持つ。ディスクへ書く側は繰り返すと
+      // `name-2.pdf` `name-3.pdf` と増えるので、冪等ではない
+      idempotentHint: readOnlyHint,
       openWorldHint: true,
     },
   };

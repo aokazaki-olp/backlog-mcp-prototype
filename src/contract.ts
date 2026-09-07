@@ -84,8 +84,31 @@ export interface ToolSpec {
   readonly scopeKind: ScopeKind;
   readonly title: string;
   readonly description: string;
-  /** MCP の ToolAnnotations に載せる。仕様上ヒントであり、防御には使わない。 */
+  /**
+   * **Backlog を書き換えないか。**
+   *
+   * `tools/list` の `readOnlyHint` の素になり、起動時に stderr へ出す
+   * 「書き込みが許可されているプロジェクト」（`writableProjectKeys`）にも効く。
+   * **`readOnlyHint` そのものではない** — 仕様の `readOnlyHint` は「環境を変えない」で、
+   * Backlog を書き換えなくてもディスクへ書くツールがある（`writesLocalFile`）。
+   */
   readonly readOnly: boolean;
+  /**
+   * **Backlog の外（ローカルのディスク）に書くか。** `readOnly` が `true` でも真になりうる。
+   *
+   * 仕様の `readOnlyHint` は "the tool does not modify its environment" なので、
+   * ここが真なら `readOnlyHint` は立てられない。**設定（`requiresConfig`）を代用にしない** —
+   * `list_issue_attachments` は同じ設定を要るが書かない。
+   */
+  readonly writesLocalFile: boolean;
+  /**
+   * **既存の値を上書きするか。** `false` は「足すだけ」。
+   *
+   * 仕様の `destructiveHint` に対応する（"If false, the tool performs only additive updates"）。
+   * **既定が `true` なので必ず書く。** ただし既定を避けるために一律 `false` を書くと、
+   * 上書きするツールについて偽を主張することになる（L3-6）。**ツールごとに決める。**
+   */
+  readonly destructive: boolean;
   /**
    * このツールが有効になるために要る設定。**未設定なら `tools/list` に出さず、呼んでも拒否する。**
    *
@@ -115,6 +138,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '許可されたプロジェクトの課題を検索する。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   get_issue: {
     toolset: 'issue',
@@ -124,6 +149,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キー（例: PROJ-123）を指定して課題を取得する。カスタム属性は名前 → 値で返し、値が入っている件数を customFieldCount で返す。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   get_issue_comments: {
     toolset: 'issue',
@@ -132,6 +159,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: '課題のコメントを取得する',
     description: '課題キー（例: PROJ-123）を指定してコメント一覧を取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_wiki_pages: {
     toolset: 'wiki',
@@ -140,6 +169,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: 'Wiki ページ一覧を取得する',
     description: '許可されたプロジェクトの Wiki ページ一覧を取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   get_wiki_page: {
     toolset: 'wiki',
@@ -149,6 +180,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーとページ名を指定して Wiki ページの本文を取得する。ページ名は list_wiki_pages が返す name をそのまま渡す。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_git_repositories: {
     toolset: 'git',
@@ -157,6 +190,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: 'Git リポジトリ一覧を取得する',
     description: '許可されたプロジェクトの Git リポジトリ一覧を取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_pull_requests: {
     toolset: 'git',
@@ -166,6 +201,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーとリポジトリ名を指定してプルリクエスト一覧を取得する。リポジトリ名は list_git_repositories が返す name をそのまま渡す。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   get_pull_request: {
     toolset: 'git',
@@ -175,6 +212,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定して取得する。番号は list_pull_requests が返す number をそのまま渡す。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   get_pull_request_comments: {
     toolset: 'git',
@@ -184,6 +223,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメント一覧を取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   search_documents: {
     toolset: 'document',
@@ -193,6 +234,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   create_document: {
     toolset: 'document',
@@ -202,6 +245,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキー・タイトル・本文を指定してドキュメントを作成する。本文は Markdown。Backlog に更新の API が無いので、作成したドキュメントを後から書き換えることはできない。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_project_masters: {
     toolset: 'issue',
@@ -211,6 +256,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトで使える状態・課題種別・カテゴリー・マイルストーン・担当者と、スペース共通の優先度・完了理由の名前を返す。課題の作成・更新・検索でこれらを名前で指定する前に引く。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_related_issues: {
     toolset: 'issue',
@@ -220,6 +267,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キー（例: PROJ-123）を指定して、その課題に「関連課題」として設定されている課題を取得する。親子課題とは別の関係なので、子課題は返らない（子課題は search_issues の parentIssueKey で引く）。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   list_issue_attachments: {
     toolset: 'issue',
@@ -229,6 +278,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キー（例: PROJ-123）を指定して、添付されているファイルの名前とサイズを取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
     requiresConfig: 'downloadsDir',
   },
   get_issue_attachment: {
@@ -239,6 +290,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キーとファイル名を指定して添付を取得する。テキストならそのまま返し、それ以外は設定されたディレクトリへ保存してパスを返す（数値 ID は受け付けない）。',
     readOnly: true,
+    writesLocalFile: true,
+    destructive: false,
     requiresConfig: 'downloadsDir',
   },
   create_wiki_page: {
@@ -248,6 +301,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: 'Wiki ページを作成する',
     description: 'プロジェクトキー・ページ名・本文を指定して Wiki ページを追加する。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
   update_wiki_page: {
     toolset: 'wiki',
@@ -257,6 +312,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーとページ名で既存の Wiki ページを指定し、ページ名または本文を書き換える。数値 ID は受け付けない。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: true,
   },
   list_project_activities: {
     toolset: 'activity',
@@ -266,6 +323,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーを指定して最近の活動を取得する。関連する課題があれば issueKey を返すので、詳細は get_issue で取得する。',
     readOnly: true,
+    writesLocalFile: false,
+    destructive: false,
   },
   add_issue_comment: {
     toolset: 'issue',
@@ -274,6 +333,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     title: '課題にコメントする',
     description: '課題キー（例: PROJ-123）を指定してコメントを追加する。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
   create_issue: {
     toolset: 'issue',
@@ -283,6 +344,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーを指定して課題を作成する。種別・優先度・担当者・カテゴリー・マイルストーンは**名前**で指定する（数値 ID は受け付けない）。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
   update_issue: {
     toolset: 'issue',
@@ -292,6 +355,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       '課題キー（例: PROJ-123）を指定して課題を更新する。状態・完了理由・優先度・担当者は**名前**で指定する。指定した項目だけが変わる。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: true,
   },
   create_pull_request: {
     toolset: 'git',
@@ -301,6 +366,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキーとリポジトリ名を指定してプルリクエストを作成する。担当者は名前で、関連課題は課題キー（例: PROJ-123）で指定する（数値 ID は受け付けない）。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
   update_pull_request: {
     toolset: 'git',
@@ -310,6 +377,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プルリクエスト番号を指定して更新する。指定した項目だけが変わる。担当者は名前で、関連課題は課題キーで指定する。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: true,
   },
   add_pull_request_comment: {
     toolset: 'git',
@@ -319,6 +388,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     description:
       'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメントを追加する。行ごとのコメントは Backlog API に存在しないので、本文に src/main.ts:42 の形で参照を書く。',
     readOnly: false,
+    writesLocalFile: false,
+    destructive: false,
   },
 };
 

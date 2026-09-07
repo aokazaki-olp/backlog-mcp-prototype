@@ -9,6 +9,7 @@ import type { UntrustedSource } from '../src/tool/untrusted.ts';
 import type { ResolvedRequest, ToolName } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
 import type { Masters } from '../src/domain/masters.ts';
+import type { ToolDefinition } from '../src/mcp/protocol.ts';
 import type { PlanContext, PlannedCall, ToolContext } from '../src/tool/tools.ts';
 
 /**
@@ -1118,9 +1119,67 @@ describe('buildHandlers — tools/list', () => {
 
   it('annotations を全ツールに付ける（既定の destructiveHint: true を避ける）', () => {
     for (const tool of buildHandlers(handlersOf()).listTools()) {
-      assert.equal(tool.annotations.destructiveHint, false);
+      assert.equal(typeof tool.annotations.destructiveHint, 'boolean');
       assert.equal(typeof tool.annotations.readOnlyHint, 'boolean');
     }
+  });
+
+  // --------------------------------------------------------------------------
+  // L3-6 — annotations は仕様が定義した意味で実挙動を述べる
+  //
+  // 仕様（authoritative schema・2026-07-28）:
+  //   readOnlyHint  … 「the tool does not modify its environment」
+  //   destructiveHint … 「if false, the tool performs only additive updates」
+  //                     **readOnlyHint == false のときだけ意味を持つ**
+  //   idempotentHint  … 同上
+  // --------------------------------------------------------------------------
+
+  const annotationsOf = (
+    context: ToolContext,
+    toolName: string,
+  ): ToolDefinition['annotations'] | undefined =>
+    buildHandlers(context)
+      .listTools()
+      .find(each => each.name === toolName)?.annotations;
+
+  it('ディスクへ書くツールは readOnlyHint を立てない', () => {
+    // `get_issue_attachment` は Backlog を書き換えないが、テキストでない添付を
+    // `BACKLOG_DOWNLOADS_DIR` へ保存する。仕様の readOnlyHint は「環境を変えない」
+    const context: ToolContext = { ...handlersOf(), downloadsDir: '/downloads' };
+
+    assert.equal(annotationsOf(context, 'get_issue_attachment')?.readOnlyHint, false);
+  });
+
+  it('ディスクへ書くツールは idempotentHint も立てない', () => {
+    // 同じ引数で繰り返すと `name-2.pdf` `name-3.pdf` と増える（上書きしない）
+    const context: ToolContext = { ...handlersOf(), downloadsDir: '/downloads' };
+
+    assert.equal(annotationsOf(context, 'get_issue_attachment')?.idempotentHint, false);
+  });
+
+  it('上書きするツールは destructiveHint を立てる', () => {
+    for (const toolName of ['update_issue', 'update_wiki_page', 'update_pull_request']) {
+      assert.equal(annotationsOf(handlersOf(), toolName)?.destructiveHint, true, toolName);
+    }
+  });
+
+  it('足すだけのツールは destructiveHint を立てない（境界）', () => {
+    for (const toolName of ['create_issue', 'add_issue_comment', 'create_wiki_page']) {
+      assert.equal(annotationsOf(handlersOf(), toolName)?.destructiveHint, false, toolName);
+    }
+  });
+
+  it('読むだけのツールは readOnlyHint が立つ（回帰）', () => {
+    assert.equal(annotationsOf(handlersOf(), 'get_issue')?.readOnlyHint, true);
+    assert.equal(annotationsOf(handlersOf(), 'get_issue')?.destructiveHint, false);
+  });
+
+  it('添付を一覧するだけのツールはディスクへ書かない（境界）', () => {
+    // `requiresConfig: 'downloadsDir'` は同じだが、こちらは書かない。
+    // 設定の有無を「書くかどうか」の代用にしない
+    const context: ToolContext = { ...handlersOf(), downloadsDir: '/downloads' };
+
+    assert.equal(annotationsOf(context, 'list_issue_attachments')?.readOnlyHint, true);
   });
 });
 
