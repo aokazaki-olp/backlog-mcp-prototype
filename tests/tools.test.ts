@@ -10,7 +10,7 @@ import type { ResolvedRequest, ToolName } from '../src/contract.ts';
 import type { BacklogGateway } from '../src/domain/gateway.ts';
 import type { Masters } from '../src/domain/masters.ts';
 import type { ToolDefinition } from '../src/mcp/protocol.ts';
-import type { PlanContext, PlannedCall, ToolContext } from '../src/tool/tools.ts';
+import type { PlanContext, PlannedCall, SupplementResult, ToolContext } from '../src/tool/tools.ts';
 
 /**
  * PROJ = 書き込み可 / SALES = 読み取りのみ / INFRA = コメント可だが issue のみ。
@@ -114,7 +114,7 @@ const bothOf = (
   args: Record<string, unknown>,
 ): {
   readonly requests: readonly [ResolvedRequest, ResolvedRequest];
-  readonly shape: (first: unknown, second: unknown) => unknown;
+  readonly shape: (first: unknown, second: SupplementResult) => unknown;
 } => {
   const planned = planToolCall(context, toolName, args);
   if (planned.kind !== 'both') {
@@ -138,8 +138,9 @@ const shapeOf = (
 ): ((raw: unknown) => unknown) => {
   const planned = planToolCall(context, toolName, args);
   if (planned.kind === 'both') {
-    // 件数は別のテストで見る。ここでは本体の shape だけを使う
-    return raw => planned.shape(raw, undefined);
+    // 件数は別のテストで見る。**取得は成功したが読めなかった**扱いにして本体だけを見る
+    // （`failed` にすると totalUnavailable が付き、他のテストの期待と混ざる）
+    return raw => planned.shape(raw, { kind: 'ok', value: undefined });
   }
   if (planned.kind !== 'send') {
     assert.fail(`${toolName} は1往復で終わるはず`);
@@ -1811,10 +1812,10 @@ describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
 
   it('打ち切ったときに「あと何件か」が分かる', () => {
     const { shape } = bothOf(contextOf(), 'search_issues', { count: 2 });
-    const payload = shape([MIRROR_ISSUE, MIRROR_ISSUE, MIRROR_ISSUE], { count: 57 }) as Record<
-      string,
-      unknown
-    >;
+    const payload = shape([MIRROR_ISSUE, MIRROR_ISSUE, MIRROR_ISSUE], {
+      kind: 'ok',
+      value: { count: 57 },
+    }) as Record<string, unknown>;
 
     assert.equal(payload['truncated'], true);
     assert.equal(payload['total'], 57);
@@ -1823,7 +1824,10 @@ describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
 
   it('打ち切っていなくても total は載せる（offset を使うと件数と一致しない）', () => {
     const { shape } = bothOf(contextOf(), 'search_issues', { offset: 12 });
-    const payload = shape([MIRROR_ISSUE], { count: 16 }) as Record<string, unknown>;
+    const payload = shape([MIRROR_ISSUE], { kind: 'ok', value: { count: 16 } }) as Record<
+      string,
+      unknown
+    >;
 
     assert.equal(payload['total'], 16);
     assert.equal(payload['truncated'], undefined);
@@ -1834,9 +1838,32 @@ describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
     const { shape } = bothOf(contextOf(), 'search_issues', {});
 
     for (const bad of [undefined, {}, { count: 'いっぱい' }, []]) {
-      const payload = shape([MIRROR_ISSUE], bad) as Record<string, unknown>;
+      const payload = shape([MIRROR_ISSUE], { kind: 'ok', value: bad }) as Record<string, unknown>;
       assert.equal(payload['total'], undefined);
+      // 読めなかっただけで、呼び出しは成功している（境界 — 失敗と混ぜない）
+      assert.equal(payload['totalUnavailable'], undefined);
     }
+  });
+
+  it('件数の取得が失敗しても検索結果は返す（L1-9）', () => {
+    const { shape } = bothOf(contextOf(), 'search_issues', {});
+    const payload = shape([MIRROR_ISSUE], {
+      kind: 'failed',
+      reason: new Error('件数だけ失敗'),
+    }) as Record<string, unknown>;
+
+    assert.equal((payload['items'] as unknown[]).length, 1);
+  });
+
+  it('件数だけ取れなかった事実を出力に載せる（規約 §5.4）', () => {
+    const { shape } = bothOf(contextOf(), 'search_issues', {});
+    const payload = shape([MIRROR_ISSUE], {
+      kind: 'failed',
+      reason: new Error('件数だけ失敗'),
+    }) as Record<string, unknown>;
+
+    assert.equal(payload['totalUnavailable'], true);
+    assert.equal(payload['total'], undefined);
   });
 });
 
@@ -3120,7 +3147,28 @@ describe('runTool — gateway を呼ぶ枝は同じ扱いになる（C-1）', ()
     assert.match(head(viaDownload.text), /Backlog API の呼び出しに失敗しました/);
   });
 
-  it('both 経路（件数の取得）の失敗も同じ形になる', async () => {
+  it('both 経路の本体（1本目）の失敗は同じ形で囲まれる', async () => {
+    // 1本目は本体。落ちたら返すものが無いので、これまでどおり失敗として返す
+    const handlers = buildHandlers({
+      ...contextOf(),
+      gateway: {
+        send(request) {
+          return request.endpoint === '/issues'
+            ? Promise.reject(new Error('本体が失敗'))
+            : Promise.resolve({ count: 3 });
+        },
+        sendBytes: () => Promise.reject(new Error('使わない')),
+      },
+    });
+
+    const result = await handlers.callTool('search_issues', {});
+
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]?.text ?? '', /<untrusted source="backlog:error"/);
+  });
+
+  it('both 経路の補助（件数）だけが失敗しても検索結果は返す（L1-9）', async () => {
+    // **仕様を変える修正。** 以前はここが isError になり、取得済みの検索結果ごと捨てていた
     const handlers = buildHandlers({
       ...contextOf(),
       gateway: {
@@ -3135,8 +3183,8 @@ describe('runTool — gateway を呼ぶ枝は同じ扱いになる（C-1）', ()
 
     const result = await handlers.callTool('search_issues', {});
 
-    assert.equal(result.isError, true);
-    assert.match(result.content[0]?.text ?? '', /<untrusted source="backlog:error"/);
+    assert.equal(result.isError, undefined);
+    assert.match(result.content[0]?.text ?? '', /"totalUnavailable": true/);
   });
 
   it('Error でない値を投げても正規化して囲む', async () => {

@@ -127,11 +127,25 @@ export type PlannedCall =
       /**
        * **独立した2本を並列に投げて合成する。** `chain` は「応答から次を決める」形なので、
        * 「本体と件数を同時に引く」ような**互いに依存しない2本**を表現できない。
+       *
+       * **2本目は補助**。失敗しても1本目の結果は捨てない（L1-9）。以前は `Promise.all` で
+       * 束ねていたので、件数の取得が落ちると**検索結果ごと消えていた**。
+       * 失敗したことは `shape` に伝えて、出力に現れる形で返させる（規約 §5.4）。
        */
       readonly kind: 'both';
       readonly requests: readonly [ResolvedRequest, ResolvedRequest];
-      readonly shape: (first: unknown, second: unknown) => unknown;
+      readonly shape: (first: unknown, second: SupplementResult) => unknown;
     };
+
+/**
+ * `both` の2本目（補助）の結果。**失敗を `undefined` に畳まない。**
+ *
+ * 畳むと「応答が読めなかった」と「呼び出しが失敗した」が区別できず、
+ * 呼び出し側が黙って項目を落とすことになる（規約 §5.4・§4.5）。
+ */
+export type SupplementResult =
+  | { readonly kind: 'ok'; readonly value: unknown }
+  | { readonly kind: 'failed'; readonly reason: Error };
 
 /**
  * 1回のツール呼び出しで許す手数の上限。
@@ -1335,12 +1349,14 @@ export const planToolCall = (
         ],
         shape: (raw, counted) => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues'), count);
-          return listPayload(
+          const payload = listPayload(
             items.map(item => shapeIssue(item, limits)),
             truncated,
             count,
-            pickTotal(counted),
+            counted.kind === 'ok' ? pickTotal(counted.value) : undefined,
           );
+          // 件数だけが取れなかったことを出力に載せる。**黙って項目を落とさない**（規約 §5.4）
+          return counted.kind === 'ok' ? payload : { ...payload, totalUnavailable: true };
         },
       }));
     }
@@ -2136,12 +2152,22 @@ const runTool = async (
       return planned.shape(await receive(bytes, planned.fileName));
     }
     if (planned.kind === 'both') {
-      // 互いに独立なので並列に投げる（規約 §5.3）
-      const [first, second] = await Promise.all([
+      // 互いに独立なので並列に投げる（規約 §5.3）。**2本目は補助**なので
+      // `allSettled` で受け、落ちても1本目の結果は捨てない（L1-9）
+      const [first, second] = await Promise.allSettled([
         context.call(planned.requests[0]),
         context.call(planned.requests[1]),
       ]);
-      return planned.shape(first, second);
+      if (first.status === 'rejected') {
+        // 1本目は本体。これが落ちたら返すものが無い
+        throw first.reason;
+      }
+      return planned.shape(
+        first.value,
+        second.status === 'fulfilled'
+          ? { kind: 'ok', value: second.value }
+          : { kind: 'failed', reason: toError(second.reason) },
+      );
     }
     const raw = await context.call(planned.request);
     if (planned.kind === 'send') {

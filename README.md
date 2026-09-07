@@ -260,6 +260,10 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize"}' \
 これを表現するために `PlannedCall` に `kind: 'both'` を足してある。`chain`（応答から次を決める）
 とは別の形で、**互いに依存しない2本**を並列に投げて合成する。
 
+**2本目（件数）は補助**で、失敗しても1本目の検索結果は捨てない。落ちたときは `total` を載せず、
+代わりに `totalUnavailable: true` を返す（黙って項目を落とさない）。**「応答が読めなかった」と
+「呼び出しが失敗した」は別物**なので、前者では `totalUnavailable` は出ない。
+
 ### 子課題として作る・関連課題を辿る
 
 `POST /issues` の `parentIssueId` は数値だが、**`parentIssueKey: "PROJ-123"` を受けてサーバ内で
