@@ -2751,6 +2751,62 @@ describe('planToolCall — update_pull_request', () => {
 });
 
 // ============================================================================
+// L1-5 — 破棄中の失敗に本来の原因を隠させない（規約 §6.3）
+//
+// `await using` は `readAttachment` / `saveAttachment` の中にある。本体と破棄の
+// 両方が失敗すると送出されるのは `SuppressedError` で、**フィールドの向きが逆**
+// （`error` が破棄時、`suppressed` が本体）。素朴に `message` を読むと本来の原因が消える。
+// ============================================================================
+
+describe('buildHandlers — SuppressedError の向き', () => {
+  const withFailingRead = (thrown: Error): ToolContext => ({
+    ...contextOf(),
+    gateway: makeGateway({}),
+    attachmentsRoot: '/allowed',
+    readAttachment: () => Promise.reject(thrown),
+  });
+
+  const callWithAttachment = async (thrown: Error): Promise<string> => {
+    const result = await buildHandlers(withFailingRead(thrown)).callTool('add_issue_comment', {
+      issueKey: 'PROJ-1',
+      content: 'x',
+      file: 'note.md',
+    });
+    return result.content.map(block => block.text).join('\n');
+  };
+
+  it('本来の失敗原因（suppressed）を返す', async () => {
+    const text = await callWithAttachment(
+      new SuppressedError(new Error('ハンドルを閉じられません'), new Error('中身が読めません')),
+    );
+
+    assert.match(text, /中身が読めません/);
+  });
+
+  it('後始末も失敗した事実を落とさない（規約 §5.4）', async () => {
+    const text = await callWithAttachment(
+      new SuppressedError(new Error('ハンドルを閉じられません'), new Error('中身が読めません')),
+    );
+
+    assert.match(text, /後始末/);
+  });
+
+  it('入れ子でも最後まで辿る（using が複数あるスコープ）', async () => {
+    const inner = new SuppressedError(new Error('内側の破棄'), new Error('本当の原因'));
+    const text = await callWithAttachment(new SuppressedError(new Error('外側の破棄'), inner));
+
+    assert.match(text, /本当の原因/);
+  });
+
+  it('ふつうのエラーはそのまま返す（境界 — 過剰に加工しない）', async () => {
+    const text = await callWithAttachment(new Error('ただの失敗'));
+
+    assert.match(text, /ただの失敗/);
+    assert.doesNotMatch(text, /後始末/);
+  });
+});
+
+// ============================================================================
 // 添付のダウンロード — テキストは囲んで返し、それ以外はディスクへ
 // ============================================================================
 

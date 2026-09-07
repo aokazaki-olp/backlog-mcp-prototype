@@ -16,6 +16,7 @@ import { lookupName, projectMastersOf, toProjectId, toProjectIds } from '../doma
 import { MasterDataError } from '../contract.ts';
 import { UNTRUSTED_NOTICE, limitCount, wrapUntrusted } from './untrusted.ts';
 import { assertNever } from '../shared/assertNever.ts';
+import { hasDisposalFailure, primaryError } from '../shared/suppressed.ts';
 import { toError } from '../shared/toError.ts';
 import type {
   AttachmentFile,
@@ -2749,8 +2750,13 @@ export const buildHandlers = (context: ToolContext): McpHandlers => {
           content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
         });
       } catch (e) {
-        const message = Error.isError(e) ? e.message : String(e);
-        return withUntrustedNotice({ content: [{ type: 'text', text: message }], isError: true });
+        // **`SuppressedError` のフィールドの向きは逆**（規約 §6.3）。素朴に `message` を読むと
+        // 破棄時の失敗が出て、本来の原因が消える。`await using` は添付の読み書きにある
+        const primary = primaryError(e);
+        const message = Error.isError(primary) ? primary.message : String(primary);
+        // 後始末の失敗も落とさない（規約 §5.4）。本来の原因を主にしたうえで印だけ添える
+        const text = hasDisposalFailure(e) ? `${message}（後始末にも失敗しました）` : message;
+        return withUntrustedNotice({ content: [{ type: 'text', text }], isError: true });
       }
     },
   };

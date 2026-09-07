@@ -6,6 +6,7 @@
  */
 
 import { runServer } from './server.ts';
+import { primaryError } from './shared/suppressed.ts';
 import { toError } from './shared/toError.ts';
 import type { StdioChannel } from './mcp/stdio.ts';
 
@@ -17,13 +18,18 @@ const stdioChannel: StdioChannel = {
   },
 };
 
-/** 失敗の原因を stderr へ。`cause` を辿って落とさない（規約 §6.2）。 */
+/**
+ * 失敗の原因を stderr へ。`cause` を辿って落とさない（規約 §6.2）。
+ *
+ * **`SuppressedError` は先に開く**（規約 §6.3）。`cause` だけを辿ると、破棄時の失敗が
+ * 表に出て**本来の原因が `suppressed` に埋まったまま**になる。
+ */
 const describeFailure = (value: unknown): string => {
   const parts: string[] = [];
-  let current: unknown = value;
+  let current: unknown = primaryError(value);
   while (Error.isError(current)) {
     parts.push(`${current.name}: ${current.message}`);
-    current = current.cause;
+    current = primaryError(current.cause);
   }
   if (parts.length === 0) {
     parts.push(String(value));
