@@ -168,6 +168,18 @@ expect_layer_error 'attach 層から domain 層への import を禁止する' \
   'src/attach/_probe.ts' \
   "import { resolveMasters } from '../domain/masters.ts';
 export const f = (): unknown => resolveMasters;"
+expect_layer_error 'shared 層から domain 層への import を禁止する' \
+  'src/shared/_probe.ts' \
+  "import { resolveMasters } from '../domain/masters.ts';
+export const f = (): unknown => resolveMasters;"
+expect_layer_error 'mcp 層から domain 層への import を禁止する' \
+  'src/mcp/_probe.ts' \
+  "import { resolveMasters } from '../domain/masters.ts';
+export const f = (): unknown => resolveMasters;"
+expect_layer_error 'mcp 層から tool 層への import を禁止する（依存は一方向）' \
+  'src/mcp/_probe.ts' \
+  "import { buildHandlers } from '../tool/tools.ts';
+export const f = (): unknown => buildHandlers;"
 
 echo
 echo '── 抑制コメント（規約 §4.7）'

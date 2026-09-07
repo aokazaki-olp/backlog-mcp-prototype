@@ -210,6 +210,36 @@ export default tseslint.config(
       ]),
     },
   },
+  {
+    files: ['src/shared/**/*.ts'],
+    rules: {
+      'no-restricted-imports': restrictedImports([
+        {
+          group: [
+            '**/libs/**',
+            '**/domain/**',
+            '**/tool/**',
+            '**/policy/**',
+            '**/mcp/**',
+            '**/attach/**',
+          ],
+          message: 'shared 層は言語機能と純粋な計算だけを知る。I/O も Backlog も MCP も知らない。',
+        },
+      ]),
+    },
+  },
+  {
+    files: ['src/mcp/**/*.ts'],
+    rules: {
+      'no-restricted-imports': restrictedImports([
+        {
+          group: ['**/libs/**', '**/domain/**', '**/policy/**', '**/attach/**', '**/tool/**'],
+          message:
+            'mcp 層は JSON-RPC と監査レコードだけを知る。Backlog もポリシーも知らない（依存は tool → mcp の一方向。規約 §2.6）。',
+        },
+      ]),
+    },
+  },
 
   // ── テスト（規約 §7.1: 本体と同じ制約をかけない）─────────────────
   // ただし実行可能性のガード（デコレータ・accessor）は緩めない。
