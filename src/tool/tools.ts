@@ -476,6 +476,39 @@ const pickNames = (value: unknown): readonly string[] | undefined => {
   return names.length === 0 ? undefined : names;
 };
 
+/**
+ * 第三者が書ける名前を囲む。
+ *
+ * **対象は「値として現れる名前」だけ。** 識別子として往復する面
+ * （`list_project_masters` の列挙・添付のファイル名・Wiki のページ名）は囲まない。
+ *
+ * **`pickName` の中では囲まない。** あちらは `status`（管理者が定義）や
+ * `priority` / `resolution`（書き込む口が API に無い）も通るので、中で囲むと過剰になる。
+ * ユーザーオブジェクトを載せる唯一の経路という性質も、通す形を変えないことで保つ。
+ */
+const wrapName = (
+  value: unknown,
+  subject: string,
+  field: string,
+  limits: ToolLimits,
+): string | undefined => {
+  const name = pickName(value);
+  return name === undefined
+    ? undefined
+    : wrapUntrusted(name, { source: { subject, field }, maxLength: limits.maxTextLength });
+};
+
+/** 配列版。空なら `undefined`（キーごと出さない）。 */
+const wrapNames = (
+  value: unknown,
+  subject: string,
+  field: string,
+  limits: ToolLimits,
+): readonly string[] | undefined =>
+  pickNames(value)?.map(name =>
+    wrapUntrusted(name, { source: { subject, field }, maxLength: limits.maxTextLength }),
+  );
+
 /** 数値をそのまま取る。**ID には使わない** — 工数のような実測値だけ。 */
 const pickNumber = (value: unknown): number | undefined =>
   typeof value === 'number' ? value : undefined;
@@ -539,8 +572,8 @@ const CUSTOM_FIELD_DATE = 4;
  * | 文字列（文字列型・文章型） | **囲む**。利用者の自由記述なので `description` と同じ扱い |
  * | 文字列（日付型） | そのまま。形が決まっている |
  * | 数値 | そのまま |
- * | `{ id, name }` | `name` だけ。**選択肢は管理者が定義したもの**なので囲まない（`status` と同型） |
- * | `{ id, name }` の配列 | `name` の配列 |
+ * | `{ id, name }` | `name` だけ。**リスト項目の追加は「すべての権限」**（一次情報・2026-09-07）なので**囲む** |
+ * | `{ id, name }` の配列 | `name` の配列。**同じ理由で1つずつ囲む** |
  *
  * **`id` は要素にもリスト項目にも入っているが、どちらも落とす**（原則4）。
  *
@@ -561,11 +594,12 @@ const pickCustomFieldValue = (
     return value;
   }
   if (isRecord(value)) {
-    return pickString(value['name']);
+    const selected = pickString(value['name']);
+    return selected === undefined ? undefined : wrap(selected, name);
   }
   if (Array.isArray(value)) {
     // pickNames は空配列を undefined にする。読めないのと同じ扱いでよい
-    return pickNames(value);
+    return pickNames(value)?.map(selected => wrap(selected, name));
   }
   return undefined;
 };
@@ -674,14 +708,14 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
     issueKey,
     // 件名も第三者が書ける。一覧では本文より先に読まれるので、囲まないと素通しになる
     summary: summary === undefined ? undefined : wrap(summary, 'summary'),
-    issueType: pickName(raw['issueType']),
+    issueType: wrapName(raw['issueType'], `backlog:issue:${issueKey}`, 'issueType', limits),
     status: pickName(raw['status']),
     priority: pickName(raw['priority']),
     resolution: pickName(raw['resolution']),
-    assignee: pickName(raw['assignee']),
-    category: pickNames(raw['category']),
-    milestone: pickNames(raw['milestone']),
-    versions: pickNames(raw['versions']),
+    assignee: wrapName(raw['assignee'], `backlog:issue:${issueKey}`, 'assignee', limits),
+    category: wrapNames(raw['category'], `backlog:issue:${issueKey}`, 'category', limits),
+    milestone: wrapNames(raw['milestone'], `backlog:issue:${issueKey}`, 'milestone', limits),
+    versions: wrapNames(raw['versions'], `backlog:issue:${issueKey}`, 'versions', limits),
     startDate: pickString(raw['startDate']),
     dueDate: pickString(raw['dueDate']),
     estimatedHours: pickNumber(raw['estimatedHours']),
@@ -697,9 +731,9 @@ const shapeIssue = (raw: unknown, limits: ToolLimits): Record<string, unknown> =
         maxLength: limits.maxTextLength,
       }),
     ),
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], `backlog:issue:${issueKey}`, 'createdUser', limits),
     created: pickString(raw['created']),
-    updatedUser: pickName(raw['updatedUser']),
+    updatedUser: wrapName(raw['updatedUser'], `backlog:issue:${issueKey}`, 'updatedUser', limits),
     updated: pickString(raw['updated']),
     description: description === undefined ? undefined : wrap(description, 'description'),
     // 数値2つなので囲まない（第三者が書けるテキストではない）
@@ -762,7 +796,7 @@ const shapeComment = (
   const changeLog = renderChangeLog(raw['changeLog']);
 
   return {
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], subject, 'createdUser', limits),
     created: pickString(raw['created']),
     updated: pickString(raw['updated']),
     content: content === undefined || content === '' ? undefined : wrap(content, 'comment'),
@@ -776,16 +810,16 @@ const shapeComment = (
 };
 
 /** 一覧の1件。**`content` は一覧の応答に無い**（本文は `shapeWikiPageDetail`）。 */
-const shapeWikiPage = (raw: unknown): Record<string, unknown> => {
+const shapeWikiPage = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: 'Wiki ページの形が想定と違います' };
   }
   return {
     name: pickString(raw['name']),
-    tags: pickNames(raw['tags']),
-    createdUser: pickName(raw['createdUser']),
+    tags: wrapNames(raw['tags'], 'backlog:wiki', 'tags', limits),
+    createdUser: wrapName(raw['createdUser'], 'backlog:wiki', 'createdUser', limits),
     created: pickString(raw['created']),
-    updatedUser: pickName(raw['updatedUser']),
+    updatedUser: wrapName(raw['updatedUser'], 'backlog:wiki', 'updatedUser', limits),
     updated: pickString(raw['updated']),
   };
 };
@@ -808,11 +842,11 @@ const shapeWikiPageDetail = (
   return {
     projectKey,
     name,
-    tags: pickNames(raw['tags']),
+    tags: wrapNames(raw['tags'], `backlog:wiki:${projectKey}`, 'tags', limits),
     attachmentCount: countOf(raw['attachments']),
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], `backlog:wiki:${projectKey}`, 'createdUser', limits),
     created: pickString(raw['created']),
-    updatedUser: pickName(raw['updatedUser']),
+    updatedUser: wrapName(raw['updatedUser'], `backlog:wiki:${projectKey}`, 'updatedUser', limits),
     updated: pickString(raw['updated']),
     content: wrapUntrusted(pickString(raw['content']) ?? '', {
       source: { subject: `backlog:wiki:${projectKey}`, name, field: 'content' },
@@ -878,11 +912,11 @@ const shapePullRequest = (
     status: pickName(raw['status']),
     base: pickString(raw['base']),
     branch: pickString(raw['branch']),
-    assignee: pickName(raw['assignee']),
+    assignee: wrapName(raw['assignee'], subject, 'assignee', limits),
     relatedIssueKey: isRecord(issue) ? pickString(issue['issueKey']) : undefined,
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], subject, 'createdUser', limits),
     created: pickString(raw['created']),
-    updatedUser: pickName(raw['updatedUser']),
+    updatedUser: wrapName(raw['updatedUser'], subject, 'updatedUser', limits),
     updated: pickString(raw['updated']),
     closeAt: pickString(raw['closeAt']),
     mergeAt: pickString(raw['mergeAt']),
@@ -919,11 +953,11 @@ const shapeDocument = (raw: unknown, limits: ToolLimits): Record<string, unknown
     });
 
   return {
-    tags: pickNames(raw['tags']),
+    tags: wrapNames(raw['tags'], 'backlog:document', 'tags', limits),
     attachmentCount: countOf(raw['attachments']),
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], 'backlog:document', 'createdUser', limits),
     created: pickString(raw['created']),
-    updatedUser: pickName(raw['updatedUser']),
+    updatedUser: wrapName(raw['updatedUser'], 'backlog:document', 'updatedUser', limits),
     updated: pickString(raw['updated']),
     // 表題も本文も第三者が書ける
     title: title === undefined ? undefined : wrap(title, 'title'),
@@ -960,7 +994,12 @@ const shapeActivity = (
     activityTypeId: pickNumber(raw['type']),
     // key_id はプロジェクト内の連番。projectKey と組めば課題キーになり、get_issue へ繋がる
     issueKey: keyId === undefined ? undefined : `${projectKey}-${String(keyId)}`,
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(
+      raw['createdUser'],
+      `backlog:activity:${projectKey}`,
+      'createdUser',
+      limits,
+    ),
     created: pickString(raw['created']),
     summary:
       summary === undefined || summary === ''
@@ -1026,7 +1065,7 @@ const findAttachment = (raw: unknown, name: string): { readonly id: number } => 
 };
 
 /** 添付の1件。**`id` は返さない**（返しても使い道が無いようにしてある）。 */
-const shapeAttachment = (raw: unknown): Record<string, unknown> => {
+const shapeAttachment = (raw: unknown, limits: ToolLimits): Record<string, unknown> => {
   if (!isRecord(raw)) {
     return { error: '添付の形が想定と違います' };
   }
@@ -1035,7 +1074,7 @@ const shapeAttachment = (raw: unknown): Record<string, unknown> => {
     // （`list_wiki_pages` のページ名と同じ扱い）
     name: pickString(raw['name']),
     size: pickNumber(raw['size']),
-    createdUser: pickName(raw['createdUser']),
+    createdUser: wrapName(raw['createdUser'], 'backlog:attachment', 'createdUser', limits),
     created: pickString(raw['created']),
   };
 };
@@ -1322,7 +1361,11 @@ export const planToolCall = (
         request: { endpoint: `/issues/${issueKey}/attachments`, method: 'GET' },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /issues/*/attachments'), count);
-          return listPayload(items.map(shapeAttachment), truncated, count);
+          return listPayload(
+            items.map(item => shapeAttachment(item, limits)),
+            truncated,
+            count,
+          );
         },
       };
     }
@@ -1411,7 +1454,11 @@ export const planToolCall = (
         request: { endpoint: '/wikis', method: 'GET', query },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'GET /wikis'), limits.maxCount);
-          return listPayload(items.map(shapeWikiPage), truncated, limits.maxCount);
+          return listPayload(
+            items.map(item => shapeWikiPage(item, limits)),
+            truncated,
+            limits.maxCount,
+          );
         },
       };
     }

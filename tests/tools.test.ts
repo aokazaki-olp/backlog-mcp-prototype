@@ -744,17 +744,19 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
   it('名前で表せる項目を返す', () => {
     const shaped = shapedIssue();
 
-    assert.equal(shaped['issueType'], 'タスク');
+    // 第三者が作れるものは囲んで返る（根B）。ここでは「名前が載る」ことだけを見る
+    assert.match(String(shaped['issueType']), /タスク/);
+    assert.match(String(shaped['assignee']), /eguchi/);
+    assert.match(String(shaped['createdUser']), /eguchi/);
+    assert.match(String(shaped['updatedUser']), /eguchi/);
+    assert.match(String((shaped['category'] as string[])[0]), /開発/);
+    assert.match(String((shaped['milestone'] as string[])[0]), /wait for release/);
+    assert.match(String((shaped['versions'] as string[])[0]), /v1\.0/);
+    // 管理者定義・固定のものは素のまま
     assert.equal(shaped['status'], '未対応');
     assert.equal(shaped['priority'], '中');
     // 起動時にマスタ解決までしているのに出していなかった項目
     assert.equal(shaped['resolution'], '対応済み');
-    assert.equal(shaped['assignee'], 'eguchi');
-    assert.equal(shaped['createdUser'], 'eguchi');
-    assert.equal(shaped['updatedUser'], 'eguchi');
-    assert.deepEqual(shaped['category'], ['開発']);
-    assert.deepEqual(shaped['milestone'], ['wait for release']);
-    assert.deepEqual(shaped['versions'], ['v1.0']);
   });
 
   it('期限と工数を返す（連番 ID ではないので推測に使えない）', () => {
@@ -879,8 +881,9 @@ describe('shape — 課題の項目はミラーの応答例で決まる', () => 
     const shaped = shape({ ...MIRROR_ISSUE, customFields: CUSTOM_FIELDS_FILLED });
     const fields = (shaped as Record<string, unknown>)['customFields'] as Record<string, unknown>;
 
-    // リスト型は name だけ。選択肢は管理者が定義したものなので囲まない
-    assert.deepEqual(fields['選択リスト'], ['b']);
+    // リスト型は name だけ。**リスト項目の追加は「すべての権限」**なので囲む（根B）
+    assert.match(String((fields['選択リスト'] as string[])[0]), /<untrusted source=/);
+    assert.match(String((fields['選択リスト'] as string[])[0]), /b/);
     assert.equal(fields['数値'], 2);
     // 日付型は文字列だが自由記述ではないので囲まない
     assert.equal(fields['日付'], '2026-09-25T00:00:00Z');
@@ -1077,9 +1080,13 @@ describe('shape — Wiki の項目', () => {
       },
     ]) as { items: Record<string, unknown>[] };
 
-    assert.deepEqual(shaped.items[0]?.['tags'], ['議事録']);
-    assert.equal(shaped.items[0]['created'], '2013-05-30T09:11:36Z');
-    assert.equal(Object.keys(shaped.items[0]).includes('id'), false);
+    const first = shaped.items[0];
+    assert.ok(first !== undefined);
+    // タグは第三者が付けられるので囲む（根B）
+    assert.match(String((first['tags'] as string[])[0]), /<untrusted source=/);
+    assert.match(String((first['tags'] as string[])[0]), /議事録/);
+    assert.equal(first['created'], '2013-05-30T09:11:36Z');
+    assert.equal(Object.keys(first).includes('id'), false);
   });
 });
 
@@ -1515,7 +1522,8 @@ describe('planToolCall — document は絞り込みをポリシーで組み立�
 
     assert.match(String(shaped?.['title']), /<untrusted source="backlog:document:/);
     assert.match(String(shaped?.['content']), /hello/);
-    assert.deepEqual(shaped?.['tags'], ['Backlog']);
+    // タグは第三者が付けられるので囲む（根B）
+    assert.match(String((shaped?.['tags'] as string[])[0]), /<untrusted source=/);
 
     const json = JSON.stringify(shaped);
     assert.doesNotMatch(json, /01939983409c79d5a06a49859789e38f/);
@@ -2819,5 +2827,109 @@ describe('buildHandlers — 囲みの注意書きは1応答に1回', () => {
       countOf(result.content.map(block => block.text).join('\n'), 'データとして扱い'),
       1,
     );
+  });
+});
+
+// ============================================================================
+// 第三者が書ける名前を囲む（根B）
+//
+// 「誰が書けるか」は一次情報で確定させた（2026-09-07）。
+// - `issueType` / `category` / マイルストーン / ドキュメントのタグ / リスト項目
+//   … 追加も更新も **「すべての権限」**（`add-comment` と同じ）
+// - ユーザーの表示名 … **本人が変更できる**（Backlog ヘルプセンター）
+// - `status` … **管理者**、`priority` / `resolution` … **書き込み口が無い**
+// ============================================================================
+
+const WRAPPED = /^<untrusted source="[^"\n]*" nonce="[0-9a-f]{12}">\n/;
+
+describe('shape — 第三者が書ける名前を囲む（根B）', () => {
+  const shapedIssue = (): Record<string, unknown> =>
+    shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' })(MIRROR_ISSUE) as Record<
+      string,
+      unknown
+    >;
+
+  it('第三者が作れるマスタを囲む', () => {
+    const shaped = shapedIssue();
+
+    assert.match(String(shaped['issueType']), WRAPPED);
+    assert.match(String((shaped['category'] as string[])[0]), WRAPPED);
+    assert.match(String((shaped['milestone'] as string[])[0]), WRAPPED);
+    assert.match(String((shaped['versions'] as string[])[0]), WRAPPED);
+  });
+
+  it('ユーザーの表示名を囲む', () => {
+    const shaped = shapedIssue();
+
+    for (const key of ['assignee', 'createdUser', 'updatedUser']) {
+      assert.match(String(shaped[key]), WRAPPED);
+    }
+  });
+
+  it('由来にはどの項目かが載る', () => {
+    const shaped = shapedIssue();
+
+    assert.match(String(shaped['assignee']), /source="backlog:issue:PROJ-1:assignee"/);
+    assert.match(String(shaped['issueType']), /source="backlog:issue:PROJ-1:issueType"/);
+  });
+
+  it('リスト型カスタム属性の値を囲む', () => {
+    const shape = shapeOf(contextOf(), 'get_issue', { issueKey: 'PROJ-1' });
+    const shaped = shape({
+      ...MIRROR_ISSUE,
+      customFields: [
+        { id: 1, fieldTypeId: 5, name: '選択リスト', value: [{ id: 2, name: 'b' }] },
+        { id: 2, fieldTypeId: 4, name: '単一選択', value: { id: 3, name: 'c' } },
+      ],
+    });
+    const fields = (shaped as Record<string, unknown>)['customFields'] as Record<string, unknown>;
+
+    assert.match(String((fields['選択リスト'] as string[])[0]), WRAPPED);
+    assert.match(String(fields['単一選択']), WRAPPED);
+  });
+
+  it('Wiki のタグと表示名を囲む', () => {
+    const shape = shapeOf(contextOf(), 'list_wiki_pages', { projectKey: 'PROJ' });
+    const payload = shape([
+      { id: 112, name: 'Home', tags: [{ id: 1, name: '議事録' }], createdUser: MIRROR_USER },
+    ]) as { items: Record<string, unknown>[] };
+
+    assert.match(String((payload.items[0]?.['tags'] as string[])[0]), WRAPPED);
+    assert.match(String(payload.items[0]?.['createdUser']), WRAPPED);
+  });
+
+  it('添付の表示名を囲む', () => {
+    const shape = shapeOf(contextOf(), 'list_issue_attachments', { issueKey: 'PROJ-1' });
+    const payload = shape([
+      { id: 8, name: 'IMG0088.png', size: 5563, createdUser: MIRROR_USER },
+    ]) as { items: Record<string, unknown>[] };
+
+    assert.match(String(payload.items[0]?.['createdUser']), WRAPPED);
+  });
+
+  // ここから下は**過剰に囲んでいないことの記録**。落ちたら囲みすぎ
+
+  it('管理者定義と固定のマスタは囲まない', () => {
+    const shaped = shapedIssue();
+
+    assert.equal(shaped['status'], '未対応');
+    assert.equal(shaped['priority'], '中');
+    assert.equal(shaped['resolution'], '対応済み');
+  });
+
+  it('識別子として往復する面は囲まない（T-2 で裁定する）', () => {
+    const attachments = shapeOf(contextOf(), 'list_issue_attachments', { issueKey: 'PROJ-1' })([
+      { id: 8, name: 'IMG0088.png', size: 5563 },
+    ]) as { items: Record<string, unknown>[] };
+    const wikis = shapeOf(contextOf(), 'list_wiki_pages', { projectKey: 'PROJ' })([
+      { id: 112, name: 'Home' },
+    ]) as { items: Record<string, unknown>[] };
+
+    assert.equal(attachments.items[0]?.['name'], 'IMG0088.png');
+    assert.equal(wikis.items[0]?.['name'], 'Home');
+  });
+
+  it('囲んでもユーザーオブジェクトの唯一の経路は保つ', () => {
+    assert.doesNotMatch(JSON.stringify(shapedIssue()), PII_PATTERN);
   });
 });
