@@ -123,6 +123,8 @@ npm run dist    # build → pack → dist-package/ に一式を集める
 
 **圧縮までは自動化していない。** Node に zip が無く、クロスプラットフォームに書くと割に合わないため。集めるところだけ script にしてあるのは自動化のためではなく、**版がずれた一式を配らないため**（tgz の名前は `package.json` の版で決まるので、手で集めると古い tgz と新しい README が混ざる）。
 
+> **`npm run check` は `dist` を回さない**（`build` までで、`pack` と収集は含まない）。ビルドが通ることと**配れる一式がそろうこと**は別なので、配る前に `npm run dist` を1回通し、`dist-package/` の4点を目で見る。実際、`.env.example` がリポジトリに無いまま README と収集スクリプトの両方が参照していて、**`npm run dist` は一度も通っていなかった**（2026-09-08 に発見・修正）。
+
 **版を上げるときは `npm version patch` → `npm run check` → `npm run dist`。** 版の出所は `package.json` ひとつなので、これだけで tgz の名前・`initialize` が返す `serverInfo.version`・監査ログの3つが揃う。
 
 受け取る側は `.mcp.json` からこう起動する。**tgz のパスは `--package=` で渡し、コマンド名を別に書く**（`npx <tgz>` だと npx が tgz を実行ファイルとして扱って失敗する）。
