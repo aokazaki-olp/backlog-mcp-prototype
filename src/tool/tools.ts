@@ -1654,12 +1654,14 @@ export const planToolCall = (
       const { projectKey, projectId } = resolveProjectKey(context, toolName, args);
       const repository = requiredPathSegment(args, 'repository');
       const count = boundedCount(args, limits);
+      // このエンドポイントは offset を持つ（ミラーで確認）。持つところは開ける（L3-4）
+      const offset = optionalOffset(args, 'offset');
       return {
         kind: 'send',
         request: {
           endpoint: `/projects/${String(projectId)}/git/repositories/${repository}/pullRequests`,
           method: 'GET',
-          query: { count: probeCount(count) },
+          query: { count: probeCount(count), ...(offset === undefined ? {} : { offset }) },
         },
         shape: raw => {
           const { items, truncated } = limitCount(asArray(raw, 'プルリクエスト一覧'), count);
@@ -1747,8 +1749,9 @@ export const planToolCall = (
       // projectId はポリシー由来。引数から受け取る口を作っていない。
       const query: Record<string, unknown> = {
         'projectId[]': scopedProjectIds(context, toolName),
-        // offset は API の必須パラメータ（ミラーで確認）。ページングの口は開けない
-        offset: 0,
+        // **offset は API の必須パラメータ**（ミラーで確認）。既定は 0 だが、
+        // 固定にすると21件目以降へ到達する手段が無くなる（L3-4）
+        offset: optionalOffset(args, 'offset') ?? 0,
         count: probeCount(count),
         sort: 'updated',
         order: 'desc',
@@ -2237,6 +2240,21 @@ const COUNT_PROPERTY = {
   description: '取得件数の希望値。サーバ側の上限で切り下げられます。',
 } as const;
 
+/**
+ * 取得開始位置。**API が持つツールにだけ載せる**（L3-4）。
+ *
+ * ミラー（`fetched: 2026-08-30`）で確認したところ、`offset` を取るのは
+ * `GET /issues` / `GET /documents`（必須）/ プルリクエスト一覧の**3本だけ**。
+ * コメント一覧・活動・プルリクエストのコメントは `minId` / `maxId`、
+ * Wiki 一覧・添付一覧・関連課題は**ページングの手段そのものが無い**。
+ * 持たないツールに載せると「渡せるのに効かない引数」になる。
+ */
+const OFFSET_PROPERTY = {
+  type: 'integer',
+  minimum: 0,
+  description: '取得開始位置。既定は 0',
+} as const;
+
 const NAMED_PROPERTIES = {
   issueType: { type: 'string', description: '課題種別の名前（例: バグ）。数値 ID は不可' },
   priority: { type: 'string', description: '優先度の名前（例: 高）' },
@@ -2316,7 +2334,7 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
         description: '並び順に使う属性。既定は updated',
       },
       order: { type: 'string', enum: [...ORDER_KEYS], description: '並び順。既定は desc' },
-      offset: { type: 'integer', minimum: 0, description: '取得開始位置。既定は 0' },
+      offset: OFFSET_PROPERTY,
       parentIssueKey: {
         type: 'string',
         description:
@@ -2415,6 +2433,7 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
     type: 'object',
     properties: {
       keyword: { type: 'string', description: '検索キーワード' },
+      offset: OFFSET_PROPERTY,
       count: COUNT_PROPERTY,
     },
     additionalProperties: false,
@@ -2470,6 +2489,7 @@ const INPUT_SCHEMAS: { readonly [K in ToolName]: Record<string, unknown> } = {
     properties: {
       projectKey: PROJECT_KEY_PROPERTY,
       repository: REPOSITORY_PROPERTY,
+      offset: OFFSET_PROPERTY,
       count: COUNT_PROPERTY,
     },
     required: ['projectKey', 'repository'],

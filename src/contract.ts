@@ -157,7 +157,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     requires: 'read',
     scopeKind: 'key',
     title: '課題のコメントを取得する',
-    description: '課題キー（例: PROJ-123）を指定してコメント一覧を取得する。',
+    description:
+      '課題キー（例: PROJ-123）を指定してコメント一覧を取得する。新しい順に上限まで返す（ページングの手段が API に無いので、続きは取得できない）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -167,7 +168,8 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     requires: 'read',
     scopeKind: 'filter',
     title: 'Wiki ページ一覧を取得する',
-    description: '許可されたプロジェクトの Wiki ページ一覧を取得する。',
+    description:
+      '許可されたプロジェクトの Wiki ページ一覧を取得する。上限まで返す（ページングの手段が API に無いので、続きは keyword で絞る）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -199,7 +201,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'プルリクエスト一覧を取得する',
     description:
-      'プロジェクトキーとリポジトリ名を指定してプルリクエスト一覧を取得する。リポジトリ名は list_git_repositories が返す name をそのまま渡す。',
+      'プロジェクトキーとリポジトリ名を指定してプルリクエスト一覧を取得する。リポジトリ名は list_git_repositories が返す name をそのまま渡す。続きは offset で取得する。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -221,7 +223,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'プルリクエストのコメントを取得する',
     description:
-      'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメント一覧を取得する。',
+      'プロジェクトキー・リポジトリ名・プルリクエスト番号を指定してコメント一覧を取得する。新しい順に上限まで返す（ページングの手段が API に無い）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -232,7 +234,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'ドキュメントを検索する',
     description:
-      '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。',
+      '許可されたプロジェクトのドキュメントを検索し、本文まで返す。検索対象のプロジェクトはサーバ側で決まり、引数では変更できない。続きは offset で取得する。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -265,7 +267,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'key',
     title: '関連課題の一覧を取得する',
     description:
-      '課題キー（例: PROJ-123）を指定して、その課題に「関連課題」として設定されている課題を取得する。親子課題とは別の関係なので、子課題は返らない（子課題は search_issues の parentIssueKey で引く）。',
+      '課題キー（例: PROJ-123）を指定して、その課題に「関連課題」として設定されている課題を取得する。親子課題とは別の関係なので、子課題は返らない（子課題は search_issues の parentIssueKey で引く）。上限まで返す（ページングの手段が API に無い）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -276,7 +278,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'key',
     title: '課題の添付ファイル一覧を取得する',
     description:
-      '課題キー（例: PROJ-123）を指定して、添付されているファイルの名前とサイズを取得する。',
+      '課題キー（例: PROJ-123）を指定して、添付されているファイルの名前とサイズを取得する。上限まで返す（ページングの手段が API に無い）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,
@@ -321,7 +323,7 @@ export const TOOL_SPECS: { readonly [K in ToolName]: ToolSpec } = {
     scopeKind: 'filter',
     title: 'プロジェクトの最近の活動を取得する',
     description:
-      'プロジェクトキーを指定して最近の活動を取得する。関連する課題があれば issueKey を返すので、詳細は get_issue で取得する。',
+      'プロジェクトキーを指定して最近の活動を取得する。関連する課題があれば issueKey を返すので、詳細は get_issue で取得する。新しい順に上限まで返す（ページングの手段が API に無い）。',
     readOnly: true,
     writesLocalFile: false,
     destructive: false,

@@ -1688,7 +1688,7 @@ describe('shape — 件名も囲む', () => {
 // ============================================================================
 
 describe('planToolCall — document は絞り込みをポリシーで組み立てる', () => {
-  it('projectId[] はポリシー由来で、offset は 0 固定', () => {
+  it('projectId[] はポリシー由来で、offset の既定は 0', () => {
     const request = planRequest(contextOf(), 'search_documents', {});
 
     assert.equal(request.endpoint, '/documents');
@@ -1699,11 +1699,21 @@ describe('planToolCall — document は絞り込みをポリシーで組み立�
   it('引数で projectId を渡しても採用しない', () => {
     const request = planRequest(contextOf(), 'search_documents', {
       'projectId[]': [999],
-      offset: 500,
     });
 
     assert.deepEqual(request.query?.['projectId[]'], [101, 102]);
-    assert.equal(request.query['offset'], 0);
+  });
+
+  it('offset を指定できる（21件目以降へ到達できる。L3-4）', () => {
+    // `GET /documents` の offset は API の**必須**パラメータ（ミラーで確認）。
+    // 以前は 0 に固定していたので、21件目以降へ到達する手段が無かった
+    const request = planRequest(contextOf(), 'search_documents', { offset: 20 });
+
+    assert.equal(request.query?.['offset'], 20);
+  });
+
+  it('offset は 0 以上（境界 — search_issues と同じ検査）', () => {
+    assert.throws(() => planToolCall(contextOf(), 'search_documents', { offset: -1 }), TypeError);
   });
 
   it('本文と表題を囲み、id / projectId / json は返さない', () => {
@@ -1878,6 +1888,52 @@ describe('planToolCall — 件数は同じ絞り込みで別途引く', () => {
 
     assert.equal(payload['totalUnavailable'], true);
     assert.equal(payload['total'], undefined);
+  });
+});
+
+describe('planToolCall — offset は API が持つところだけ開ける（L3-4）', () => {
+  // ミラー（`fetched: 2026-08-30`）で確認した。offset を持つのは3本だけ:
+  //   GET /issues / GET /documents（必須）/ GET /projects/*/git/repositories/*/pullRequests
+  // コメント一覧・活動・PR コメントは minId / maxId、Wiki 一覧・添付一覧・関連課題は手段が無い
+
+  it('list_pull_requests は offset を受ける', () => {
+    const request = planRequest(contextOf(), 'list_pull_requests', {
+      projectKey: 'PROJ',
+      repository: 'app',
+      offset: 40,
+    });
+
+    assert.equal(request.query?.['offset'], 40);
+  });
+
+  it('指定が無ければ offset を送らない（境界 — 既定を作らない）', () => {
+    const request = planRequest(contextOf(), 'list_pull_requests', {
+      projectKey: 'PROJ',
+      repository: 'app',
+    });
+
+    assert.equal('offset' in (request.query ?? {}), false);
+  });
+
+  it('API が offset を持たないツールは引数にも出さない', () => {
+    const withoutOffset = [
+      'get_issue_comments',
+      'list_wiki_pages',
+      'list_issue_attachments',
+      'list_related_issues',
+      'list_project_activities',
+      'get_pull_request_comments',
+    ] as const;
+    const schemas = buildHandlers(handlersOf()).listTools();
+
+    for (const toolName of withoutOffset) {
+      const properties = schemas.find(each => each.name === toolName)?.inputSchema['properties'];
+      assert.equal(
+        typeof properties === 'object' && properties !== null && 'offset' in properties,
+        false,
+        toolName,
+      );
+    }
   });
 });
 
