@@ -148,6 +148,10 @@ const toNameToIdAllowingEmpty = (value: unknown, where: string): ReadonlyMap<str
  *
  * **同じ人が同じ名前を2度名乗るのは衝突ではない**（ログイン名と表示名が同じ人）。
  * ここを衝突扱いにすると「指せるのに候補から消える」— 実データで一度踏んだ形になる。
+ *
+ * **引ける名前が1つも残らなくても送出しない。** 応答が空だったのとは別物で、
+ * 参加者は `members` に載り、引けない名前は `ambiguousUserNames` が案内する。
+ * 止めるのは**応答そのものが空だったとき**だけにする。
  */
 const toUserIds = (
   value: unknown,
@@ -204,7 +208,12 @@ const toUserIds = (
     }
   }
 
-  if (result.size === 0) {
+  // **「応答が空」と「引ける名前が残らなかった」は別物。**
+  // 全員の名前が衝突していると `result` は空になるが、応答は空ではない。以前はここを
+  // 一緒に扱っていたので、**そういうプロジェクトが1つあるだけで起動できなかった**。
+  // 参加者は `members` に載るし、引けない名前は `ambiguousUserNames` が案内する（規約 §5.4）ので、
+  // 止めるべきなのは**応答そのものが空だったとき**だけ。
+  if (value.length === 0) {
     throw new MasterDataError(`${where} の応答が空です`);
   }
   return {

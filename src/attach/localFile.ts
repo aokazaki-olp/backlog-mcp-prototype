@@ -136,12 +136,19 @@ const matchesContent = async (
   return false;
 };
 
+/**
+ * 読み取りの上限。`AttachmentOptions.limits` の型なので**公開面に要る**。
+ *
+ * 既定値のほう（`DEFAULT_MAX_BYTES`）は外へ出さない — 外から参照する経路が無く、
+ * 出すと「上限は外から差し替えるもの」という誤った読み方を許す（規約 §2.5）。
+ */
 export interface AttachmentLimits {
   /** これを超えるファイルは読まない。 */
   readonly maxBytes: number;
 }
 
-export const DEFAULT_ATTACHMENT_LIMITS: AttachmentLimits = { maxBytes: 10 * 1024 * 1024 };
+/** 上限の既定。**公開しない**（差し替えは `AttachmentOptions.limits` で行う）。 */
+const DEFAULT_LIMITS: AttachmentLimits = { maxBytes: 10 * 1024 * 1024 };
 
 /** 拡張子から期待する中身を決める。未知の拡張子は受け付けない。 */
 const contentRuleFor = (
@@ -241,7 +248,7 @@ export const readAttachment = async (
   requested: string,
   options: AttachmentOptions = {},
 ): Promise<AttachmentFile> => {
-  const limits = options.limits ?? DEFAULT_ATTACHMENT_LIMITS;
+  const limits = options.limits ?? DEFAULT_LIMITS;
   if (requested === '') {
     throw new AttachmentError('添付するファイルのパスを指定してください');
   }

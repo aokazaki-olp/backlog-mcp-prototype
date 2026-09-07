@@ -278,6 +278,37 @@ describe('resolveMasters — プロジェクト単位のマスタ', () => {
     assert.equal(project.ambiguousUserNames.size, 0);
   });
 
+  it('全員の名前が曖昧でも起動を止めない（空の応答とは別物）', async () => {
+    // 表示名もログイン名も衝突していると、引ける名前が1つも残らない。
+    // 以前はここで「応答が空です」と言って**起動ごと落ちていた**（応答は空ではない）
+    const masters = await resolveMasters(
+      makeFetcher({
+        ...projectMasterResponses,
+        '/projects/151/users': [
+          { id: 7, userId: 'dup', name: 'dup' },
+          { id: 8, userId: 'dup', name: 'dup' },
+        ],
+      }),
+      ['PROJ'],
+    );
+    const project = projectMastersOf(masters, 'PROJ');
+
+    assert.equal(project.userIds.size, 0);
+    assert.equal(project.ambiguousUserNames.has('dup'), true);
+    // 参加者そのものは見える（誰がいるかは分かる）
+    assert.equal(project.members.length, 2);
+  });
+
+  it('応答が本当に空なら送出する（境界 — 沈黙させない）', async () => {
+    await assert.rejects(
+      () =>
+        resolveMasters(makeFetcher({ ...projectMasterResponses, '/projects/151/users': [] }), [
+          'PROJ',
+        ]),
+      { name: 'MasterDataError', message: /応答が空です/ },
+    );
+  });
+
   it('同名のユーザーがいたら表示名では引けなくする（別人に割り当てない）', async () => {
     const masters = await resolveMasters(
       makeFetcher({
